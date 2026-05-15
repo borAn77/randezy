@@ -32,6 +32,7 @@ export default function IsletmeEkle() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     category: "", shopName: "", officialTitle: "",
@@ -133,12 +134,10 @@ export default function IsletmeEkle() {
       }));
       await supabase.from('shop_hours').insert(hoursToInsert);
 
-      alert("Mükemmel! İşletmen yayına alındı ve yetkilerin güncellendi.");
-      router.push('/hesabim');
-      router.refresh(); // Değişikliği algılaması için zorla yenile
+      router.push('/dashboard');
 
     } catch (err: any) {
-      alert("Hata: " + err.message);
+      setSubmitError(err.message || "Bir hata oluştu, lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
     }
@@ -300,6 +299,9 @@ export default function IsletmeEkle() {
                   </div>
                 ))}
               </div>
+              {submitError && (
+                <p className="mt-8 text-center text-sm font-bold text-red-500 bg-red-50 rounded-2xl p-4">{submitError}</p>
+              )}
               <div className="grid grid-cols-2 gap-6 mt-12">
                 <button onClick={() => setStep(3)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
                 <button onClick={handleSubmit} disabled={loading} className="bg-[#00A3AD] text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-3">

@@ -117,7 +117,18 @@ export default function ShopDetail() {
       .neq('status', 'İptal Edildi')
       .then(({ data: booked }) => {
         const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
-        setAvailableSlots(slots.filter(s => !bookedTimes.has(s)));
+        let available = slots.filter(s => !bookedTimes.has(s));
+
+        const today = new Date();
+        if (selectedDay.toDateString() === today.toDateString()) {
+          const nowMinutes = today.getHours() * 60 + today.getMinutes();
+          available = available.filter(s => {
+            const [h, m] = s.split(':').map(Number);
+            return (h * 60 + m) > nowMinutes;
+          });
+        }
+
+        setAvailableSlots(available);
       });
   }, [selectedDay, selectedService, shopHours, shopId]);
 
