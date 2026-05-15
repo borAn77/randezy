@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 
 export default function CompleteProfileModal({ user, onComplete }: { user: any; onComplete: () => void }) {
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
     lastName: user?.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
@@ -28,8 +29,11 @@ export default function CompleteProfileModal({ user, onComplete }: { user: any; 
     });
 
     if (error) {
-      console.error("Detaylı Hata:", error);
-      alert("Hata oluştu: " + error.message);
+      if (error.message?.includes("profiles_phone_key")) {
+        setErrorMsg("Bu telefon numarası başka bir hesaba kayıtlı. Lütfen farklı bir numara girin.");
+      } else {
+        setErrorMsg("Bir hata oluştu, lütfen tekrar deneyin.");
+      }
     } else {
       onComplete(); // Başarılıysa modalı kapat
     }
@@ -75,9 +79,12 @@ export default function CompleteProfileModal({ user, onComplete }: { user: any; 
               type="tel" 
               placeholder="05XX XXX XX XX" 
               className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all placeholder:text-gray-300" 
-              value={formData.phone} 
-              onChange={e => setFormData({...formData, phone: e.target.value})} 
+              value={formData.phone}
+              onChange={e => { setErrorMsg(null); setFormData({...formData, phone: e.target.value}); }}
             />
+            {errorMsg && (
+              <p className="ml-4 text-[11px] font-bold text-red-500">{errorMsg}</p>
+            )}
           </div>
 
           <div className="space-y-2">
