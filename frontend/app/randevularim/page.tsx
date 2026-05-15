@@ -24,6 +24,7 @@ export default function Randevularim() {
       .from('appointments')
       .select('*, shops(name, city, district)')
       .eq('user_id', user.id)
+      .neq('status', 'İptal Edildi')
       .order('appointment_date', { ascending: true });
     setAppointments(data || []);
     setLoading(false);
@@ -49,30 +50,30 @@ export default function Randevularim() {
     <main className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="max-w-[1000px] mx-auto pt-40 px-6">
-        <h1 className="text-4xl font-black uppercase tracking-tighter mb-10">Randevularım</h1>
+        <h1 className="text-4xl font-black uppercase tracking-tighter mb-10 text-[#222]">Randevularım</h1>
 
         <div className="space-y-6">
           {loading ? (
-            <div className="text-center py-20 font-black text-gray-200 uppercase tracking-widest italic">Randevular Yükleniyor...</div>
+            <div className="text-center py-20 font-black text-gray-400 uppercase tracking-widest italic">Randevular Yükleniyor...</div>
           ) : appointments.length > 0 ? appointments.map((apt) => (
             <div key={apt.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex justify-between items-center group hover:border-[#00A3AD] transition-all">
               <div className="flex gap-8 items-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex flex-col items-center justify-center border border-gray-100">
+                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex flex-col items-center justify-center border border-gray-100 flex-shrink-0">
                   <span className="text-[10px] font-black text-[#00A3AD] uppercase">{apt.appointment_date.split('-')[1]}</span>
-                  <span className="text-xl font-black">{apt.appointment_date.split('-')[2]}</span>
+                  <span className="text-xl font-black text-[#222]">{apt.appointment_date.split('-')[2]}</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-black uppercase">{apt.service_name}</h3>
-                  <div className="flex gap-4 mt-2 text-gray-400 font-bold text-[11px] uppercase tracking-widest">
+                  <h3 className="text-xl font-black uppercase text-[#222]">{apt.service_name}</h3>
+                  <div className="flex flex-wrap gap-4 mt-2 text-gray-500 font-bold text-[11px] uppercase tracking-widest">
                     <span className="flex items-center gap-1"><Clock size={14}/> {apt.appointment_time?.slice(0, 5) ?? "--:--"}</span>
                     <span className="flex items-center gap-1 text-[#00A3AD]"><CalIcon size={14}/> {apt.appointment_date}</span>
                     <span className="flex items-center gap-1"><MapPin size={14}/> {apt.shops?.name || "—"}</span>
                   </div>
                 </div>
               </div>
-              <div className="text-right flex flex-col items-end gap-3">
-                <span className="block text-2xl font-black">{apt.price} TL</span>
-                <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full inline-block ${statusStyle[apt.status] ?? 'text-gray-500 bg-gray-100'}`}>
+              <div className="text-right flex flex-col items-end gap-3 flex-shrink-0 ml-4">
+                <span className="block text-2xl font-black text-[#222]">{apt.price} TL</span>
+                <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full inline-block ${statusStyle[apt.status] ?? 'text-gray-600 bg-gray-100'}`}>
                   {apt.status}
                 </span>
                 {canCancel(apt) && (
@@ -88,7 +89,7 @@ export default function Randevularim() {
             </div>
           )) : (
             <div className="text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-gray-200">
-              <p className="font-black text-gray-300 uppercase tracking-widest italic">Henüz randevun bulunmuyor.</p>
+              <p className="font-black text-gray-400 uppercase tracking-widest italic">Henüz randevun bulunmuyor.</p>
             </div>
           )}
         </div>
