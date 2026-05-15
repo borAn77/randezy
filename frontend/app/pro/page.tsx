@@ -1,5 +1,8 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../../lib/supabase";
+import AuthModal from "../../components/layout/AuthModal";
 import { Hero } from "../../components/landing/Hero";
 import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
@@ -8,6 +11,28 @@ import { Pricing } from "../../components/landing/Pricing";
 
 export default function ProPage() {
   const router = useRouter();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const pendingRedirect = useRef(false);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && pendingRedirect.current) {
+        pendingRedirect.current = false;
+        router.push("/isletme-ekle");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router]);
+
+  const handleStart = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      router.push("/isletme-ekle");
+    } else {
+      pendingRedirect.current = true;
+      setIsAuthOpen(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -28,7 +53,7 @@ export default function ProPage() {
             </div>
           </div>
           <button
-            onClick={() => router.push("/isletme-ekle")}
+            onClick={handleStart}
             className="bg-black text-white px-8 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-lg"
           >
             Ücretsiz Başla
@@ -40,7 +65,7 @@ export default function ProPage() {
       <div className="h-[72px]" />
 
       {/* SaaS Landing Page Sections */}
-      <Hero />
+      <Hero onStart={handleStart} />
 
       <section id="ozellikler">
         <Stats />
@@ -49,7 +74,7 @@ export default function ProPage() {
       </section>
 
       <section id="fiyatlandirma">
-        <Pricing />
+        <Pricing onStart={handleStart} />
       </section>
 
       {/* Footer */}
@@ -63,6 +88,8 @@ export default function ProPage() {
           <button onClick={() => router.push("/")} className="hover:text-[#00A3AD] cursor-pointer transition-colors">Müşteri Paneli</button>
         </div>
       </footer>
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 }

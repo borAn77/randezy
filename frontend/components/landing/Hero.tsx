@@ -1,10 +1,7 @@
 "use client";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
 
-export function Hero() {
-  const router = useRouter();
-
+export function Hero({ onStart }: { onStart?: () => void }) {
   return (
     <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 md:px-12 lg:px-24 pt-24 pb-32 overflow-hidden">
       <div className="absolute inset-0 opacity-10">
@@ -33,7 +30,7 @@ export function Hero() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => router.push("/isletme-ekle")}
+              onClick={onStart}
               className="bg-white text-black px-10 py-4 rounded-xl text-lg font-semibold hover:shadow-2xl transition-all"
             >
               Ücretsiz dene

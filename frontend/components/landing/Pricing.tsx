@@ -1,7 +1,6 @@
 "use client";
 import { motion } from "motion/react";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 const features = [
   "Sınırsız randevu",
@@ -13,9 +12,7 @@ const features = [
   "Mobil uygulama erişimi",
 ];
 
-export function Pricing() {
-  const router = useRouter();
-
+export function Pricing({ onStart }: { onStart?: () => void }) {
   return (
     <section className="bg-gray-50 py-20 px-6 md:px-12 lg:px-24">
       <div className="max-w-[1400px] mx-auto">
@@ -77,7 +74,7 @@ export function Pricing() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => router.push("/isletme-ekle")}
+              onClick={onStart}
               className="w-full bg-black hover:bg-gray-800 text-white py-4 rounded-xl text-lg md:text-xl font-semibold transition-all"
             >
               Hemen başla
