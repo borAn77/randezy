@@ -286,47 +286,50 @@ async function seed() {
     role: "business_owner",
   });
 
-  // 2. Sadece demo kullanıcıya ait işletmeleri temizle
-  console.log("\n🗑️   Demo işletmeler temizleniyor (sadece demo@randezy.com'a ait)...");
-  const { data: existingShops } = await supabase.from("shops").select("id").eq("owner_id", ownerId);
-  const ids = (existingShops || []).map((s) => s.id);
-
-  if (ids.length > 0) {
-    await supabase.from("appointments").delete().in("shop_id", ids);
-    await supabase.from("shop_hours").delete().in("shop_id", ids);
-    await supabase.from("services").delete().in("shop_id", ids);
-    await supabase.from("shops").delete().in("id", ids);
-    console.log(`   ${ids.length} demo işletme silindi.`);
-  } else {
-    console.log("   Silinecek demo işletme yok.");
-  }
-
-  // 3. Yeni işletmeleri ekle
-  console.log("\n📦  Demo işletmeler ekleniyor...\n");
+  // 2. Demo işletmeleri upsert et (sil+ekle değil, güncelle — yorumlar korunur)
+  console.log("\n📦  Demo işletmeler güncelleniyor / ekleniyor...\n");
 
   for (const shop of SHOPS) {
     const { services: shopServices, ...shopData } = shop;
 
-    const { data: inserted, error: shopErr } = await supabase
+    // Aynı isimde demo işletme var mı?
+    const { data: existing } = await supabase
       .from("shops")
-      .insert({ ...shopData, owner_id: ownerId, is_active: true })
-      .select()
-      .single();
+      .select("id")
+      .eq("owner_id", ownerId)
+      .eq("name", shop.name)
+      .maybeSingle();
 
-    if (shopErr) {
-      console.error(`❌  ${shop.name} eklenemedi:`, shopErr.message);
-      continue;
+    let shopId;
+
+    if (existing) {
+      // Varsa güncelle (yorumlar bozulmaz)
+      await supabase.from("shops").update({ ...shopData, owner_id: ownerId, is_active: true }).eq("id", existing.id);
+      shopId = existing.id;
+      // Hizmet ve saatlerini sıfırla (reviews'a dokunma)
+      await supabase.from("services").delete().eq("shop_id", shopId);
+      await supabase.from("shop_hours").delete().eq("shop_id", shopId);
+      console.log(`   🔄  [${shop.category.padEnd(18)}]  ${shop.name}  —  güncellendi`);
+    } else {
+      // Yoksa ekle
+      const { data: inserted, error: shopErr } = await supabase
+        .from("shops")
+        .insert({ ...shopData, owner_id: ownerId, is_active: true })
+        .select()
+        .single();
+
+      if (shopErr) {
+        console.error(`❌  ${shop.name} eklenemedi:`, shopErr.message);
+        continue;
+      }
+      shopId = inserted.id;
+      console.log(`   ✅  [${shop.category.padEnd(18)}]  ${shop.name}  —  ${shop.city} / ${shop.district}`);
     }
 
     // Hizmetler
-    await supabase.from("services").insert(
-      shopServices.map((s) => ({ shop_id: inserted.id, ...s }))
-    );
-
+    await supabase.from("services").insert(shopServices.map((s) => ({ shop_id: shopId, ...s })));
     // Çalışma saatleri
-    await supabase.from("shop_hours").insert(defaultHours(inserted.id));
-
-    console.log(`   ✅  [${shop.category.padEnd(18)}]  ${shop.name}  —  ${shop.city} / ${shop.district}`);
+    await supabase.from("shop_hours").insert(defaultHours(shopId));
   }
 
   console.log("\n🎉  Seed tamamlandı! 9 işletme, hizmetleri ve çalışma saatleriyle birlikte eklendi.");
