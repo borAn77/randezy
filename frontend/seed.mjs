@@ -286,9 +286,9 @@ async function seed() {
     role: "business_owner",
   });
 
-  // 2. Mevcut verileri temizle
-  console.log("\n🗑️   Mevcut veriler temizleniyor...");
-  const { data: existingShops } = await supabase.from("shops").select("id");
+  // 2. Sadece demo kullanıcıya ait işletmeleri temizle
+  console.log("\n🗑️   Demo işletmeler temizleniyor (sadece demo@randezy.com'a ait)...");
+  const { data: existingShops } = await supabase.from("shops").select("id").eq("owner_id", ownerId);
   const ids = (existingShops || []).map((s) => s.id);
 
   if (ids.length > 0) {
@@ -296,9 +296,9 @@ async function seed() {
     await supabase.from("shop_hours").delete().in("shop_id", ids);
     await supabase.from("services").delete().in("shop_id", ids);
     await supabase.from("shops").delete().in("id", ids);
-    console.log(`   ${ids.length} işletme ve ilişkili kayıtlar silindi.`);
+    console.log(`   ${ids.length} demo işletme silindi.`);
   } else {
-    console.log("   Silinecek mevcut işletme yok.");
+    console.log("   Silinecek demo işletme yok.");
   }
 
   // 3. Yeni işletmeleri ekle
