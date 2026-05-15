@@ -1,11 +1,12 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Clock, ArrowLeft, X, Calendar as CalIcon,
   ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
+import AuthModal from "../../../components/layout/AuthModal";
 
 function generateTimeSlots(openTime: string, closeTime: string, duration: number): string[] {
   const [openH, openM] = openTime.split(':').map(Number);
@@ -53,6 +54,8 @@ export default function ShopDetail() {
   const [userHasReviewed, setUserHasReviewed] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const pendingService = useRef<any>(null);
 
   const fetchReviews = async () => {
     const { data } = await supabase
@@ -83,7 +86,33 @@ export default function ShopDetail() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUserId(user?.id ?? null);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUserId(session?.user?.id ?? null);
+      if (session && pendingService.current) {
+        setSelectedService(pendingService.current);
+        setSelectedDay(null);
+        setSelectedTime("");
+        setIsBooking(true);
+        pendingService.current = null;
+        setIsAuthOpen(false);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [shopId]);
+
+  const handleBookingClick = async (service: any) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      setSelectedService(service);
+      setSelectedDay(null);
+      setSelectedTime("");
+      setIsBooking(true);
+    } else {
+      pendingService.current = service;
+      setIsAuthOpen(true);
+    }
+  };
 
   useEffect(() => {
     if (!currentUserId || reviews.length === 0) return;
@@ -195,7 +224,7 @@ export default function ShopDetail() {
     if (!selectedDay || !selectedTime) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { alert("Lütfen önce giriş yapın!"); setLoading(false); return; }
+    if (!session) { setLoading(false); setIsBooking(false); setIsAuthOpen(true); return; }
     const { error } = await supabase.from('appointments').insert([{
       user_id: session.user.id,
       shop_id: shopId,
@@ -280,7 +309,7 @@ export default function ShopDetail() {
                   </div>
                   <div className="flex items-center gap-3 md:gap-8 flex-shrink-0">
                     <span className="font-black text-base md:text-2xl tracking-tighter text-black">{service.price} ₺</span>
-                    <button onClick={() => { setSelectedService(service); setSelectedDay(null); setSelectedTime(""); setIsBooking(true); }} className="bg-[#222] text-white px-3 md:px-10 py-2.5 md:py-4 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase shadow-lg hover:bg-[#00A3AD] hover:scale-105 transition-all whitespace-nowrap">
+                    <button onClick={() => handleBookingClick(service)} className="bg-[#222] text-white px-3 md:px-10 py-2.5 md:py-4 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase shadow-lg hover:bg-[#00A3AD] hover:scale-105 transition-all whitespace-nowrap">
                       Randevu Al
                     </button>
                   </div>
@@ -376,6 +405,8 @@ export default function ShopDetail() {
           <img src={lightboxUrl} className="max-h-[90vh] max-w-[95vw] md:max-w-[90vw] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
         </div>
       )}
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => { setIsAuthOpen(false); pendingService.current = null; }} />
 
       {/* Booking modal */}
       {isBooking && (
