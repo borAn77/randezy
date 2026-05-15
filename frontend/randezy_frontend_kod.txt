@@ -1,0 +1,388 @@
+========================================
+RANDEZY — FRONTEND KAYNAK KODU
+========================================
+Bu dosya NotebookLM için hazırlanmıştır.
+Next.js 16 ile geliştirilmiş Randezy frontend'inin
+tüm sayfa ve bileşen kodlarını içerir.
+
+Teknoloji: Next.js 16, React 19, TypeScript, Tailwind CSS, Supabase JS, Motion
+
+
+========================================
+BÖLÜM 1: ANA SAYFA — app/page.tsx
+========================================
+Müşterilerin işletmeleri keşfettiği ana sayfa.
+Kategori filtresi, canlı arama ve işletme kartları içerir.
+
+"use client";
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { Search, X } from "lucide-react";
+import Navbar from "../components/layout/Navbar";
+import { supabase } from "../lib/supabase";
+
+const CATEGORY_MAP = {
+  "Kuaför": "KUAFÖR", "Berber": "BERBER", "Güzellik Merkezi": "GÜZELLİK MERKEZİ",
+  "Tırnak": "TIRNAK", "Fizyoterapi": "FİZYOTERAPİ", "Kaş ve Kirpik": "KAŞ VE KİRPİK",
+  "Masaj": "MASAJ", "Dövme": "DÖVME",
+};
+
+// Ana sayfa:
+// - Supabase'den is_active=true olan işletmeleri çeker
+// - İsme, ilçeye veya şehre göre metin araması yapar
+// - Kategoriye göre filtreler
+// - Her işletme için Link ile /shop/[id] sayfasına yönlendirir
+// - Navbar içinde "İşletmeni Ekle" butonu /pro'ya yönlendirir
+
+
+========================================
+BÖLÜM 2: İŞLETME DETAY SAYFASI — app/shop/[id]/page.tsx
+========================================
+Tek bir işletmenin detay sayfası.
+Hizmetler, randevu alma modalı, galeri, yorumlar ve çalışma saatleri içerir.
+
+Önemli Fonksiyonlar:
+- generateTimeSlots(openTime, closeTime, duration): Açık saatler arasında seçilebilir zaman dilimleri üretir
+- handleBookingConfirm(): Supabase appointments tablosuna randevu ekler
+- handleSubmitReview(): reviews tablosuna yorum ekler ve shop.score günceller
+- renderDays(): Interaktif takvim görünümü oluşturur
+
+Supabase Tabloları Kullanımı:
+- shops: işletme bilgisi
+- services: hizmet listesi
+- shop_hours: gün bazlı çalışma saatleri
+- appointments: dolu saatleri filtrelemek için (status != İptal Edildi)
+- reviews: yorum listesi ve ortalama puan hesabı
+- profiles: yorum yapan kullanıcı adı
+
+Özellikler:
+- Fotoğraf galerisi lightbox ile büyütme
+- Takvimden gün ve saat seçimi
+- Dolu saatler otomatik gizlenir
+- Randevu sonrası tam ekran başarı sayfası
+- Yıldız puanlama ve metin yorum formu
+- Kullanıcı başına bir yorum sınırı
+
+
+========================================
+BÖLÜM 3: PRO LANDING PAGE — app/pro/page.tsx
+========================================
+İşletme sahiplerine yönelik SaaS tanıtım sayfası.
+"İşletmeni Ekle" butonuna basınca açılır.
+
+"use client";
+import { useRouter } from "next/navigation";
+import { Hero } from "../../components/landing/Hero";
+import { Stats } from "../../components/landing/Stats";
+import { Features } from "../../components/landing/Features";
+import { Industries } from "../../components/landing/Industries";
+import { Pricing } from "../../components/landing/Pricing";
+
+// Sayfa yapısı:
+// 1. Sabit beyaz navbar (randezy.pro logosu, Özellikler/Fiyatlandırma/Müşteri Paneli linkleri)
+// 2. Hero: "Telefonu kapat, işini büyüt" başlığı + telefon mockup animasyonu
+// 3. Stats: 50K+ kullanıcı, %87 zaman tasarrufu, 2M+ randevu, %99.9 memnuniyet
+// 4. Features: Akıllı randevu yönetimi, Gelir takibi
+// 5. Industries: Kuaför&Berber, Güzellik Merkezi, Spa&Masaj sektör kartları
+// 6. Pricing: ₺0 lansman fiyatı, 8 özellik listesi, "Hemen başla" butonu
+// Tüm CTA butonları /isletme-ekle'ye yönlendirir
+
+
+========================================
+BÖLÜM 4: İŞLETME KAYIT AKIŞI — app/isletme-ekle/page.tsx
+========================================
+İşletme sahiplerinin işletmelerini sisteme eklediği 4 adımlı form.
+
+Adım 1 — Kimlik & Adres:
+  - Kategori seçimi (8 kategori kartı)
+  - Tabela adı ve resmi ünvan
+  - İl seçimi (81 il alfabetik), ilçe, mahalle, sokak
+
+Adım 2 — Yasal Bilgiler:
+  - Vergi dairesi ve vergi numarası
+  - IBAN (TR...)
+
+Adım 3 — Hizmet Menüsü:
+  - Hizmet adı, süre (30/60/90 dk), fiyat girişi
+  - Eklenen hizmetler liste olarak görüntülenir, silinebilir
+
+Adım 4 — Çalışma Saatleri:
+  - Pazartesi-Pazar her gün için açık/kapalı toggle
+  - Açık günler için başlangıç ve bitiş saati seçimi
+
+handleSubmit() sırası:
+  1. supabase.auth.getUser() ile mevcut kullanıcıyı alır
+  2. shops tablosuna işletme kaydeder
+  3. profiles tablosunda rolü "business_owner" yapar
+  4. services tablosuna hizmetleri toplu ekler
+  5. shop_hours tablosuna çalışma saatlerini ekler
+  6. /hesabim'a yönlendirir
+
+
+========================================
+BÖLÜM 5: DASHBOARD — app/dashboard/page.tsx
+========================================
+İşletme sahiplerinin yönetim paneli. Sadece "business_owner" rolüne açık.
+
+Sidebar Sekmeleri:
+1. Dashboard (overview): Toplam kazanç, benzersiz müşteri sayısı, bekleyen randevu sayısı
+2. Görsel Kimlik (branding): Kapak fotoğrafı ve galeri görsel yükleme (Supabase Storage)
+3. Randevular (appointments): Tüm randevular listelenir, Onayla/İptal Et aksiyonları
+4. Hizmet Yönetimi (services): Hizmet ekleme, düzenleme, silme; her hizmet için görsel
+5. Çalışma Saatleri (hours): Gün bazlı saat ayarı, upsert ile kaydedilir
+6. Ayarlar (settings): İşletme bilgileri düzenleme formu
+
+Teknik Detaylar:
+- Supabase Realtime: appointments tablosuna abone olur, yeni randevu gelince otomatik günceller
+- handleFileUpload(): Supabase Storage "randezy_images" bucket'ına görsel yükler
+- Rol kontrolü: profile.role !== "business_owner" ise / ana sayfaya yönlendirir
+- Metrikler: confirmedAppointments.reduce ile toplam gelir, Set ile benzersiz müşteri sayısı
+
+Supabase Tabloları:
+- profiles (rol kontrolü, avatar)
+- shops (işletme bilgileri)
+- services (hizmet menüsü)
+- appointments (randevu trafiği, profil join ile)
+- shop_hours (çalışma saatleri, upsert onConflict: shop_id,day_of_week)
+- supabase.storage (görsel yükleme)
+
+
+========================================
+BÖLÜM 6: RANDEVULARIM — app/randevularim/page.tsx
+========================================
+Müşterinin kendi randevularını gördüğü sayfa.
+
+- Supabase'den user_id'ye göre randevuları çeker (shops join ile)
+- appointment_date'e göre artan sıralı listeleme
+- Durum badge'leri: Onaylandı (yeşil), İptal Edildi (kırmızı), Beklemede (turuncu)
+- Beklemede veya Onaylandı randevular iptal edilebilir
+- İptal butonu status: "İptal Edildi" olarak günceller
+
+
+========================================
+BÖLÜM 7: HESABIM — app/hesabim/page.tsx
+========================================
+Kullanıcı profil sayfası.
+
+Sekmeler:
+- Profil: kullanıcı adı, email, telefon bilgileri
+- Güvenlik: şifre değiştirme
+- business_owner rolündeki kullanıcılar için Dashboard linki
+
+Supabase profiles tablosundan kullanıcı verisi çeker.
+
+
+========================================
+BÖLÜM 8: HEDİYE KARTI — app/hediye-karti/page.tsx
+========================================
+Dijital hediye kartı satış sayfası.
+
+3 kart tipi:
+- Silver Edition: 1.000 TL (beyaz kart)
+- Gold Premium: 5.000 TL (turkuaz kart)
+- Black Diamond: 10.000 TL (siyah kart)
+
+Her kart: "Tüm işletmelerde geçerli", "1 yıl kullanım süresi", "Öncelikli rezervasyon"
+Satın alma butonu mevcut (ödeme entegrasyonu gelecek sürümde)
+
+
+========================================
+BÖLÜM 9: NAVBAR — components/layout/Navbar.tsx
+========================================
+Tüm sayfalarda kullanılan sticky navigasyon çubuğu.
+
+State yönetimi:
+- user: Supabase auth oturumu
+- userRole: profiles tablosundan "customer" veya "business_owner"
+- isScrolled: 20px+ scroll'da şeffaf -> beyaz/blur geçişi
+
+Davranış:
+- Ana sayfa (isHomePage): şeffaf üzerinde beyaz metin
+- Diğer sayfalar veya scroll: beyaz/blur arka plan, siyah metin
+- Giriş yapılmamış: "Giriş / Kayıt" butonu -> AuthModal açar
+- Giriş yapılmış: UserMenu bileşeni (avatar, menü)
+- business_owner rolü: "Yönetim Paneli" butonu -> /dashboard
+- customer rolü: "İşletmeni Ekle" butonu -> /pro
+
+AuthModal entegrasyonu:
+- onAuthStateChange dinler, giriş sonrası modal kapanır
+- CompleteProfileModal: giriş yapan ama profili eksik kullanıcıya gösterilir
+
+
+========================================
+BÖLÜM 10: AUTH MODAL — components/layout/AuthModal.tsx
+========================================
+Giriş ve kayıt işlemlerini yöneten modal bileşeni.
+
+Modlar (Mode type):
+- login: email/şifre ile giriş, Google OAuth butonu
+- register: kayıt formu (şifre kuralı: 8+ karakter, büyük harf, sembol)
+- otp: email doğrulama kodu ekranı
+- forgot: şifre sıfırlama email gönderme
+- forgotSent: email gönderildi onay ekranı
+
+Supabase Auth Metodları:
+- signInWithPassword: email/şifre girişi
+- signInWithOAuth: Google ile giriş
+- signUp: yeni kayıt (email doğrulama ile)
+- verifyOtp: OTP kodu doğrulama
+- resetPasswordForEmail: şifre sıfırlama emaili
+
+
+========================================
+BÖLÜM 11: LANDING PAGE BİLEŞENLERİ — components/landing/
+========================================
+/pro sayfasında kullanılan SaaS Landing Page bileşenleri.
+Tüm bileşenler "motion/react" ile animasyonludur.
+
+Hero.tsx:
+  - Sol: "Telefonu kapat, işini büyüt" başlığı, açıklama metni, "Ücretsiz dene" butonu
+  - Sağ: iPhone mockup içinde randevu listesi (3 randevu animasyonlu giriş)
+  - Arka plan: koyu gradient + turkuaz glow efekti
+  - Tüm butonlar /isletme-ekle'ye yönlendirir
+
+Stats.tsx:
+  - 50K+ Aktif Kullanıcı
+  - %87 Zaman Tasarrufu
+  - 2M+ Randevu (başarıyla tamamlandı)
+  - %99.9 Müşteri Memnuniyeti
+  - Her kart whileInView animasyonu ile görünür
+
+Features.tsx:
+  - 3 özellik, 2'li grid (metin + mockup/demo)
+  - Akıllı Randevu Yönetimi: interaktif takvim mockup'ı
+  - Gelir ve Performans Takibi: gelir kartı + bar chart
+  - Tek/çift index'e göre metin solu/sağı değişir
+
+Industries.tsx:
+  - Kuaför & Berber (Scissors ikonu)
+  - Güzellik Merkezi (Sparkles ikonu)
+  - Spa & Masaj (Heart ikonu)
+  - Hover'da shadow efekti
+
+Pricing.tsx:
+  - "Lansma Kampanyası" badge
+  - ₺0 / ₺299 üstü çizili fiyat
+  - 8 özellik listesi (Check ikonlu)
+  - "Hemen başla" butonu -> /isletme-ekle
+  - Alt kısım: sektör logoları (Kuaför, Berber, Güzellik, Spa, Tırnak)
+
+
+========================================
+BÖLÜM 12: VERİTABANI ŞEMASI (SUPABASE)
+========================================
+
+profiles:
+  id (uuid, FK auth.users)
+  full_name (text)
+  phone (text)
+  role (text: "customer" | "business_owner")
+  avatar_url (text)
+  email (text)
+
+shops:
+  id (int, PK)
+  owner_id (uuid, FK auth.users)
+  name (text) — tabela adı
+  legal_name (text) — resmi ünvan
+  category (text) — KUAFÖR, BERBER, vb.
+  city, district, neighborhood, street, building_no, door_no (text)
+  tax_office, tax_no, mersis_no, iban (text)
+  image_url (text) — kapak fotoğrafı
+  gallery_urls (text[]) — galeri görselleri
+  shop_phone (text)
+  description (text)
+  is_active (bool)
+  score (float) — ortalama yorum puanı
+
+services:
+  id (int, PK)
+  shop_id (int, FK shops)
+  name (text)
+  price (float)
+  duration (int) — dakika
+  image_url (text)
+
+shop_hours:
+  id (int, PK)
+  shop_id (int, FK shops)
+  day_of_week (int) — 0=Pazar, 1=Pazartesi, ... 6=Cumartesi
+  open_time (time)
+  close_time (time)
+  is_closed (bool)
+
+appointments:
+  id (uuid, PK)
+  shop_id (int, FK shops)
+  user_id (uuid, FK auth.users)
+  service_name (text)
+  price (float)
+  appointment_date (date)
+  appointment_time (time)
+  status (text) — "Beklemede" | "Onaylandı" | "İptal Edildi"
+  notes (text)
+
+reviews:
+  id (uuid, PK)
+  shop_id (int, FK shops)
+  user_id (uuid, FK auth.users)
+  rating (int) — 1-5
+  comment (text)
+  created_at (timestamp)
+
+
+========================================
+BÖLÜM 13: KULLANICI AKIŞLARI
+========================================
+
+Müşteri Akışı:
+  1. Ana sayfa açılır -> aktif işletmeler listelenir
+  2. Arama veya kategori filtresi uygulanır
+  3. İşletme kartına tıklanır -> /shop/[id] sayfasına gidilir
+  4. Hizmet seçilir -> "Randevu Al" butonuna basılır
+  5. Giriş yapılmamışsa AuthModal açılır
+  6. Takvimden tarih, saat listesinden saat seçilir
+  7. "Onayla" butonuna basılır -> appointments tablosuna kaydedilir
+  8. Tam ekran başarı sayfası görünür
+  9. /randevularim'dan randevular takip edilir
+
+İşletme Sahibi Akışı:
+  1. Navbar'daki "İşletmeni Ekle" butonuna basılır
+  2. /pro SaaS Landing Page açılır (Hero, Stats, Features, Pricing)
+  3. "Ücretsiz Başla" / "Hemen Başla" butonuna basılır -> /isletme-ekle
+  4. 4 adımlı form tamamlanır
+  5. Supabase'e shop, services, shop_hours kaydedilir
+  6. Kullanıcı rolü "business_owner" yapılır
+  7. /hesabim'a yönlendirilir
+  8. Navbar artık "Yönetim Paneli" butonu gösterir
+  9. /dashboard'dan tüm yönetim yapılır
+
+
+========================================
+BÖLÜM 14: PROJE ÖZETİ
+========================================
+
+Randezy, Türkiye'deki kişisel bakım ve güzellik sektörü
+işletmelerine yönelik çevrimiçi randevu yönetim platformudur.
+
+Çözdüğü Problem:
+  - İşletmeler telefon trafiğini azaltıp randevuları otomatikleştirir
+  - Müşteriler 7/24 online randevu alabilir
+  - İşletme sahipleri tek panelden tüm operasyonlarını yönetir
+
+Hedef Kitle:
+  - Kuaför, berber, güzellik merkezi, spa, tırnak, dövme, masaj işletmeleri
+  - Bu işletmelerin müşterileri
+
+İş Modeli:
+  - Lansman dönemi: tamamen ücretsiz
+  - Normal fiyat: ₺299/ay (landing page üzerinde belirtilmiş)
+  - Gelecek: premium özellikler (CRM, gelişmiş analitik, otomatik bildirimler)
+
+Teknik Öne Çıkanlar:
+  - Supabase Realtime ile anlık randevu bildirimleri
+  - Rol tabanlı yetkilendirme (customer / business_owner)
+  - Supabase Storage ile görsel yönetimi
+  - Next.js App Router ile SSR + client-side hibrit
+  - Motion kütüphanesi ile animasyonlu landing page
+  - 4 adımlı stepper formu ile işletme kaydı

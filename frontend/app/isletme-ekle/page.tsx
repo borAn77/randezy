@@ -144,7 +144,7 @@ export default function IsletmeEkle() {
     }
   };
 
-  const isStep1Valid = formData.category && formData.shopName && formData.city && formData.district;
+  const isStep1Valid = formData.category && formData.shopName && formData.city && formData.district && formData.street;
 
   return (
     <main className="min-h-screen bg-[#F9F9F9] text-[#111] pb-20">
