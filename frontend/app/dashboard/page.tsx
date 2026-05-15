@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabase";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
-  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown
+  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, Star, MessageSquare
 } from "lucide-react";
 
 const cities = [
@@ -29,10 +29,14 @@ export default function Dashboard() {
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [shopHours, setShopHours] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
   const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "", image_url: "" });
   const [savingHours, setSavingHours] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -55,13 +59,15 @@ export default function Dashboard() {
 
     if (shopData) {
       setShop(shopData);
-      const [servicesRes, appointmentsRes, hoursRes] = await Promise.all([
+      const [servicesRes, appointmentsRes, hoursRes, reviewsRes] = await Promise.all([
         supabase.from('services').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
         supabase.from('appointments').select('*, profiles(full_name, phone, email)').eq('shop_id', shopData.id).order('appointment_date', { ascending: false }),
         supabase.from('shop_hours').select('*').eq('shop_id', shopData.id).order('day_of_week', { ascending: true }),
+        supabase.from('reviews').select('*, profiles(full_name)').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
       ]);
       setServices(servicesRes.data || []);
       setAppointments(appointmentsRes.data || []);
+      setReviews(reviewsRes.data || []);
 
       const hours = hoursRes.data || [];
       if (hours.length === 0) {
@@ -125,6 +131,19 @@ export default function Dashboard() {
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
     if (!error) fetchInitialData();
+  };
+
+  const handleReject = async (id: string) => {
+    const words = rejectReason.trim().split(/\s+/).filter(Boolean);
+    if (words.length < 10) {
+      setRejectError(`En az 10 kelime gerekli. Şu an: ${words.length} kelime.`);
+      return;
+    }
+    await supabase.from('appointments').update({ status: 'İptal Edildi', cancel_reason: rejectReason.trim() }).eq('id', id);
+    setRejectingId(null);
+    setRejectReason("");
+    setRejectError("");
+    fetchInitialData();
   };
 
   const handleSettingsSubmit = async (e: any) => {
@@ -197,6 +216,7 @@ export default function Dashboard() {
             { id: "overview", label: "Dashboard", icon: <LayoutDashboard size={18}/> },
             { id: "branding", label: "Görsel Kimlik", icon: <Camera size={18}/> },
             { id: "appointments", label: "Randevular", icon: <Calendar size={18}/> },
+            { id: "reviews", label: "Yorumlar", icon: <MessageSquare size={18}/> },
             { id: "services", label: "Hizmet Yönetimi", icon: <Package size={18}/> },
             { id: "hours", label: "Çalışma Saatleri", icon: <Clock size={18}/> },
           ].map((item) => (
@@ -288,32 +308,111 @@ export default function Dashboard() {
 
             {/* 3. RANDEVULAR */}
             {activeTab === "appointments" && (
-              <div className="animate-in slide-in-from-right-4 space-y-6">
+              <div className="animate-in slide-in-from-right-4 space-y-4">
                 <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 italic">Randevu Trafiği</h2>
                 {appointments.length > 0 ? appointments.map((apt) => (
-                  <div key={apt.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex items-center justify-between group hover:border-[#00A3AD] transition-all">
-                    <div className="flex items-center gap-8">
-                      <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center">
-                        <p className="text-[9px] uppercase opacity-50">Saat</p>
-                        <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
-                        <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{apt.profiles?.phone || apt.profiles?.email} • {apt.appointment_date}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${apt.status === 'Onaylandı' ? 'bg-green-50 text-green-600' : apt.status === 'İptal Edildi' ? 'bg-red-50 text-red-500' : 'bg-yellow-50 text-yellow-600'}`}>{apt.status}</span>
-                      {apt.status === 'Beklemede' && (
-                        <div className="flex gap-2">
-                          <button onClick={() => updateAppointmentStatus(apt.id, 'Onaylandı')} className="p-3 bg-black text-white rounded-xl hover:bg-green-600 transition-all"><CheckCircle2 size={18}/></button>
-                          <button onClick={() => updateAppointmentStatus(apt.id, 'İptal Edildi')} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><X size={18}/></button>
+                  <div key={apt.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden group hover:border-[#00A3AD] transition-all">
+                    <div className="p-8 flex items-center justify-between">
+                      <div className="flex items-center gap-8">
+                        <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
+                          <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
+                          <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
                         </div>
-                      )}
+                        <div>
+                          <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
+                          <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{apt.service_name} • {apt.profiles?.phone || apt.profiles?.email}</p>
+                          {apt.cancel_reason && (
+                            <p className="text-[10px] font-bold text-red-400 mt-1 italic">Red gerekçesi: {apt.cancel_reason}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${apt.status === 'Onaylandı' ? 'bg-green-50 text-green-600' : apt.status === 'İptal Edildi' ? 'bg-red-50 text-red-500' : 'bg-yellow-50 text-yellow-600'}`}>{apt.status}</span>
+                        {apt.status === 'Beklemede' && (
+                          <div className="flex gap-2">
+                            <button onClick={() => updateAppointmentStatus(apt.id, 'Onaylandı')} className="p-3 bg-black text-white rounded-xl hover:bg-green-600 transition-all" title="Onayla"><CheckCircle2 size={18}/></button>
+                            <button
+                              onClick={() => { setRejectingId(rejectingId === apt.id ? null : apt.id); setRejectReason(""); setRejectError(""); }}
+                              className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                              title="Reddet"
+                            ><X size={18}/></button>
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Red gerekçesi paneli */}
+                    {rejectingId === apt.id && (
+                      <div className="border-t border-red-100 bg-red-50 p-6 animate-in slide-in-from-top-2">
+                        <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3">Red Gerekçesi — En az 10 kelime yazın</p>
+                        <textarea
+                          rows={3}
+                          placeholder="Müşteriye iletilecek red açıklamasını yazın..."
+                          className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none mb-2"
+                          value={rejectReason}
+                          onChange={e => { setRejectReason(e.target.value); setRejectError(""); }}
+                        />
+                        {rejectError && <p className="text-[11px] font-bold text-red-500 mb-2">{rejectError}</p>}
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleReject(apt.id)}
+                            className="bg-red-500 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all"
+                          >Reddet ve Gönder</button>
+                          <button
+                            onClick={() => { setRejectingId(null); setRejectReason(""); setRejectError(""); }}
+                            className="bg-white text-gray-400 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:text-black transition-all"
+                          >Vazgeç</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )) : (
                   <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz randevu talebi yok</div>
+                )}
+              </div>
+            )}
+
+            {/* 3.5 YORUMLAR */}
+            {activeTab === "reviews" && (
+              <div className="animate-in slide-in-from-right-4">
+                <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 italic">Müşteri Yorumları</h2>
+                {reviews.length === 0 ? (
+                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz yorum yapılmamış</div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Ortalama */}
+                    <div className="bg-black text-white p-8 rounded-[2.5rem] flex items-center gap-8 mb-6">
+                      <div className="text-center">
+                        <p className="text-5xl font-black text-[#00A3AD]">{(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}</p>
+                        <p className="text-[9px] uppercase tracking-widest text-gray-400 mt-1">Ortalama Puan</p>
+                      </div>
+                      <div>
+                        <div className="flex gap-1 mb-2">
+                          {[1,2,3,4,5].map(s => (
+                            <Star key={s} size={20} className={s <= Math.round(reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'} />
+                          ))}
+                        </div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{reviews.length} değerlendirme</p>
+                      </div>
+                    </div>
+
+                    {reviews.map((r) => (
+                      <div key={r.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="font-black text-base uppercase tracking-tight">{r.profiles?.full_name || "Anonim"}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-1">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} size={14} className={s <= r.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} />
+                              ))}
+                            </div>
+                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
+                          </div>
+                        </div>
+                        {r.comment && <p className="text-gray-500 text-sm font-medium">{r.comment}</p>}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

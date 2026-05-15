@@ -24,7 +24,6 @@ export default function Randevularim() {
       .from('appointments')
       .select('*, shops(name, city, district)')
       .eq('user_id', user.id)
-      .neq('status', 'İptal Edildi')
       .order('appointment_date', { ascending: true });
     setAppointments(data || []);
     setLoading(false);
@@ -69,6 +68,12 @@ export default function Randevularim() {
                     <span className="flex items-center gap-1 text-[#00A3AD]"><CalIcon size={14}/> {apt.appointment_date}</span>
                     <span className="flex items-center gap-1"><MapPin size={14}/> {apt.shops?.name || "—"}</span>
                   </div>
+                  {apt.status === 'İptal Edildi' && apt.cancel_reason && (
+                    <div className="mt-3 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                      <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">İşletmeden Red Gerekçesi</p>
+                      <p className="text-sm text-red-500 font-medium">{apt.cancel_reason}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right flex flex-col items-end gap-3 flex-shrink-0 ml-4">
