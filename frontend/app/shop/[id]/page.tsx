@@ -92,6 +92,7 @@ export default function ShopDetail() {
 
   useEffect(() => {
     setSelectedTime("");
+    console.log('[DEBUG] shopHours:', shopHours, '| selectedDay:', selectedDay, '| selectedService:', selectedService);
     if (!selectedDay || !selectedService || shopHours.length === 0) {
       setAvailableSlots([]);
       return;
@@ -99,6 +100,7 @@ export default function ShopDetail() {
 
     const dayOfWeek = selectedDay.getDay();
     const dayHours = shopHours.find((h: any) => h.day_of_week === dayOfWeek);
+    console.log('[DEBUG] dayOfWeek:', dayOfWeek, '| dayHours found:', dayHours);
 
     if (!dayHours || dayHours.is_closed) {
       setIsClosedDay(true);
@@ -108,6 +110,7 @@ export default function ShopDetail() {
 
     setIsClosedDay(false);
     const slots = generateTimeSlots(dayHours.open_time, dayHours.close_time, selectedService.duration);
+    console.log('[DEBUG] dayHours:', dayHours, '| slots:', slots);
 
     supabase
       .from('appointments')
@@ -115,7 +118,8 @@ export default function ShopDetail() {
       .eq('shop_id', shopId)
       .eq('appointment_date', selectedDay.toISOString().split('T')[0])
       .neq('status', 'İptal Edildi')
-      .then(({ data: booked }) => {
+      .then(({ data: booked, error: apptError }) => {
+        console.log('[DEBUG] appointments data:', booked, '| error:', apptError);
         const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
         let available = slots.filter(s => !bookedTimes.has(s));
 
