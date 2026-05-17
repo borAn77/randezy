@@ -8,6 +8,10 @@ import {
 import { supabase } from "../../../lib/supabase";
 import AuthModal from "../../../components/layout/AuthModal";
 
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function generateTimeSlots(openTime: string, closeTime: string, duration: number): string[] {
   const [openH, openM] = openTime.split(':').map(Number);
   const [closeH, closeM] = closeTime.split(':').map(Number);
@@ -145,7 +149,7 @@ export default function ShopDetail() {
       .from('appointments')
       .select('appointment_time')
       .eq('shop_id', shopId)
-      .eq('appointment_date', selectedDay.toISOString().split('T')[0])
+      .eq('appointment_date', localDateStr(selectedDay))
       .neq('status', 'İptal Edildi')
       .then(({ data: booked, error: apptError }) => {
         console.log('[DEBUG] appointments data:', booked, '| error:', apptError);
@@ -230,7 +234,7 @@ export default function ShopDetail() {
       shop_id: shopId,
       service_name: selectedService.name,
       price: selectedService.price,
-      appointment_date: selectedDay.toISOString().split('T')[0],
+      appointment_date: localDateStr(selectedDay),
       appointment_time: selectedTime,
       status: 'Beklemede'
     }]);
