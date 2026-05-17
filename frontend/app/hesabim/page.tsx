@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import Navbar from "../../components/layout/Navbar";
 import { 
-  User, Calendar, Shield, Trash2, ChevronRight, 
-  Store, TrendingUp, Users, Settings, PlusCircle 
+  User, Calendar, Shield, Trash2, ChevronRight
 } from "lucide-react";
 
 export default function HesabimPage() {
@@ -86,17 +85,7 @@ export default function HesabimPage() {
             {/* SADECE İŞLETME SAHİPLERİNE GÖZÜKEN BUTONLAR */}
             {isOwner && (
               <>
-                <button 
-                  onClick={() => setActiveTab("isletme-yonetimi")}
-                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'isletme-yonetimi' ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Store size={18} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">İşletme Yönetimi</span>
-                  </div>
-                  <ChevronRight size={14} />
-                </button>
-                <button 
+                <button
                   onClick={() => setActiveTab("isletme-randevular")}
                   className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'isletme-randevular' ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                 >
@@ -167,45 +156,6 @@ export default function HesabimPage() {
                 ))}
               </div>
               <button className="mt-16 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">Bilgileri Güncelle</button>
-            </div>
-          )}
-
-          {/* TAB: İŞLETME YÖNETİMİ (SADECE PATRONLAR) */}
-          {activeTab === "isletme-yonetimi" && isOwner && (
-            <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-2xl">
-                  <TrendingUp className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Aylık Kazanç</p>
-                  <h4 className="text-4xl font-black mt-2 tracking-tighter">₺12.450</h4>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
-                  <Users className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aktif Müşteriler</p>
-                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">128</h4>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
-                  <Calendar className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Yeni Randevu</p>
-                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">14</h4>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-[3.5rem] p-12 shadow-2xl border border-gray-100">
-                <div className="flex justify-between items-center mb-10">
-                  <h3 className="text-2xl font-black uppercase tracking-tighter text-black">Hızlı İşlemler</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
-                    <span className="font-black uppercase text-[11px] tracking-widest text-gray-600 group-hover:text-white">Dükkan Durumu (Açık)</span>
-                    <div className="w-12 h-6 bg-[#00A3AD] rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
-                  </div>
-                  <div className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
-                    <span className="font-black uppercase text-[11px] tracking-widest text-gray-600 group-hover:text-white">Yeni Hizmet Ekle</span>
-                    <PlusCircle size={24} className="text-[#00A3AD]" />
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 

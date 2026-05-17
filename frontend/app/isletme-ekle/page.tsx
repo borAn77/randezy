@@ -37,7 +37,7 @@ export default function IsletmeEkle() {
   const [formData, setFormData] = useState({
     category: "", shopName: "", officialTitle: "",
     city: "", district: "", neighborhood: "", street: "", buildingNo: "", doorNo: "",
-    vergiDairesi: "", vergiNo: "", mersisNo: "", iban: ""
+    vergiDairesi: "", vergiNo: "", mersisNo: ""
   });
 
   const [services, setServices] = useState<any[]>([]);
@@ -99,8 +99,7 @@ export default function IsletmeEkle() {
           door_no: formData.doorNo,
           tax_office: formData.vergiDairesi,
           tax_no: formData.vergiNo,
-          mersis_no: formData.mersisNo,
-          iban: formData.iban
+          mersis_no: formData.mersisNo
         }])
         .select()
         .single();
@@ -221,7 +220,6 @@ export default function IsletmeEkle() {
               <section className="space-y-8">
                 <input placeholder="Vergi Dairesi" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, vergiDairesi: e.target.value})} />
                 <input placeholder="Vergi Numarası" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, vergiNo: e.target.value})} />
-                <input placeholder="IBAN (TR...)" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, iban: e.target.value})} />
               </section>
               <div className="grid grid-cols-2 gap-6 mt-12">
                 <button onClick={() => setStep(1)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50 transition-all">Geri Dön</button>
