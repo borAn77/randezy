@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -227,7 +228,7 @@ def get_availability(
     if not hours_entry:
         return []
 
-    tz = timezone.utc
+    tz = ZoneInfo("Europe/Istanbul")
     open_dt = datetime.combine(
         date, datetime.strptime(hours_entry["open_time"], "%H:%M").time(), tzinfo=tz
     )
