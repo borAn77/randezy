@@ -12,9 +12,6 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Use direct connection URL for migrations (pooler doesn't support DDL transactions)
-config.set_main_option("sqlalchemy.url", os.environ["ALEMBIC_DATABASE_URL"])
-
 # Import all models so Alembic can detect them
 from app.database import Base  # noqa: E402
 from app.models import (  # noqa: E402, F401
@@ -37,11 +34,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    from sqlalchemy import create_engine
+    connectable = create_engine(os.environ["ALEMBIC_DATABASE_URL"], poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
