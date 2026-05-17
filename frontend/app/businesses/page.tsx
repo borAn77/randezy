@@ -10,7 +10,7 @@ import { MapPin, Clock, Search, SlidersHorizontal, ChevronLeft, ChevronRight } f
 const CATEGORIES = ["Kuaför", "Berber", "Güzellik Salonu", "Spa", "Diğer"];
 const CITIES = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Konya", "Gaziantep"];
 
-export default function BusinessesPage() {
+function BusinessesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -222,5 +222,15 @@ export default function BusinessesPage() {
         )}
       </div>
     </main>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function BusinessesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F9F9F9]" />}>
+      <BusinessesContent />
+    </Suspense>
   );
 }

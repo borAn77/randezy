@@ -22,7 +22,7 @@ function addDays(d: Date, n: number): Date {
   return copy;
 }
 
-export default function BookPage() {
+function BookContent() {
   const { slug } = useParams<{ slug: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -373,6 +373,16 @@ export default function BookPage() {
         )}
       </div>
     </main>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function BookPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F9F9F9]" />}>
+      <BookContent />
+    </Suspense>
   );
 }
 
