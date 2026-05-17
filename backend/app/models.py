@@ -33,7 +33,7 @@ staff_services = Table(
     "staff_services",
     Base.metadata,
     Column("staff_id", Uuid(as_uuid=True), ForeignKey("staff.id", ondelete="CASCADE"), primary_key=True),
-    Column("service_id", Uuid(as_uuid=True), ForeignKey("services.id", ondelete="CASCADE"), primary_key=True),
+    Column("service_id", Uuid(as_uuid=True), ForeignKey("biz_services.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -101,7 +101,7 @@ class BusinessPhoto(Base):
 
 
 class Service(Base):
-    __tablename__ = "services"
+    __tablename__ = "biz_services"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     business_id: Mapped[uuid.UUID] = mapped_column(
@@ -140,7 +140,7 @@ class Staff(Base):
 
 
 class Appointment(Base):
-    __tablename__ = "appointments"
+    __tablename__ = "biz_appointments"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     customer_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.supabase_id"), index=True)
@@ -150,7 +150,7 @@ class Appointment(Base):
     staff_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("staff.id"), nullable=True
     )
-    service_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("services.id"))
+    service_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("biz_services.id"))
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[AppointmentStatus] = mapped_column(
