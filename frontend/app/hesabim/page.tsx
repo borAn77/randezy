@@ -67,13 +67,14 @@ export default function HesabimPage() {
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
-    const { error } = await supabase.from('profiles').update({
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
       first_name: editForm.firstName,
       last_name: editForm.lastName,
       full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
       phone: editForm.phone.trim() || null,
       updated_at: new Date().toISOString(),
-    }).eq('id', user.id);
+    }, { onConflict: 'id' });
     setSavingProfile(false);
     if (!error) {
       setProfile({ ...profile, first_name: editForm.firstName, last_name: editForm.lastName, full_name: `${editForm.firstName} ${editForm.lastName}`.trim(), phone: editForm.phone.trim() || null });
