@@ -28,6 +28,68 @@ const categories = [
 
 const daysOfWeek = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 
+const SERVICE_TEMPLATES: Record<string, { name: string; duration: string; price: string }[]> = {
+  "BERBER": [
+    { name: "Saç Kesimi", duration: "20", price: "80" },
+    { name: "Sakal Tıraşı", duration: "20", price: "60" },
+    { name: "Saç + Sakal", duration: "40", price: "120" },
+    { name: "Çocuk Saç Kesimi", duration: "20", price: "60" },
+    { name: "Saç Yıkama", duration: "15", price: "40" },
+    { name: "Ense Tıraşı", duration: "15", price: "40" },
+  ],
+  "KUAFÖR": [
+    { name: "Saç Kesimi", duration: "30", price: "150" },
+    { name: "Saç Boyama", duration: "90", price: "400" },
+    { name: "Fön", duration: "30", price: "100" },
+    { name: "Keratin Bakım", duration: "120", price: "600" },
+    { name: "Röfle", duration: "90", price: "350" },
+    { name: "Maske & Bakım", duration: "30", price: "150" },
+  ],
+  "GÜZELLİK MERKEZİ": [
+    { name: "Manikür", duration: "45", price: "120" },
+    { name: "Pedikür", duration: "45", price: "130" },
+    { name: "Kaş Alımı", duration: "20", price: "60" },
+    { name: "Cilt Bakımı", duration: "60", price: "250" },
+    { name: "Kalıcı Oje", duration: "60", price: "200" },
+    { name: "Epilasyon", duration: "30", price: "100" },
+  ],
+  "TIRNAK": [
+    { name: "Protez Tırnak", duration: "90", price: "350" },
+    { name: "Manikür", duration: "45", price: "120" },
+    { name: "Pedikür", duration: "45", price: "130" },
+    { name: "Kalıcı Oje", duration: "60", price: "180" },
+    { name: "Tırnak Tasarımı", duration: "60", price: "200" },
+  ],
+  "KAŞ VE KİRPİK": [
+    { name: "Kaş Alımı", duration: "20", price: "60" },
+    { name: "Kaş Boyama", duration: "30", price: "80" },
+    { name: "Kirpik Lifting", duration: "60", price: "250" },
+    { name: "Kirpik Uzatma", duration: "120", price: "500" },
+    { name: "Microblading", duration: "90", price: "800" },
+  ],
+  "MASAJ": [
+    { name: "Klasik Masaj (30dk)", duration: "30", price: "200" },
+    { name: "Klasik Masaj (60dk)", duration: "60", price: "350" },
+    { name: "Aromaterapi Masajı", duration: "60", price: "400" },
+    { name: "Sırt & Boyun Masajı", duration: "30", price: "200" },
+    { name: "Derin Doku Masajı", duration: "60", price: "450" },
+  ],
+  "FİZYOTERAPİ": [
+    { name: "Manuel Terapi", duration: "45", price: "300" },
+    { name: "Egzersiz Tedavisi", duration: "45", price: "250" },
+    { name: "Kinesio Bantlama", duration: "30", price: "150" },
+    { name: "Ultrason Tedavisi", duration: "30", price: "200" },
+    { name: "Elektroterapi", duration: "30", price: "200" },
+  ],
+  "DÖVME": [
+    { name: "Küçük Dövme", duration: "60", price: "500" },
+    { name: "Orta Dövme", duration: "120", price: "1000" },
+    { name: "Büyük Dövme", duration: "180", price: "2000" },
+    { name: "Dövme Kapama", duration: "120", price: "1200" },
+    { name: "Konsültasyon", duration: "30", price: "0" },
+  ],
+};
+
 export default function IsletmeEkle() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -261,6 +323,46 @@ export default function IsletmeEkle() {
               <p className="text-gray-500 text-[11px] font-bold uppercase tracking-[0.3em]">ADIM 3: MENÜ VE FİYATLANDIRMA</p>
             </div>
             <div className="bg-white rounded-[3.5rem] shadow-2xl p-12 md:p-16 border border-gray-100">
+
+              {/* HAZIR ŞABLONLAR */}
+              {SERVICE_TEMPLATES[formData.category] && (
+                <div className="mb-10">
+                  <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-[0.4em] mb-4 flex items-center gap-2">
+                    <CheckCircle2 size={13} /> {formData.category} için hazır hizmetler — tıkla ekle
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {SERVICE_TEMPLATES[formData.category].map((tpl) => {
+                      const isAdded = services.some(s => s.name === tpl.name);
+                      return (
+                        <button
+                          key={tpl.name}
+                          type="button"
+                          onClick={() => {
+                            if (!isAdded) setServices(prev => [...prev, tpl]);
+                          }}
+                          className={`text-left p-4 rounded-2xl border-2 transition-all ${
+                            isAdded
+                              ? 'border-[#00A3AD] bg-[#E6F6F7] cursor-default'
+                              : 'border-gray-100 hover:border-[#00A3AD] hover:bg-[#f0fafb] cursor-pointer'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="font-black text-[11px] uppercase tracking-tight text-black leading-tight">{tpl.name}</span>
+                            {isAdded && <CheckCircle2 size={14} className="text-[#00A3AD] flex-shrink-0 mt-0.5" />}
+                          </div>
+                          <p className="text-[10px] text-gray-400 font-bold mt-1">{tpl.duration} dk · {tpl.price} ₺</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3 mt-6 mb-2">
+                    <div className="flex-1 h-px bg-gray-100" />
+                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">veya kendин ekle</span>
+                    <div className="flex-1 h-px bg-gray-100" />
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-gray-50 p-6 rounded-3xl">
                 <input placeholder="Hizmet Adı" className="bg-white border-2 border-gray-100 rounded-2xl p-4 text-sm font-bold text-black outline-none" value={newService.name} onChange={(e) => setNewService({...newService, name: e.target.value})} />
                 <select className="bg-white border-2 border-gray-100 rounded-2xl p-4 text-sm font-bold text-black outline-none" value={newService.duration} onChange={(e) => setNewService({...newService, duration: e.target.value})}>
