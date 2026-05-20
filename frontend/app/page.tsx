@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, MapPin } from "lucide-react";
+import { Search, X, MapPin, Image as ImageIcon } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import { supabase } from "../lib/supabase";
 
@@ -251,7 +251,13 @@ export default function Home() {
                 {filteredShops.map((shop: any) => (
                   <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
                     <div className="relative h-52 sm:h-64 md:h-80 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-3 md:mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
-                      <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
+                      {shop.image_url
+                        ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
+                        : <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center gap-2">
+                            <ImageIcon size={40} className="text-gray-300" />
+                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{shop.category || 'İşletme'}</span>
+                          </div>
+                      }
                       <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
                         ⭐ {shop.score ?? "—"}
                       </div>

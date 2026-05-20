@@ -1,9 +1,9 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Clock, ArrowLeft, X, Calendar as CalIcon,
-  ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon
+  ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon, Share2
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import AuthModal from "../../../components/layout/AuthModal";
@@ -62,6 +62,30 @@ export default function ShopDetail() {
   const pendingService = useRef<any>(null);
   const [staff, setStaff] = useState<any[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+  const [showAllHours, setShowAllHours] = useState(false);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const h = heroRef.current?.offsetHeight ?? 350;
+      setShowStickyBar(window.scrollY > h + 80);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: shop?.name ?? 'Randezy', url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [shop]);
 
   const fetchReviews = async () => {
     const { data } = await supabase
@@ -315,18 +339,29 @@ export default function ShopDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-20">
           <div className="lg:col-span-2 text-black">
             {/* Hero Image */}
-            <div className="relative rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl mb-8 md:mb-12 h-[240px] sm:h-[320px] md:h-[450px]">
+            <div ref={heroRef} className="relative rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl mb-8 md:mb-12 h-[240px] sm:h-[320px] md:h-[450px]">
               {shop.image_url
                 ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
                 : <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ImageIcon size={64} className="text-gray-300" /></div>
               }
               <div className="absolute bottom-4 left-4 right-4 md:bottom-10 md:left-10 md:right-auto bg-white/90 backdrop-blur-md p-4 md:p-8 rounded-[1.5rem] md:rounded-[2rem] shadow-xl">
-                <h1 className="text-xl sm:text-2xl md:text-4xl font-black tracking-tighter uppercase mb-1 md:mb-2 text-black">{shop.name}</h1>
-                <p className="text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-[0.15em] md:tracking-[0.2em]">
-                  {shop.district}, {shop.city}
-                  {avgRating && <span className="ml-2">— ⭐ {avgRating} ({reviews.length} yorum)</span>}
-                  {!avgRating && shop.score && <span className="ml-2">— ⭐ {shop.score}</span>}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl md:text-4xl font-black tracking-tighter uppercase mb-1 md:mb-2 text-black">{shop.name}</h1>
+                    <p className="text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-[0.15em] md:tracking-[0.2em]">
+                      {shop.district}, {shop.city}
+                      {avgRating && <span className="ml-2">— ⭐ {avgRating} ({reviews.length} yorum)</span>}
+                      {!avgRating && shop.score && <span className="ml-2">— ⭐ {shop.score}</span>}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleShare}
+                    className="flex-shrink-0 p-2 md:p-3 bg-white rounded-xl md:rounded-2xl shadow-sm hover:bg-[#00A3AD] hover:text-white transition-all group"
+                    title="Paylaş"
+                  >
+                    {copied ? <CheckCircle2 size={16} className="text-[#00A3AD] group-hover:text-white" /> : <Share2 size={16} className="text-gray-500 group-hover:text-white" />}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -434,15 +469,37 @@ export default function ShopDetail() {
           <div className="hidden lg:block text-black">
             <div className="bg-[#222] text-white p-10 rounded-[2.5rem] sticky top-12 shadow-2xl">
               <h3 className="text-xl font-black uppercase tracking-tighter mb-6 border-b border-white/10 pb-4">İletişim</h3>
-              <div className="space-y-6 text-sm font-bold opacity-80 uppercase tracking-widest text-white">
-                {shopHours.length > 0 ? shopHours.filter(h => !h.is_closed).slice(0, 2).map((h: any, i: number) => (
-                  <p key={i} className="text-[#00A3AD]">{h.open_time?.slice(0,5)} - {h.close_time?.slice(0,5)}</p>
-                )) : (
-                  <p className="text-[#00A3AD]">09:00 - 20:00</p>
+              <div className="space-y-4 text-sm font-bold uppercase tracking-widest text-white">
+                {shopHours.length > 0 ? (() => {
+                  const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+                  const todayIdx = new Date().getDay();
+                  const sorted = [...shopHours].sort((a: any, b: any) => a.day_of_week - b.day_of_week);
+                  const visible = showAllHours ? sorted : sorted.filter((h: any) => h.day_of_week === todayIdx || !h.is_closed).slice(0, 3);
+                  return (
+                    <>
+                      {visible.map((h: any) => (
+                        <div key={h.day_of_week} className={`flex justify-between items-center ${h.day_of_week === todayIdx ? 'opacity-100' : 'opacity-60'}`}>
+                          <span className={`text-[10px] ${h.day_of_week === todayIdx ? 'text-white' : 'text-white/60'}`}>{dayNames[h.day_of_week]}</span>
+                          {h.is_closed
+                            ? <span className="text-[10px] text-red-400">Kapalı</span>
+                            : <span className="text-[10px] text-[#00A3AD]">{h.open_time?.slice(0,5)} – {h.close_time?.slice(0,5)}</span>
+                          }
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setShowAllHours(p => !p)}
+                        className="text-[9px] text-white/40 hover:text-white transition-colors uppercase tracking-widest mt-1"
+                      >
+                        {showAllHours ? 'Daha az göster' : 'Tüm haftayı göster'}
+                      </button>
+                    </>
+                  );
+                })() : (
+                  <p className="text-[#00A3AD] text-[10px]">09:00 – 20:00</p>
                 )}
                 <hr className="opacity-10" />
-                <p>{shop.district}, {shop.city}</p>
-                {shop.shop_phone && <p className="text-[#00A3AD]">{shop.shop_phone}</p>}
+                <p className="text-[10px] opacity-60">{shop.district}, {shop.city}</p>
+                {shop.shop_phone && <p className="text-[#00A3AD] text-[10px]">{shop.shop_phone}</p>}
               </div>
             </div>
           </div>
@@ -454,6 +511,22 @@ export default function ShopDetail() {
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 md:p-6" onClick={() => setLightboxUrl(null)}>
           <button className="absolute top-5 right-5 md:top-8 md:right-8 text-white hover:text-gray-300 transition-colors"><X size={28} /></button>
           <img src={lightboxUrl} className="max-h-[90vh] max-w-[95vw] md:max-w-[90vw] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* Sticky mobile booking bar */}
+      {showStickyBar && !isBooking && !showSuccess && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 shadow-2xl px-4 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-black text-sm uppercase tracking-tighter truncate text-black">{shop.name}</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{shop.district}, {shop.city}</p>
+          </div>
+          <button
+            onClick={() => services.length > 0 ? handleBookingClick(services[0]) : null}
+            className="flex-shrink-0 bg-[#00A3AD] text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-[#008A94] transition-all"
+          >
+            Randevu Al
+          </button>
         </div>
       )}
 
