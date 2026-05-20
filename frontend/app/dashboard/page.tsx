@@ -51,11 +51,13 @@ export default function Dashboard() {
 
     if (profile?.role !== 'business_owner') { router.replace('/'); return; }
 
-    const { data: shopData } = await supabase
+    const { data: shopList } = await supabase
       .from('shops')
       .select('*, profiles(avatar_url, full_name)')
       .eq('owner_id', user.id)
-      .single();
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const shopData = shopList?.[0] || null;
 
     if (shopData) {
       setShop(shopData);
@@ -154,8 +156,15 @@ export default function Dashboard() {
 
     await supabase.from('profiles').upsert({ id: user.id, email: user.email, role: 'business_owner', full_name: fd.get('name') as string });
 
+    // Mevcut dükkanı bul — yoksa yeni oluştur, varsa üzerine yaz
+    let shopId = shop?.id;
+    if (!shopId) {
+      const { data: existing } = await supabase.from('shops').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
+      shopId = existing?.id;
+    }
+
     const { error } = await supabase.from('shops').upsert({
-      id: shop?.id,
+      id: shopId,
       owner_id: user.id,
       name: fd.get('name') as string,
       legal_name: fd.get('legal_name') as string,
