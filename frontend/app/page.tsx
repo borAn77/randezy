@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, MapPin, Image as ImageIcon, ArrowUpDown } from "lucide-react";
+import { Search, X, MapPin, Image as ImageIcon, ArrowUpDown, Heart } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import { supabase } from "../lib/supabase";
+import AuthModal from "../components/layout/AuthModal";
 
 const CATEGORY_MAP: Record<string, string> = {
   "Kuaför": "KUAFÖR",
@@ -25,6 +26,9 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [sortBy, setSortBy] = useState<"default" | "rating">("default");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
   const shopsRef = useRef<HTMLDivElement>(null);
 
   // Read URL params on mount
@@ -62,7 +66,32 @@ export default function Home() {
         if (error) { setError(true); } else { setShops(data || []); }
         setLoading(false);
       });
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUserId(user.id);
+      supabase
+        .from("favorites")
+        .select("shop_id")
+        .eq("user_id", user.id)
+        .then(({ data }) => {
+          setFavoriteIds(new Set((data || []).map((f: any) => f.shop_id)));
+        });
+    });
   }, []);
+
+  const toggleFavorite = async (e: React.MouseEvent, shopId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!userId) { setIsAuthOpen(true); return; }
+    if (favoriteIds.has(shopId)) {
+      await supabase.from("favorites").delete().eq("user_id", userId).eq("shop_id", shopId);
+      setFavoriteIds(prev => { const n = new Set(prev); n.delete(shopId); return n; });
+    } else {
+      await supabase.from("favorites").insert({ user_id: userId, shop_id: shopId });
+      setFavoriteIds(prev => new Set(prev).add(shopId));
+    }
+  };
 
   const cities = useMemo(() =>
     [...new Set(shops.map(s => s.city).filter(Boolean))].sort() as string[],
@@ -199,7 +228,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* District filter — shown only when a city is selected and has multiple districts */}
+          {/* District filter */}
           {selectedCity && districts.length > 1 && (
             <div className="flex items-center gap-3 mt-2 w-full max-w-[700px]">
               <div className="flex items-center gap-1.5 text-white/40 text-[10px] font-black uppercase tracking-widest flex-shrink-0">
@@ -261,7 +290,7 @@ export default function Home() {
       {/* Shops grid */}
       <section ref={shopsRef} className="max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 py-12 md:py-24 bg-white">
 
-        {/* Filter bar — always visible when not loading */}
+        {/* Filter bar */}
         {!loading && !error && (
           <div className="flex items-center justify-between mb-8 md:mb-12 flex-wrap gap-3">
             <div className="flex items-center gap-2 flex-wrap">
@@ -292,8 +321,6 @@ export default function Home() {
                 </button>
               )}
             </div>
-
-            {/* Sort */}
             <button
               onClick={() => setSortBy(p => p === "rating" ? "default" : "rating")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all
@@ -338,6 +365,15 @@ export default function Home() {
                   <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
                     ⭐ {shop.score ?? "—"}
                   </div>
+                  <button
+                    onClick={e => toggleFavorite(e, shop.id)}
+                    className="absolute bottom-3 right-3 md:bottom-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
+                  >
+                    <Heart
+                      size={16}
+                      className={favoriteIds.has(shop.id) ? "fill-red-500 text-red-500" : "text-gray-400"}
+                    />
+                  </button>
                 </div>
                 <h3 className="font-black text-sm md:text-xl text-[#222] uppercase tracking-tighter leading-none mb-1">
                   {shop.name}
@@ -350,6 +386,8 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </main>
   );
 }

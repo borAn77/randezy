@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import Navbar from "../../components/layout/Navbar";
-import { 
-  User, Calendar, Shield, Trash2, ChevronRight, 
-  Store, TrendingUp, Users, Settings, PlusCircle 
+import {
+  User, Calendar, Shield, Trash2, ChevronRight,
+  Store, TrendingUp, Users, Settings, PlusCircle, Heart
 } from "lucide-react";
 
 export default function HesabimPage() {
@@ -17,6 +17,7 @@ export default function HesabimPage() {
   const [shopData, setShopData] = useState<any>(null);
   const [userAppointments, setUserAppointments] = useState<any[]>([]);
   const [shopAppointments, setShopAppointments] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [savingProfile, setSavingProfile] = useState(false);
@@ -39,6 +40,13 @@ export default function HesabimPage() {
           .eq('user_id', session.user.id)
           .order('appointment_date', { ascending: true });
         setUserAppointments(aptData || []);
+
+        const { data: favData } = await supabase
+          .from('favorites')
+          .select('shop_id, shops(id, name, city, district, image_url, score, category)')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+        setFavorites((favData || []).map((f: any) => f.shops).filter(Boolean));
 
         if (prof?.role === 'business_owner') {
           const { data: shopRes } = await supabase
@@ -168,16 +176,28 @@ export default function HesabimPage() {
             )}
 
             {!isOwner && (
-               <button 
-               onClick={() => setActiveTab("randevularim")}
-               className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-             >
-               <div className="flex items-center gap-4">
-                 <Calendar size={18} />
-                 <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
-               </div>
-               <ChevronRight size={14} />
-             </button>
+              <>
+                <button
+                  onClick={() => setActiveTab("randevularim")}
+                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <Calendar size={18} />
+                    <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
+                  </div>
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  onClick={() => setActiveTab("favorilerim")}
+                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'favorilerim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <Heart size={18} />
+                    <span className="text-[11px] font-black uppercase tracking-widest">Favorilerim</span>
+                  </div>
+                  <ChevronRight size={14} />
+                </button>
+              </>
             )}
 
             <button 
@@ -317,6 +337,33 @@ export default function HesabimPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {activeTab === "favorilerim" && !isOwner && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 text-black italic">Favorilerim</h2>
+              {favorites.length === 0 ? (
+                <div className="text-center py-40 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 font-black uppercase text-gray-300 tracking-[0.3em] italic">Henüz favori işletmen yok.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {favorites.map((shop: any) => (
+                    <a key={shop.id} href={`/shop/${shop.id}`} className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex gap-5 p-4 items-center group">
+                      <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
+                        {shop.image_url
+                          ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
+                          : <div className="w-full h-full flex items-center justify-center"><Heart size={24} className="text-gray-300" /></div>
+                        }
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-black text-sm uppercase tracking-tight text-black group-hover:text-[#00A3AD] transition-colors truncate">{shop.name}</h3>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{shop.district}, {shop.city}</p>
+                        {shop.score && <p className="text-[11px] font-black text-[#00A3AD] mt-1">⭐ {shop.score}</p>}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

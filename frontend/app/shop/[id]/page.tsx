@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Clock, ArrowLeft, X, Calendar as CalIcon,
-  ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon, Share2
+  ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon, Share2, Heart
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import AuthModal from "../../../components/layout/AuthModal";
@@ -65,6 +65,7 @@ export default function ShopDetail() {
   const [copied, setCopied] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,6 +76,17 @@ export default function ShopDetail() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!currentUserId) { setIsAuthOpen(true); return; }
+    if (isFavorited) {
+      await supabase.from('favorites').delete().eq('user_id', currentUserId).eq('shop_id', shopId);
+      setIsFavorited(false);
+    } else {
+      await supabase.from('favorites').insert({ user_id: currentUserId, shop_id: shopId });
+      setIsFavorited(true);
+    }
+  }, [currentUserId, isFavorited, shopId]);
 
   const handleShare = useCallback(async () => {
     const url = window.location.href;
@@ -117,6 +129,10 @@ export default function ShopDetail() {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUserId(user?.id ?? null);
+      if (user) {
+        supabase.from('favorites').select('id').eq('user_id', user.id).eq('shop_id', shopId).single()
+          .then(({ data }) => setIsFavorited(!!data));
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -354,13 +370,22 @@ export default function ShopDetail() {
                       {!avgRating && shop.score && <span className="ml-2">— ⭐ {shop.score}</span>}
                     </p>
                   </div>
-                  <button
-                    onClick={handleShare}
-                    className="flex-shrink-0 p-2 md:p-3 bg-white rounded-xl md:rounded-2xl shadow-sm hover:bg-[#00A3AD] hover:text-white transition-all group"
-                    title="Paylaş"
-                  >
-                    {copied ? <CheckCircle2 size={16} className="text-[#00A3AD] group-hover:text-white" /> : <Share2 size={16} className="text-gray-500 group-hover:text-white" />}
-                  </button>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={toggleFavorite}
+                      className="p-2 md:p-3 bg-white rounded-xl md:rounded-2xl shadow-sm hover:scale-110 transition-all"
+                      title={isFavorited ? "Favorilerden çıkar" : "Favorilere ekle"}
+                    >
+                      <Heart size={16} className={isFavorited ? "fill-red-500 text-red-500" : "text-gray-400"} />
+                    </button>
+                    <button
+                      onClick={handleShare}
+                      className="p-2 md:p-3 bg-white rounded-xl md:rounded-2xl shadow-sm hover:bg-[#00A3AD] hover:text-white transition-all group"
+                      title="Paylaş"
+                    >
+                      {copied ? <CheckCircle2 size={16} className="text-[#00A3AD] group-hover:text-white" /> : <Share2 size={16} className="text-gray-500 group-hover:text-white" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
