@@ -19,6 +19,7 @@ export default function HesabimPage() {
   const [shopAppointments, setShopAppointments] = useState<any[]>([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     const getInitialData = async () => {
@@ -65,14 +66,17 @@ export default function HesabimPage() {
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavingProfile(true);
     const { error } = await supabase.from('profiles').update({
       first_name: editForm.firstName,
       last_name: editForm.lastName,
       full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
-      phone: editForm.phone,
+      phone: editForm.phone.trim() || null,
+      updated_at: new Date().toISOString(),
     }).eq('id', user.id);
+    setSavingProfile(false);
     if (!error) {
-      setProfile({ ...profile, first_name: editForm.firstName, last_name: editForm.lastName, full_name: `${editForm.firstName} ${editForm.lastName}`.trim(), phone: editForm.phone });
+      setProfile({ ...profile, first_name: editForm.firstName, last_name: editForm.lastName, full_name: `${editForm.firstName} ${editForm.lastName}`.trim(), phone: editForm.phone.trim() || null });
       setIsEditingProfile(false);
     } else {
       alert("Güncelleme hatası: " + error.message);
@@ -97,6 +101,7 @@ export default function HesabimPage() {
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center font-black uppercase tracking-widest text-gray-400 italic animate-pulse">Yükleniyor...</div>;
+  if (!user) { router.replace("/"); return null; }
 
   return (
     <main className="min-h-screen bg-[#F9F9F9] text-[#111]">
@@ -219,8 +224,10 @@ export default function HesabimPage() {
                     <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
                   </div>
                   <div className="flex gap-4 mt-8">
-                    <button type="submit" className="flex-1 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">Kaydet</button>
-                    <button type="button" onClick={() => setIsEditingProfile(false)} className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all">İptal</button>
+                    <button type="submit" disabled={savingProfile} className="flex-1 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl disabled:opacity-50">
+                      {savingProfile ? "Kaydediliyor..." : "Kaydet"}
+                    </button>
+                    <button type="button" onClick={() => setIsEditingProfile(false)} disabled={savingProfile} className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50">İptal</button>
                   </div>
                 </form>
               ) : (
