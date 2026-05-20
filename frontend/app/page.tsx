@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
@@ -8,6 +8,21 @@ import { supabase } from "../lib/supabase";
 export default function Home() {
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const shopsRef = useRef<HTMLElement>(null);
+
+  const categoryMap: { [key: string]: string } = {
+    "Kuaför": "KUAFÖR", "Berber": "BERBER", "Güzellik Merkezi": "GÜZELLİK MERKEZİ",
+    "Tırnak": "TIRNAK", "Fizyoterapi": "FİZYOTERAPİ", "Kaş ve Kirpik": "KAŞ VE KİRPİK",
+    "Masaj": "MASAJ", "Dövme": "DÖVME",
+  };
+
+  const filteredShops = shops.filter(shop => {
+    const matchSearch = !searchQuery || shop.name?.toLowerCase().includes(searchQuery.toLowerCase()) || shop.category?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchCategory = !selectedCategory || shop.category === selectedCategory;
+    return matchSearch && matchCategory;
+  });
 
   useEffect(() => {
     supabase
@@ -44,21 +59,24 @@ export default function Home() {
           <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-2xl w-full max-w-[700px]">
             <div className="flex-1 flex items-center px-6">
               <Search className="text-gray-300 mr-4" size={22} />
-              <input 
-                type="text" 
-                placeholder="Hizmet veya işletme adı ara..." 
-                className="w-full py-4 text-black outline-none font-bold text-sm placeholder:text-gray-300" 
+              <input
+                type="text"
+                placeholder="Hizmet veya işletme adı ara..."
+                className="w-full py-4 text-black outline-none font-bold text-sm placeholder:text-gray-300"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && shopsRef.current?.scrollIntoView({ behavior: 'smooth' })}
               />
             </div>
-            <button className="bg-[#222] text-white px-10 py-4 rounded-xl font-black text-sm uppercase tracking-widest">
+            <button onClick={() => shopsRef.current?.scrollIntoView({ behavior: 'smooth' })} className="bg-[#222] text-white px-10 py-4 rounded-xl font-black text-sm uppercase tracking-widest">
               Ara
             </button>
           </div>
 
           <div className="flex flex-wrap justify-center gap-10 mt-16 font-black text-[11px] opacity-100 uppercase tracking-[0.2em]">
             {["Kuaför", "Berber", "Güzellik Merkezi", "Tırnak", "Fizyoterapi", "Kaş ve Kirpik", "Masaj", "Dövme", "Dahası..."].map((c) => (
-              <div key={c} className="cursor-pointer group flex flex-col items-center">
-                <span className="text-white">{c}</span>
+              <div key={c} onClick={() => { const mapped = categoryMap[c]; setSelectedCategory(mapped && mapped !== selectedCategory ? mapped : ""); shopsRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="cursor-pointer group flex flex-col items-center">
+                <span className={`text-white ${categoryMap[c] === selectedCategory ? 'underline underline-offset-4' : ''}`}>{c}</span>
                 <div className="h-[2.5px] w-full bg-white mt-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
             ))}
@@ -70,18 +88,20 @@ export default function Home() {
               <h3 className="text-2xl font-black text-[#222] tracking-tighter leading-none">Öne Çıkanlar</h3>
               <p className="text-[12px] font-bold text-gray-400 italic mt-1.5 uppercase tracking-widest">Randezy topluluğunun favorileri.</p>
            </div>
-           <button className="text-[#00A3AD] font-black text-[12px] tracking-[0.2em] border-b-2 border-[#00A3AD] pb-1 hover:text-[#008A94] transition-colors uppercase">
+           <button onClick={() => { setSelectedCategory(""); setSearchQuery(""); shopsRef.current?.scrollIntoView({ behavior: 'smooth' }); }} className="text-[#00A3AD] font-black text-[12px] tracking-[0.2em] border-b-2 border-[#00A3AD] pb-1 hover:text-[#008A94] transition-colors uppercase">
              TÜMÜNÜ GÖR
            </button>
         </div>
       </section>
 
-      <section className="max-w-[1400px] mx-auto px-20 py-24 bg-white">
+      <section ref={shopsRef} className="max-w-[1400px] mx-auto px-20 py-24 bg-white">
         {loading ? (
           <div className="text-center font-black text-gray-200 py-20 uppercase tracking-widest italic">Dükkanlar Hazırlanıyor...</div>
+        ) : filteredShops.length === 0 ? (
+          <div className="text-center font-black text-gray-300 py-20 uppercase tracking-widest italic">Sonuç Bulunamadı</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-            {shops.map((shop: any) => (
+            {filteredShops.map((shop: any) => (
               <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
                 <div className="relative h-80 rounded-[2.5rem] overflow-hidden mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
                   <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />

@@ -47,7 +47,7 @@ export default function Randevularim() {
               </div>
               <div className="text-right">
                 <span className="block text-2xl font-black">{apt.price} TL</span>
-                <span className="text-[10px] font-black uppercase text-orange-400 bg-orange-50 px-3 py-1 rounded-full mt-2 inline-block">
+                <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full mt-2 inline-block ${apt.status === 'Onaylandı' ? 'text-green-600 bg-green-50' : apt.status === 'İptal Edildi' ? 'text-red-500 bg-red-50' : 'text-orange-400 bg-orange-50'}`}>
                   {apt.status}
                 </span>
               </div>

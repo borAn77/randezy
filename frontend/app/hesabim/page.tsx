@@ -14,6 +14,11 @@ export default function HesabimPage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("profil");
+  const [shopData, setShopData] = useState<any>(null);
+  const [userAppointments, setUserAppointments] = useState<any[]>([]);
+  const [shopAppointments, setShopAppointments] = useState<any[]>([]);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "" });
 
   useEffect(() => {
     const getInitialData = async () => {
@@ -26,6 +31,30 @@ export default function HesabimPage() {
           .eq('id', session.user.id)
           .single();
         setProfile(prof);
+
+        const { data: aptData } = await supabase
+          .from('appointments')
+          .select('*, shops(name, city, district)')
+          .eq('user_id', session.user.id)
+          .order('appointment_date', { ascending: true });
+        setUserAppointments(aptData || []);
+
+        if (prof?.role === 'business_owner') {
+          const { data: shopRes } = await supabase
+            .from('shops')
+            .select('*')
+            .eq('owner_id', session.user.id)
+            .single();
+          setShopData(shopRes);
+          if (shopRes) {
+            const { data: shopAptData } = await supabase
+              .from('appointments')
+              .select('*, profiles(full_name, phone, email)')
+              .eq('shop_id', shopRes.id)
+              .order('appointment_date', { ascending: false });
+            setShopAppointments(shopAptData || []);
+          }
+        }
       }
       setLoading(false);
     };
@@ -33,6 +62,29 @@ export default function HesabimPage() {
   }, []);
 
   const isOwner = profile?.role === 'business_owner';
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase.from('profiles').update({
+      first_name: editForm.firstName,
+      last_name: editForm.lastName,
+      full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
+      phone: editForm.phone,
+    }).eq('id', user.id);
+    if (!error) {
+      setProfile({ ...profile, first_name: editForm.firstName, last_name: editForm.lastName, full_name: `${editForm.firstName} ${editForm.lastName}`.trim(), phone: editForm.phone });
+      setIsEditingProfile(false);
+    } else {
+      alert("Güncelleme hatası: " + error.message);
+    }
+  };
+
+  const handleToggleShopStatus = async () => {
+    if (!shopData) return;
+    const newStatus = !shopData.is_active;
+    const { error } = await supabase.from('shops').update({ is_active: newStatus }).eq('id', shopData.id);
+    if (!error) setShopData({ ...shopData, is_active: newStatus });
+  };
 
   const handleDeleteAccount = async () => {
     const confirmDelete = confirm("HESABINI SİLMEK İSTEDİĞİNE EMİN MİSİN? Bu işlem geri alınamaz.");
@@ -56,10 +108,10 @@ export default function HesabimPage() {
         <aside className="w-full lg:w-80 space-y-8">
           <div className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-gray-100 flex flex-col items-center text-center">
             <div className="w-24 h-24 rounded-full bg-[#00A3AD] flex items-center justify-center text-3xl font-black text-white shadow-xl mb-4 uppercase">
-              {profile?.first_name?.[0] || user?.email?.[0]}
+              {profile?.first_name?.[0] || profile?.full_name?.[0] || user?.email?.[0]}
             </div>
             <h2 className="text-2xl font-black text-black uppercase tracking-tighter">
-              {profile?.first_name} {profile?.last_name}
+              {profile?.first_name ? `${profile.first_name} ${profile.last_name || ''}`.trim() : (profile?.full_name || '')}
             </h2>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
               {user?.email}
@@ -150,23 +202,48 @@ export default function HesabimPage() {
                 <h1 className="text-4xl font-black text-black uppercase tracking-tighter mb-2">Profil Bilgileri</h1>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] italic">Kişisel detaylarını buradan yönetebilirsin.</p>
               </header>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-16">
-                {[
-                  { label: "Ad", value: profile?.first_name },
-                  { label: "Soyad", value: profile?.last_name },
-                  { label: "E-Posta", value: user?.email, muted: true },
-                  { label: "Telefon", value: profile?.phone },
-                  { label: "Yaş", value: profile?.age }
-                ].map((field, i) => (
-                  <div key={i} className="space-y-2">
-                    <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">{field.label}</label>
-                    <p className={`text-lg font-bold border-b-2 border-gray-50 pb-3 ${field.muted ? 'text-gray-400' : 'text-black'}`}>
-                      {field.value || "-"}
-                    </p>
+              {isEditingProfile ? (
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Ad</label>
+                      <input required value={editForm.firstName} onChange={e => setEditForm({...editForm, firstName: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Soyad</label>
+                      <input required value={editForm.lastName} onChange={e => setEditForm({...editForm, lastName: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                    </div>
                   </div>
-                ))}
-              </div>
-              <button className="mt-16 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">Bilgileri Güncelle</button>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Telefon</label>
+                    <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                  </div>
+                  <div className="flex gap-4 mt-8">
+                    <button type="submit" className="flex-1 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">Kaydet</button>
+                    <button type="button" onClick={() => setIsEditingProfile(false)} className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all">İptal</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-16">
+                    {[
+                      { label: "Ad", value: profile?.first_name || profile?.full_name?.split(' ')[0] },
+                      { label: "Soyad", value: profile?.last_name || profile?.full_name?.split(' ').slice(1).join(' ') },
+                      { label: "E-Posta", value: user?.email, muted: true },
+                      { label: "Telefon", value: profile?.phone },
+                      { label: "Yaş", value: profile?.age }
+                    ].map((field, i) => (
+                      <div key={i} className="space-y-2">
+                        <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">{field.label}</label>
+                        <p className={`text-lg font-bold border-b-2 border-gray-50 pb-3 ${field.muted ? 'text-gray-400' : 'text-black'}`}>
+                          {field.value || "-"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => { setEditForm({ firstName: profile?.first_name || '', lastName: profile?.last_name || '', phone: profile?.phone || '' }); setIsEditingProfile(true); }} className="mt-16 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">Bilgileri Güncelle</button>
+                </>
+              )}
             </div>
           )}
 
@@ -176,18 +253,18 @@ export default function HesabimPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-2xl">
                   <TrendingUp className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Aylık Kazanç</p>
-                  <h4 className="text-4xl font-black mt-2 tracking-tighter">₺12.450</h4>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Toplam Kazanç</p>
+                  <h4 className="text-4xl font-black mt-2 tracking-tighter">₺{shopAppointments.filter(a => a.status === 'Onaylandı').reduce((sum, a) => sum + (a.price || 0), 0).toLocaleString('tr-TR')}</h4>
                 </div>
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
                   <Users className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aktif Müşteriler</p>
-                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">128</h4>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Toplam Müşteri</p>
+                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">{new Set(shopAppointments.map(a => a.user_id).filter(Boolean)).size}</h4>
                 </div>
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-gray-100">
                   <Calendar className="mb-4 text-[#00A3AD]" size={28} />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Yeni Randevu</p>
-                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">14</h4>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bekleyen Randevu</p>
+                  <h4 className="text-4xl font-black mt-2 text-black tracking-tighter">{shopAppointments.filter(a => a.status === 'Beklemede').length}</h4>
                 </div>
               </div>
 
@@ -196,11 +273,11 @@ export default function HesabimPage() {
                   <h3 className="text-2xl font-black uppercase tracking-tighter text-black">Hızlı İşlemler</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
-                    <span className="font-black uppercase text-[11px] tracking-widest text-gray-600 group-hover:text-white">Dükkan Durumu (Açık)</span>
-                    <div className="w-12 h-6 bg-[#00A3AD] rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div>
+                  <div onClick={handleToggleShopStatus} className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
+                    <span className="font-black uppercase text-[11px] tracking-widest text-gray-600 group-hover:text-white">Dükkan Durumu ({shopData?.is_active ? 'Açık' : 'Kapalı'})</span>
+                    <div className={`w-12 h-6 rounded-full relative transition-colors ${shopData?.is_active ? 'bg-[#00A3AD]' : 'bg-gray-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${shopData?.is_active ? 'right-1' : 'left-1'}`}></div></div>
                   </div>
-                  <div className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
+                  <div onClick={() => router.push('/dashboard')} className="p-8 bg-gray-50 rounded-[2rem] flex justify-between items-center group cursor-pointer hover:bg-black transition-all">
                     <span className="font-black uppercase text-[11px] tracking-widest text-gray-600 group-hover:text-white">Yeni Hizmet Ekle</span>
                     <PlusCircle size={24} className="text-[#00A3AD]" />
                   </div>
@@ -209,9 +286,57 @@ export default function HesabimPage() {
             </div>
           )}
 
-          {/* DİĞER TABLAR İÇİN YER TUTUCULAR */}
-          {activeTab === "randevularim" && <div className="text-center py-40 font-black uppercase text-gray-300 tracking-[0.3em] italic">Randevu geçmişin temiz.</div>}
-          {activeTab === "isletme-randevular" && <div className="text-center py-40 font-black uppercase text-gray-300 tracking-[0.3em] italic">Henüz yeni randevu gelmedi.</div>}
+          {activeTab === "randevularim" && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 text-black italic">Randevularım</h2>
+              {userAppointments.length === 0 ? (
+                <div className="text-center py-40 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 font-black uppercase text-gray-300 tracking-[0.3em] italic">Henüz randevun yok.</div>
+              ) : userAppointments.map((apt) => (
+                <div key={apt.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex justify-between items-center group hover:border-[#00A3AD] transition-all">
+                  <div className="flex gap-6 items-center">
+                    <div className="w-14 h-14 bg-gray-50 rounded-2xl flex flex-col items-center justify-center border border-gray-100">
+                      <span className="text-[10px] font-black text-[#00A3AD] uppercase">{apt.appointment_date?.split('-')[1]}</span>
+                      <span className="text-lg font-black text-black">{apt.appointment_date?.split('-')[2]}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black uppercase text-black">{apt.service_name}</h3>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{apt.shops?.name} • {apt.appointment_time?.slice(0,5)} • {apt.appointment_date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xl font-black text-black">{apt.price} TL</span>
+                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full mt-2 inline-block ${apt.status === 'Onaylandı' ? 'text-green-600 bg-green-50' : apt.status === 'İptal Edildi' ? 'text-red-500 bg-red-50' : 'text-orange-400 bg-orange-50'}`}>{apt.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "isletme-randevular" && isOwner && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 text-black italic">Gelen Randevular</h2>
+              {shopAppointments.length === 0 ? (
+                <div className="text-center py-40 bg-white rounded-[3rem] border-2 border-dashed border-gray-100 font-black uppercase text-gray-300 tracking-[0.3em] italic">Henüz randevu gelmedi.</div>
+              ) : shopAppointments.map((apt) => (
+                <div key={apt.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex justify-between items-center group hover:border-[#00A3AD] transition-all">
+                  <div className="flex gap-6 items-center">
+                    <div className="bg-black text-[#00A3AD] px-5 py-3 rounded-2xl font-black text-center">
+                      <p className="text-[9px] uppercase opacity-50">Saat</p>
+                      <p className="text-lg">{apt.appointment_time?.slice(0,5)}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black uppercase text-black">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h3>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{apt.service_name} • {apt.appointment_date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xl font-black text-black">{apt.price} TL</span>
+                    <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full mt-2 inline-block ${apt.status === 'Onaylandı' ? 'text-green-600 bg-green-50' : apt.status === 'İptal Edildi' ? 'text-red-500 bg-red-50' : 'text-orange-400 bg-orange-50'}`}>{apt.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
         </section>
       </div>

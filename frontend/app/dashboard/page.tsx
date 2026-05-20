@@ -92,11 +92,9 @@ export default function Dashboard() {
       mersis_no: fd.get('mersis_no') as string,
       tax_office: fd.get('tax_office') as string,
       tax_no: fd.get('tax_no') as string,
-      category: 'BERBER',
       shop_phone: fd.get('phone') as string,
       description: fd.get('bio') as string,
       iban: fd.get('iban') as string,
-      city: 'İstanbul', district: 'Kadıköy', neighborhood: 'Moda', street: 'Güneş', building_no: '1'
     });
 
     if (!error) { alert("Tüm Veriler Mühürlendi!"); fetchInitialData(); setActiveTab("overview"); }
@@ -154,8 +152,8 @@ export default function Dashboard() {
             {/* 1. OVERVIEW */}
             {activeTab === "overview" && (
                <div className="animate-in fade-in duration-500 grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm group hover:shadow-xl transition-all"><TrendingUp className="text-[#00A3AD] mb-4" size={24}/><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tahmini Kazanç</p><h3 className="text-4xl font-black text-black">₺12.450</h3></div>
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm group hover:shadow-xl transition-all"><Users className="text-[#00A3AD] mb-4" size={24}/><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Müşteriler</p><h3 className="text-4xl font-black text-black">{appointments.length * 2 + 3}</h3></div>
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm group hover:shadow-xl transition-all"><TrendingUp className="text-[#00A3AD] mb-4" size={24}/><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tahmini Kazanç</p><h3 className="text-4xl font-black text-black">₺{appointments.filter(a => a.status === 'Onaylandı').reduce((sum, a) => sum + (a.price || 0), 0).toLocaleString('tr-TR')}</h3></div>
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm group hover:shadow-xl transition-all"><Users className="text-[#00A3AD] mb-4" size={24}/><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Müşteriler</p><h3 className="text-4xl font-black text-black">{new Set(appointments.map(a => a.user_id).filter(Boolean)).size}</h3></div>
                   <div className="bg-black text-white p-10 rounded-[3rem] shadow-2xl"><Calendar className="text-[#00A3AD] mb-4" size={24}/><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bekleyen Randevu</p><h3 className="text-4xl font-black">{appointments.filter(a => a.status === 'Beklemede').length}</h3></div>
                </div>
             )}

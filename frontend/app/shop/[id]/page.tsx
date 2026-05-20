@@ -17,10 +17,11 @@ export default function ShopDetail() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedService, setSelectedService] = useState<any>(null);
   
-  const [currentDate, setCurrentDate] = useState(new Date()); 
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [shopHours, setShopHours] = useState<any[]>([]);
 
   useEffect(() => {
     supabase
@@ -35,6 +36,12 @@ export default function ShopDetail() {
       .select('*')
       .eq('shop_id', Number(params.id))
       .then(({ data }) => setServices(data || []));
+
+    supabase
+      .from('shop_hours')
+      .select('*')
+      .eq('shop_id', Number(params.id))
+      .then(({ data }) => setShopHours(data || []));
   }, [params.id]);
 
   const renderDays = () => {
@@ -55,7 +62,7 @@ export default function ShopDetail() {
         <button 
           key={d} 
           disabled={isPast}
-          onClick={() => setSelectedDay(fullDate)}
+          onClick={() => { setSelectedDay(fullDate); setSelectedTime(""); }}
           className={`h-14 w-14 rounded-2xl font-black text-sm transition-all flex items-center justify-center
             ${isSelected ? 'bg-[#00A3AD] text-white shadow-2xl scale-110' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}
             ${isPast ? 'opacity-20 cursor-not-allowed' : ''}`}
@@ -83,6 +90,26 @@ export default function ShopDetail() {
       }]);
     if (!error) { setIsBooking(false); setShowSuccess(true); } else { alert("Hata: " + error.message); }
     setLoading(false);
+  };
+
+  const generateTimeSlots = (openTime: string, closeTime: string): string[] => {
+    const slots: string[] = [];
+    const [openH] = openTime.split(':').map(Number);
+    const [closeH] = closeTime.split(':').map(Number);
+    for (let h = openH; h < closeH; h++) {
+      slots.push(`${String(h).padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+
+  const getAvailableSlots = (): string[] | null => {
+    if (shopHours.length === 0) return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+    if (!selectedDay) return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+    const dayOfWeek = selectedDay.getDay();
+    const dayHours = shopHours.find(h => h.day_of_week === dayOfWeek);
+    if (!dayHours) return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+    if (dayHours.is_closed) return null;
+    return generateTimeSlots(dayHours.open_time, dayHours.close_time);
   };
 
   const aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -165,11 +192,17 @@ export default function ShopDetail() {
               </div>
               <div className="grid grid-cols-7 gap-4 mb-12">{renderDays()}</div>
               <div className="grid grid-cols-4 gap-4">
-                {["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"].map((t) => (
-                  <button key={t} onClick={() => setSelectedTime(t)} className={`py-5 rounded-2xl font-black text-xs border-2 transition-all ${selectedTime === t ? 'border-[#00A3AD] text-[#00A3AD] bg-[#E6F6F7]' : 'border-gray-100 text-gray-400 hover:border-[#00A3AD]'}`}>
-                    {t}
-                  </button>
-                ))}
+                {(() => {
+                  const slots = getAvailableSlots();
+                  if (slots === null) return (
+                    <div className="col-span-4 text-center text-gray-400 font-black text-xs uppercase tracking-widest py-6">Bu gün kapalı</div>
+                  );
+                  return slots.map((t) => (
+                    <button key={t} onClick={() => setSelectedTime(t)} className={`py-5 rounded-2xl font-black text-xs border-2 transition-all ${selectedTime === t ? 'border-[#00A3AD] text-[#00A3AD] bg-[#E6F6F7]' : 'border-gray-100 text-gray-400 hover:border-[#00A3AD]'}`}>
+                      {t}
+                    </button>
+                  ));
+                })()}
               </div>
             </div>
             <div className="w-[400px] bg-gray-50 p-16 flex flex-col justify-between border-l border-gray-100">

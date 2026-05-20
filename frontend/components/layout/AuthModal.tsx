@@ -35,21 +35,11 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     return regex.test(pass);
   };
 
-  const handleNextStep = async () => {
+  const handleNextStep = () => {
     if (!formData.email.includes("@")) {
       alert("Lütfen geçerli bir e-posta adresi giriniz.");
       return;
     }
-    // Email kayıtlı mı kontrol et
-    setLoading(true);
-    const { data } = await supabase.auth.signInWithOtp({
-      email: formData.email,
-      options: { shouldCreateUser: false }
-    });
-    setLoading(false);
-    // Hata yoksa kullanıcı var demek → giriş modu
-    // Hata varsa yeni kullanıcı → kayıt modu
-    // En basit yol: direkt adım 2'ye geç, orada belirle
     setStep(2);
   };
 
