@@ -176,29 +176,28 @@ export default function HesabimPage() {
             )}
 
             {!isOwner && (
-              <>
-                <button
-                  onClick={() => setActiveTab("randevularim")}
-                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Calendar size={18} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
-                  </div>
-                  <ChevronRight size={14} />
-                </button>
-                <button
-                  onClick={() => setActiveTab("favorilerim")}
-                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'favorilerim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Heart size={18} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Favorilerim</span>
-                  </div>
-                  <ChevronRight size={14} />
-                </button>
-              </>
+              <button
+                onClick={() => setActiveTab("randevularim")}
+                className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                <div className="flex items-center gap-4">
+                  <Calendar size={18} />
+                  <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
+                </div>
+                <ChevronRight size={14} />
+              </button>
             )}
+
+            <button
+              onClick={() => setActiveTab("favorilerim")}
+              className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'favorilerim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              <div className="flex items-center gap-4">
+                <Heart size={18} />
+                <span className="text-[11px] font-black uppercase tracking-widest">Favorilerim</span>
+              </div>
+              <ChevronRight size={14} />
+            </button>
 
             <button 
               onClick={() => setActiveTab("guvenlik")}
@@ -340,7 +339,7 @@ export default function HesabimPage() {
             </div>
           )}
 
-          {activeTab === "favorilerim" && !isOwner && (
+          {activeTab === "favorilerim" && (
             <div className="space-y-6 animate-in fade-in duration-500">
               <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 text-black italic">Favorilerim</h2>
               {favorites.length === 0 ? (
