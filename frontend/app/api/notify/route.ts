@@ -1,0 +1,168 @@
+import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
+import { createClient } from "@supabase/supabase-js";
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function POST(req: NextRequest) {
+  if (!resend) {
+    return NextResponse.json({ ok: false, reason: "RESEND_API_KEY not configured" });
+  }
+
+  const body = await req.json();
+  const { type } = body;
+
+  try {
+    if (type === "new_appointment") {
+      await handleNewAppointment(body);
+    } else if (type === "appointment_confirmed") {
+      await handleStatusChange(body, "confirmed");
+    } else if (type === "appointment_rejected") {
+      await handleStatusChange(body, "rejected");
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[notify]", err);
+    return NextResponse.json({ ok: false });
+  }
+}
+
+async function handleNewAppointment(body: {
+  shopId: number;
+  ownerId: string;
+  customerName: string;
+  serviceName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  price: number;
+}) {
+  const { data: ownerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", body.ownerId)
+    .single();
+
+  if (!ownerProfile?.email) return;
+
+  const dateStr = formatDate(body.appointmentDate);
+
+  await resend!.emails.send({
+    from: "Randezy <bildirim@randezy.com>",
+    to: ownerProfile.email,
+    subject: `Yeni Randevu — ${body.serviceName}`,
+    html: emailTemplate({
+      title: "Yeni Randevu Geldi!",
+      color: "#00A3AD",
+      lines: [
+        `<b>Hizmet:</b> ${body.serviceName}`,
+        `<b>Müşteri:</b> ${body.customerName}`,
+        `<b>Tarih:</b> ${dateStr}`,
+        `<b>Saat:</b> ${body.appointmentTime}`,
+        `<b>Ücret:</b> ₺${body.price}`,
+      ],
+      note: "Randevuyu onaylamak veya reddetmek için dashboard'ınıza giriş yapın.",
+      ctaText: "Dashboard'a Git",
+      ctaUrl: "https://randezy.com/dashboard",
+    }),
+  });
+}
+
+async function handleStatusChange(
+  body: {
+    customerEmail: string;
+    customerName: string;
+    shopName: string;
+    serviceName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    reason?: string;
+  },
+  status: "confirmed" | "rejected"
+) {
+  if (!body.customerEmail) return;
+
+  const dateStr = formatDate(body.appointmentDate);
+  const isConfirmed = status === "confirmed";
+
+  await resend!.emails.send({
+    from: "Randezy <bildirim@randezy.com>",
+    to: body.customerEmail,
+    subject: isConfirmed
+      ? `Randevunuz Onaylandı — ${body.shopName}`
+      : `Randevunuz İptal Edildi — ${body.shopName}`,
+    html: emailTemplate({
+      title: isConfirmed ? "Randevunuz Onaylandı!" : "Randevunuz İptal Edildi",
+      color: isConfirmed ? "#00A3AD" : "#ef4444",
+      lines: [
+        `<b>İşletme:</b> ${body.shopName}`,
+        `<b>Hizmet:</b> ${body.serviceName}`,
+        `<b>Tarih:</b> ${dateStr}`,
+        `<b>Saat:</b> ${body.appointmentTime}`,
+        ...(body.reason ? [`<b>Sebep:</b> ${body.reason}`] : []),
+      ],
+      note: isConfirmed
+        ? "Randevunuzu iptal etmek isterseniz hesabınızdan yapabilirsiniz."
+        : "Yeni bir randevu almak için sitemizi ziyaret edebilirsiniz.",
+      ctaText: isConfirmed ? "Randevularım" : "Yeni Randevu Al",
+      ctaUrl: "https://randezy.com/hesabim",
+    }),
+  });
+}
+
+function formatDate(dateStr: string): string {
+  const months = [
+    "Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+    "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık",
+  ];
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return `${d} ${months[m - 1]} ${y}`;
+}
+
+function emailTemplate(opts: {
+  title: string;
+  color: string;
+  lines: string[];
+  note: string;
+  ctaText: string;
+  ctaUrl: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+        <tr>
+          <td style="background:${opts.color};padding:32px 40px;text-align:center">
+            <p style="margin:0;font-size:13px;font-weight:900;color:rgba(255,255,255,0.7);letter-spacing:4px;text-transform:uppercase">RANDEZY</p>
+            <h1 style="margin:12px 0 0;font-size:26px;font-weight:900;color:#fff;letter-spacing:-0.5px">${opts.title}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:12px;padding:24px">
+              ${opts.lines.map(l => `<tr><td style="padding:8px 0;font-size:14px;color:#333;border-bottom:1px solid #eee">${l}</td></tr>`).join("")}
+            </table>
+            <p style="font-size:13px;color:#888;margin:24px 0 28px;line-height:1.6">${opts.note}</p>
+            <a href="${opts.ctaUrl}" style="display:inline-block;background:${opts.color};color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:900;font-size:13px;letter-spacing:2px;text-transform:uppercase">${opts.ctaText}</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #f0f0f0;text-align:center">
+            <p style="margin:0;font-size:11px;color:#bbb">© 2025 Randezy · <a href="https://randezy.com" style="color:#bbb">randezy.com</a></p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}

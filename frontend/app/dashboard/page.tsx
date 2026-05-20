@@ -140,7 +140,27 @@ export default function Dashboard() {
 
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
-    if (!error) fetchInitialData();
+    if (!error) {
+      fetchInitialData();
+      if (newStatus === 'Onaylandı') {
+        const apt = appointments.find(a => a.id === id);
+        if (apt?.profiles?.email) {
+          fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'appointment_confirmed',
+              customerEmail: apt.profiles.email,
+              customerName: apt.profiles.full_name || 'Müşteri',
+              shopName: shop?.name || '',
+              serviceName: apt.service_name,
+              appointmentDate: apt.appointment_date,
+              appointmentTime: apt.appointment_time?.slice(0, 5),
+            }),
+          }).catch(() => {});
+        }
+      }
+    }
   };
 
   const handleReject = async (id: string) => {
@@ -149,11 +169,28 @@ export default function Dashboard() {
       setRejectError(`En az 10 kelime gerekli. Şu an: ${words.length} kelime.`);
       return;
     }
+    const apt = appointments.find(a => a.id === id);
     await supabase.from('appointments').update({ status: 'İptal Edildi', cancel_reason: rejectReason.trim() }).eq('id', id);
     setRejectingId(null);
     setRejectReason("");
     setRejectError("");
     fetchInitialData();
+    if (apt?.profiles?.email) {
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'appointment_rejected',
+          customerEmail: apt.profiles.email,
+          customerName: apt.profiles.full_name || 'Müşteri',
+          shopName: shop?.name || '',
+          serviceName: apt.service_name,
+          appointmentDate: apt.appointment_date,
+          appointmentTime: apt.appointment_time?.slice(0, 5),
+          reason: rejectReason.trim(),
+        }),
+      }).catch(() => {});
+    }
   };
 
   const handleSettingsSubmit = async (e: any) => {

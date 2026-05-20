@@ -131,7 +131,6 @@ export default function ShopDetail() {
 
   useEffect(() => {
     setSelectedTime("");
-    console.log('[DEBUG] shopHours:', shopHours, '| selectedDay:', selectedDay, '| selectedService:', selectedService);
     if (!selectedDay || !selectedService || shopHours.length === 0) {
       setAvailableSlots([]);
       return;
@@ -139,7 +138,6 @@ export default function ShopDetail() {
 
     const dayOfWeek = selectedDay.getDay();
     const dayHours = shopHours.find((h: any) => h.day_of_week === dayOfWeek);
-    console.log('[DEBUG] dayOfWeek:', dayOfWeek, '| dayHours found:', dayHours);
 
     if (!dayHours || dayHours.is_closed) {
       setIsClosedDay(true);
@@ -149,22 +147,44 @@ export default function ShopDetail() {
 
     setIsClosedDay(false);
     const slots = generateTimeSlots(dayHours.open_time, dayHours.close_time, selectedService.duration);
-    console.log('[DEBUG] dayHours:', dayHours, '| slots:', slots);
 
     supabase
       .from('appointments')
-      .select('appointment_time')
+      .select('appointment_time, staff_id')
       .eq('shop_id', shopId)
       .eq('appointment_date', localDateStr(selectedDay))
       .neq('status', 'İptal Edildi')
-      .then(({ data: booked, error: apptError }) => {
-        console.log('[DEBUG] appointments data:', booked, '| error:', apptError);
-        const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
-        let available = slots.filter(s => !bookedTimes.has(s));
+      .then(({ data: booked }) => {
+        const now = new Date();
+        const isToday = selectedDay.toDateString() === now.toDateString();
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-        const today = new Date();
-        if (selectedDay.toDateString() === today.toDateString()) {
-          const nowMinutes = today.getHours() * 60 + today.getMinutes();
+        let available: string[];
+
+        if (selectedStaff) {
+          // Sadece seçili personelin dolu saatlerini kontrol et
+          const bookedTimes = new Set(
+            (booked || [])
+              .filter((a: any) => a.staff_id === selectedStaff.id)
+              .map((a: any) => a.appointment_time.slice(0, 5))
+          );
+          available = slots.filter(s => !bookedTimes.has(s));
+        } else if (staff.length > 0) {
+          // "Fark etmez" — en az bir personel müsaitse slotu göster
+          const bookedByTime: Record<string, Set<string>> = {};
+          (booked || []).forEach((a: any) => {
+            const t = a.appointment_time.slice(0, 5);
+            if (!bookedByTime[t]) bookedByTime[t] = new Set();
+            if (a.staff_id) bookedByTime[t].add(a.staff_id);
+          });
+          available = slots.filter(s => (bookedByTime[s]?.size || 0) < staff.length);
+        } else {
+          // Personel tanımlanmamış — mağaza genelinde dolu saatleri engelle
+          const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
+          available = slots.filter(s => !bookedTimes.has(s));
+        }
+
+        if (isToday) {
           available = available.filter(s => {
             const [h, m] = s.split(':').map(Number);
             return (h * 60 + m) > nowMinutes;
@@ -173,7 +193,7 @@ export default function ShopDetail() {
 
         setAvailableSlots(available);
       });
-  }, [selectedDay, selectedService, shopHours, shopId]);
+  }, [selectedDay, selectedService, shopHours, shopId, selectedStaff, staff]);
 
   const handleSubmitReview = async () => {
     if (!currentUserId) { alert("Yorum yazmak için giriş yapmalısınız."); return; }
@@ -245,7 +265,27 @@ export default function ShopDetail() {
       status: 'Beklemede',
       staff_id: selectedStaff?.id || null,
     }]);
-    if (!error) { setIsBooking(false); setShowSuccess(true); } else { alert("Hata: " + error.message); }
+    if (!error) {
+      setIsBooking(false);
+      setShowSuccess(true);
+      // Berber'e bildirim gönder (fire-and-forget)
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'new_appointment',
+          shopId,
+          ownerId: shop.owner_id,
+          customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri',
+          serviceName: selectedService.name,
+          appointmentDate: localDateStr(selectedDay),
+          appointmentTime: selectedTime,
+          price: selectedService.price,
+        }),
+      }).catch(() => {});
+    } else {
+      alert("Hata: " + error.message);
+    }
     setLoading(false);
   };
 

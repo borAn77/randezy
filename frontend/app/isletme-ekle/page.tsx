@@ -43,6 +43,9 @@ export default function IsletmeEkle() {
   const [services, setServices] = useState<any[]>([]);
   const [newService, setNewService] = useState({ name: "", price: "", duration: "30" });
 
+  const [staffList, setStaffList] = useState<{ firstName: string; lastName: string }[]>([]);
+  const [newStaff, setNewStaff] = useState({ firstName: "", lastName: "" });
+
   const [hours, setHours] = useState(
     daysOfWeek.map((day, index) => ({
       day_of_week: index + 1,
@@ -62,6 +65,17 @@ export default function IsletmeEkle() {
 
   const removeService = (index: number) => {
     setServices(services.filter((_, i) => i !== index));
+  };
+
+  const addStaff = () => {
+    if (newStaff.firstName.trim() && newStaff.lastName.trim()) {
+      setStaffList([...staffList, { firstName: newStaff.firstName.trim(), lastName: newStaff.lastName.trim() }]);
+      setNewStaff({ firstName: "", lastName: "" });
+    }
+  };
+
+  const removeStaff = (index: number) => {
+    setStaffList(staffList.filter((_, i) => i !== index));
   };
 
   const toggleDay = (index: number) => {
@@ -133,6 +147,16 @@ export default function IsletmeEkle() {
       }));
       await supabase.from('shop_hours').insert(hoursToInsert);
 
+      // 5. Personeli Kaydet
+      if (staffList.length > 0) {
+        const staffToInsert = staffList.map(s => ({
+          shop_id: shop.id,
+          first_name: s.firstName,
+          last_name: s.lastName,
+        }));
+        await supabase.from('staff').insert(staffToInsert);
+      }
+
       router.push('/dashboard');
 
     } catch (err: any) {
@@ -152,7 +176,7 @@ export default function IsletmeEkle() {
         {/* STEPPER */}
         <div className="flex items-center justify-between mb-16 relative">
           <div className="absolute top-1/2 left-0 w-full h-[2px] bg-gray-200 -z-10"></div>
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className={`flex items-center justify-center w-10 h-10 rounded-full font-black text-xs border-4 transition-all duration-500
               ${s === step ? 'bg-[#00A3AD] border-[#E6F6F7] text-white scale-125' : 
                 s < step ? 'bg-black border-black text-white' : 'bg-white border-gray-100 text-gray-300'}`}>
@@ -262,14 +286,60 @@ export default function IsletmeEkle() {
               </div>
               <div className="grid grid-cols-2 gap-6 mt-12">
                 <button onClick={() => setStep(2)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
-                <button disabled={services.length === 0} onClick={() => setStep(4)} className="bg-black text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] disabled:opacity-20 hover:bg-[#00A3AD] transition-all">Son Adım</button>
+                <button disabled={services.length === 0} onClick={() => setStep(4)} className="bg-black text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] disabled:opacity-20 hover:bg-[#00A3AD] transition-all">Devam Et</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 4: ÇALIŞMA SAATLERİ */}
+        {/* STEP 4: PERSONEL */}
         {step === 4 && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="text-center mb-12 text-black">
+              <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Personelin</h1>
+              <p className="text-gray-500 text-[11px] font-bold uppercase tracking-[0.3em]">ADIM 4: EKİP ÜYELERİ (İSTEĞE BAĞLI)</p>
+            </div>
+            <div className="bg-white rounded-[3.5rem] shadow-2xl p-12 md:p-16 border border-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 bg-gray-50 p-6 rounded-3xl">
+                <input
+                  placeholder="Ad"
+                  className="bg-white border-2 border-gray-100 rounded-2xl p-4 text-sm font-bold text-black outline-none focus:border-[#00A3AD]"
+                  value={newStaff.firstName}
+                  onChange={(e) => setNewStaff({ ...newStaff, firstName: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && addStaff()}
+                />
+                <div className="relative">
+                  <input
+                    placeholder="Soyad"
+                    className="w-full bg-white border-2 border-gray-100 rounded-2xl p-4 text-sm font-bold text-black outline-none focus:border-[#00A3AD]"
+                    value={newStaff.lastName}
+                    onChange={(e) => setNewStaff({ ...newStaff, lastName: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && addStaff()}
+                  />
+                  <button onClick={addStaff} className="absolute right-2 top-2 bottom-2 bg-black text-white px-4 rounded-xl text-[10px] font-black hover:bg-[#00A3AD] transition-all">EKLE</button>
+                </div>
+              </div>
+              <div className="space-y-3 min-h-[60px]">
+                {staffList.length === 0 && (
+                  <p className="text-center text-gray-300 font-bold text-xs uppercase tracking-widest italic py-4">Henüz personel eklenmedi. Dashboard'dan da ekleyebilirsiniz.</p>
+                )}
+                {staffList.map((s, i) => (
+                  <div key={i} className="flex justify-between p-5 bg-white border-2 border-gray-50 rounded-2xl items-center hover:border-gray-200 transition-all shadow-sm">
+                    <span className="font-black text-xs uppercase tracking-widest text-black">{s.firstName} {s.lastName}</span>
+                    <button onClick={() => removeStaff(i)} className="text-red-500 hover:scale-110 transition-transform"><Trash2 size={18}/></button>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-6 mt-12">
+                <button onClick={() => setStep(3)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
+                <button onClick={() => setStep(5)} className="bg-black text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] hover:bg-[#00A3AD] transition-all">Son Adım</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: ÇALIŞMA SAATLERİ */}
+        {step === 5 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-500">
             <div className="text-center mb-12 text-black">
               <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Çalışma Saatleri</h1>
@@ -301,7 +371,7 @@ export default function IsletmeEkle() {
                 <p className="mt-8 text-center text-sm font-bold text-red-500 bg-red-50 rounded-2xl p-4">{submitError}</p>
               )}
               <div className="grid grid-cols-2 gap-6 mt-12">
-                <button onClick={() => setStep(3)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
+                <button onClick={() => setStep(4)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
                 <button onClick={handleSubmit} disabled={loading} className="bg-[#00A3AD] text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-3">
                   {loading ? "Veriler Mühürleniyor..." : <><Save size={18}/> İşletmeyi Yayına Al</>}
                 </button>
