@@ -67,7 +67,7 @@ export default function Dashboard() {
       setShop(shopData);
       const [servicesRes, appointmentsRes, hoursRes, reviewsRes, staffRes] = await Promise.all([
         supabase.from('services').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
-        supabase.from('appointments').select('*, profiles(full_name, phone, email)').eq('shop_id', shopData.id).order('appointment_date', { ascending: false }),
+        supabase.from('appointments').select('*, profiles(full_name, phone, email), staff(first_name, last_name)').eq('shop_id', shopData.id).order('appointment_date', { ascending: true }).order('appointment_time', { ascending: true }),
         supabase.from('shop_hours').select('*').eq('shop_id', shopData.id).order('day_of_week', { ascending: true }),
         supabase.from('reviews').select('*, profiles(full_name)').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
         supabase.from('staff').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: true }),
@@ -232,6 +232,8 @@ export default function Dashboard() {
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
   const uniqueCustomers = new Set(appointments.map(a => a.user_id)).size;
   const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
+  const pendingAppointments = appointments.filter(a => a.status === 'Beklemede');
+  const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
 
   if (loading) return <div className="h-screen bg-black flex items-center justify-center font-black text-[#00A3AD] animate-pulse uppercase tracking-[0.5em]">RANDEZY.PRO YÜKLENİYOR...</div>;
 
@@ -339,66 +341,100 @@ export default function Dashboard() {
 
             {/* 3. RANDEVULAR */}
             {activeTab === "appointments" && (
-              <div className="animate-in slide-in-from-right-4 space-y-4">
+              <div className="animate-in slide-in-from-right-4">
                 <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 italic">Randevu Trafiği</h2>
-                {appointments.length > 0 ? appointments.map((apt) => (
-                  <div key={apt.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden group hover:border-[#00A3AD] transition-all">
-                    <div className="p-8 flex items-center justify-between">
-                      <div className="flex items-center gap-8">
-                        <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
-                          <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
-                          <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
-                          <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{apt.service_name} • {apt.profiles?.phone || apt.profiles?.email}</p>
-                          {apt.cancel_reason && (
-                            <p className="text-[10px] font-bold text-red-400 mt-1 italic">Red gerekçesi: {apt.cancel_reason}</p>
+
+                {appointments.length === 0 && (
+                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz randevu talebi yok</div>
+                )}
+
+                {/* Bekleyen Talepler */}
+                {pendingAppointments.length > 0 && (
+                  <div className="mb-10">
+                    <div className="flex items-center gap-3 mb-5">
+                      <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Bekleyen Talepler</span>
+                      <span className="min-w-[20px] h-5 px-1.5 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-[10px] font-black">{pendingAppointments.length}</span>
+                    </div>
+                    <div className="space-y-4">
+                      {pendingAppointments.map((apt) => (
+                        <div key={apt.id} className="bg-white rounded-[2.5rem] border border-orange-100 overflow-hidden group hover:border-orange-300 transition-all">
+                          <div className="p-8 flex items-center justify-between">
+                            <div className="flex items-center gap-8">
+                              <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
+                                <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
+                                <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
+                              </div>
+                              <div>
+                                <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
+                                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                                  {apt.service_name}
+                                  {apt.staff && <span className="text-[#00A3AD]"> • {apt.staff.first_name} {apt.staff.last_name}</span>}
+                                  {(apt.profiles?.phone || apt.profiles?.email) && ` • ${apt.profiles?.phone || apt.profiles?.email}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                              <span className="px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest bg-yellow-50 text-yellow-600">{apt.status}</span>
+                              <div className="flex gap-2">
+                                <button onClick={() => updateAppointmentStatus(apt.id, 'Onaylandı')} className="p-3 bg-black text-white rounded-xl hover:bg-green-600 transition-all" title="Onayla"><CheckCircle2 size={18}/></button>
+                                <button onClick={() => { setRejectingId(rejectingId === apt.id ? null : apt.id); setRejectReason(""); setRejectError(""); }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all" title="Reddet"><X size={18}/></button>
+                              </div>
+                            </div>
+                          </div>
+                          {rejectingId === apt.id && (
+                            <div className="border-t border-red-100 bg-red-50 p-6 animate-in slide-in-from-top-2">
+                              <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3">Red Gerekçesi — En az 10 kelime yazın</p>
+                              <textarea rows={3} placeholder="Müşteriye iletilecek red açıklamasını yazın..." className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none mb-2" value={rejectReason} onChange={e => { setRejectReason(e.target.value); setRejectError(""); }} />
+                              {rejectError && <p className="text-[11px] font-bold text-red-500 mb-2">{rejectError}</p>}
+                              <div className="flex gap-3">
+                                <button onClick={() => handleReject(apt.id)} className="bg-red-500 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all">Reddet ve Gönder</button>
+                                <button onClick={() => { setRejectingId(null); setRejectReason(""); setRejectError(""); }} className="bg-white text-gray-400 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:text-black transition-all">Vazgeç</button>
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4 flex-shrink-0">
-                        <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${apt.status === 'Onaylandı' ? 'bg-green-50 text-green-600' : apt.status === 'İptal Edildi' ? 'bg-red-50 text-red-500' : 'bg-yellow-50 text-yellow-600'}`}>{apt.status}</span>
-                        {apt.status === 'Beklemede' && (
-                          <div className="flex gap-2">
-                            <button onClick={() => updateAppointmentStatus(apt.id, 'Onaylandı')} className="p-3 bg-black text-white rounded-xl hover:bg-green-600 transition-all" title="Onayla"><CheckCircle2 size={18}/></button>
-                            <button
-                              onClick={() => { setRejectingId(rejectingId === apt.id ? null : apt.id); setRejectReason(""); setRejectError(""); }}
-                              className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                              title="Reddet"
-                            ><X size={18}/></button>
-                          </div>
-                        )}
-                      </div>
+                      ))}
                     </div>
+                  </div>
+                )}
 
-                    {/* Red gerekçesi paneli */}
-                    {rejectingId === apt.id && (
-                      <div className="border-t border-red-100 bg-red-50 p-6 animate-in slide-in-from-top-2">
-                        <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3">Red Gerekçesi — En az 10 kelime yazın</p>
-                        <textarea
-                          rows={3}
-                          placeholder="Müşteriye iletilecek red açıklamasını yazın..."
-                          className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none mb-2"
-                          value={rejectReason}
-                          onChange={e => { setRejectReason(e.target.value); setRejectError(""); }}
-                        />
-                        {rejectError && <p className="text-[11px] font-bold text-red-500 mb-2">{rejectError}</p>}
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => handleReject(apt.id)}
-                            className="bg-red-500 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all"
-                          >Reddet ve Gönder</button>
-                          <button
-                            onClick={() => { setRejectingId(null); setRejectReason(""); setRejectError(""); }}
-                            className="bg-white text-gray-400 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:text-black transition-all"
-                          >Vazgeç</button>
-                        </div>
+                {/* Onaylı & Geçmiş Randevular */}
+                {otherAppointments.length > 0 && (
+                  <div>
+                    {pendingAppointments.length > 0 && (
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="flex-1 h-px bg-gray-100"></div>
+                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-2">Onaylı & Geçmiş</span>
+                        <div className="flex-1 h-px bg-gray-100"></div>
                       </div>
                     )}
+                    <div className="space-y-4">
+                      {otherAppointments.map((apt) => (
+                        <div key={apt.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden group hover:border-[#00A3AD] transition-all">
+                          <div className="p-8 flex items-center justify-between">
+                            <div className="flex items-center gap-8">
+                              <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
+                                <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
+                                <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
+                              </div>
+                              <div>
+                                <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
+                                <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
+                                  {apt.service_name}
+                                  {apt.staff && <span className="text-[#00A3AD]"> • {apt.staff.first_name} {apt.staff.last_name}</span>}
+                                  {(apt.profiles?.phone || apt.profiles?.email) && ` • ${apt.profiles?.phone || apt.profiles?.email}`}
+                                </p>
+                                {apt.cancel_reason && <p className="text-[10px] font-bold text-red-400 mt-1 italic">Red gerekçesi: {apt.cancel_reason}</p>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                              <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${apt.status === 'Onaylandı' ? 'bg-green-50 text-green-600' : apt.status === 'İptal Edildi' ? 'bg-red-50 text-red-500' : 'bg-yellow-50 text-yellow-600'}`}>{apt.status}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )) : (
-                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz randevu talebi yok</div>
                 )}
               </div>
             )}
