@@ -5,7 +5,8 @@ import { supabase } from "../../lib/supabase";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
-  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, Star, MessageSquare
+  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, Star, MessageSquare,
+  ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail
 } from "lucide-react";
 
 const cities = [
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [staffForm, setStaffForm] = useState({ firstName: "", lastName: "", avatarUrl: "" });
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
+  const [financeChartView, setFinanceChartView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -234,6 +236,89 @@ export default function Dashboard() {
   const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
   const pendingAppointments = appointments.filter(a => a.status === 'Beklemede');
   const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
+
+  // Finance computed values
+  const today = new Date().toISOString().split('T')[0];
+  const currentMonth = today.slice(0, 7);
+  const fPrevMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
+  const cancelledAll = appointments.filter((a: any) => a.status === 'İptal Edildi');
+  const confirmedThisMonth = confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(currentMonth));
+  const confirmedPrevMonth = confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(fPrevMonth));
+  const cancelledThisMonth = cancelledAll.filter((a: any) => a.appointment_date?.startsWith(currentMonth));
+  const todayRevenue = confirmedAppointments.filter((a: any) => a.appointment_date === today).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
+  const monthlyRevenue = confirmedThisMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
+  const prevMonthRevenue = confirmedPrevMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
+  const monthlyApptCount = confirmedThisMonth.length;
+  const avgBasket = monthlyApptCount > 0 ? monthlyRevenue / monthlyApptCount : 0;
+  const cancellationLoss = cancelledThisMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
+  const finEstExpenses = monthlyRevenue * 0.30;
+  const finNetProfit = monthlyRevenue - finEstExpenses;
+
+  const dailyRevChart = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i));
+    const dateStr = d.toISOString().split('T')[0];
+    return { date: dateStr, label: d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), value: confirmedAppointments.filter((a: any) => a.appointment_date === dateStr).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
+  });
+
+  const weeklyRevChart = Array.from({ length: 8 }, (_, i) => {
+    const now = new Date();
+    const monday = new Date(now); monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1) - 7 * (7 - i));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const startStr = monday.toISOString().split('T')[0], endStr = sunday.toISOString().split('T')[0];
+    return { label: `H${i + 1}`, value: confirmedAppointments.filter((a: any) => a.appointment_date >= startStr && a.appointment_date <= endStr).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
+  });
+
+  const monthlyRevChart = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(); d.setMonth(d.getMonth() - (5 - i));
+    const mStr = d.toISOString().slice(0, 7);
+    return { label: d.toLocaleDateString('tr-TR', { month: 'short' }), value: confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(mStr)).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
+  });
+
+  const staffPerf = staff.map((s: any) => {
+    const appts = confirmedAppointments.filter((a: any) => a.staff_id === s.id);
+    const rev = appts.reduce((sum: number, a: any) => sum + (parseFloat(a.price) || 0), 0);
+    return { ...s, revenue: rev, apptCount: appts.length, avgBasket: appts.length > 0 ? rev / appts.length : 0 };
+  }).sort((a: any, b: any) => b.revenue - a.revenue);
+
+  const servicePerf = services.map((s: any) => {
+    const appts = confirmedAppointments.filter((a: any) => a.service_name === s.name);
+    const totalRev = appts.reduce((sum: number, a: any) => sum + (parseFloat(a.price) || 0), 0);
+    const svcNet = totalRev * 0.75;
+    return { ...s, salesCount: appts.length, totalRevenue: totalRev, svcNet, margin: totalRev > 0 ? 75 : 0 };
+  }).sort((a: any, b: any) => b.svcNet - a.svcNet);
+
+  const heatmapData: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+  appointments.forEach((a: any) => {
+    if (!a.appointment_date || !a.appointment_time) return;
+    const d = new Date(a.appointment_date + 'T12:00:00');
+    const dayIdx = d.getDay(); const hour = parseInt(a.appointment_time.split(':')[0]);
+    if (!isNaN(dayIdx) && !isNaN(hour) && hour >= 0 && hour < 24) heatmapData[dayIdx][hour]++;
+  });
+  const heatmapMax = Math.max(1, ...heatmapData.flat());
+  const heatmapHours = Array.from({ length: 14 }, (_, i) => i + 8);
+
+  const totalCancellations = cancelledAll.length;
+  const cancellationRate = appointments.length > 0 ? (totalCancellations / appointments.length * 100) : 0;
+
+  const custCounts: Record<string, number> = {};
+  appointments.forEach((a: any) => { if (a.user_id) custCounts[a.user_id] = (custCounts[a.user_id] || 0) + 1; });
+  const totalCust = Object.keys(custCounts).length;
+  const returningCust = Object.values(custCounts).filter(c => c > 1).length;
+  const newCust = totalCust - returningCust;
+  const loyaltyRate = totalCust > 0 ? (returningCust / totalCust * 100) : 0;
+
+  const fDayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+  const smartSuggestions: string[] = [];
+  let lbDay = -1, lbHour = 9, lbVal = Infinity;
+  for (let d = 1; d <= 5; d++) { for (let h = 9; h <= 17; h++) { if (heatmapData[d][h] < lbVal) { lbVal = heatmapData[d][h]; lbDay = d; lbHour = h; } } }
+  if (appointments.length > 0 && lbDay > -1) smartSuggestions.push(`${fDayNames[lbDay]} ${lbHour}:00–${lbHour + 1}:00 arası düşük yoğunluk var. Bu saatler için kampanya önerilir.`);
+  if (servicePerf.length > 0 && servicePerf[0].totalRevenue > 0) smartSuggestions.push(`"${servicePerf[0].name}" en yüksek kâr marjına sahip hizmet (%${servicePerf[0].margin.toFixed(0)}).`);
+  if (cancellationRate > 10) smartSuggestions.push(`İptal oranı %${cancellationRate.toFixed(1)} — müşterilere hatırlatma mesajı gönderilmesi önerilir.`);
+  if (staffPerf.length > 0 && staffPerf[0].revenue > 0) smartSuggestions.push(`En çok ciro getiren personel: ${staffPerf[0].first_name} ${staffPerf[0].last_name} (₺${staffPerf[0].revenue.toLocaleString('tr-TR')}).`);
+  const satTotal = heatmapData[6].reduce((a: number, b: number) => a + b, 0);
+  const allDayTotals = heatmapData.map((d: number[]) => d.reduce((a: number, b: number) => a + b, 0));
+  if (satTotal > 0 && satTotal === Math.max(...allDayTotals)) smartSuggestions.push('Cumartesi günleri kapasite tamamen doluyor. Rezervasyon önceliği veya fiyat optimizasyonu uygulanabilir.');
+  if (monthlyRevenue > prevMonthRevenue && prevMonthRevenue > 0) smartSuggestions.push(`Bu ay geçen aya göre %${((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)} daha fazla ciro elde edildi.`);
 
   if (loading) return <div className="h-screen bg-black flex items-center justify-center font-black text-[#00A3AD] animate-pulse uppercase tracking-[0.5em]">RANDEZY.PRO YÜKLENİYOR...</div>;
 
@@ -576,11 +661,313 @@ export default function Dashboard() {
 
             {/* 7. FİNANS */}
             {activeTab === "finance" && (
-              <div className="animate-in slide-in-from-right-4">
-                <h2 className="text-4xl font-black uppercase tracking-tighter italic mb-12">Finans</h2>
-                <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
-                  <TrendingUp size={48} className="text-gray-200 mb-6" />
-                  <p className="font-black text-gray-300 uppercase tracking-widest italic text-sm">Yakında Geliyor</p>
+              <div className="animate-in slide-in-from-right-4 space-y-8">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Finans Paneli</h2>
+                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest bg-white px-5 py-2.5 rounded-2xl border border-gray-100">
+                    {new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+
+                {/* ÖZET KARTLAR */}
+                <div className="grid grid-cols-3 gap-5">
+                  <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-2xl">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Bugünkü Ciro</p>
+                    <h3 className="text-3xl font-black text-[#00A3AD]">₺{todayRevenue.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[9px] text-gray-600 mt-2 font-bold uppercase tracking-widest">Bugün onaylanan randevular</p>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <div className="flex items-start justify-between mb-3">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aylık Ciro</p>
+                      {prevMonthRevenue > 0 && (
+                        <span className={`flex items-center gap-0.5 text-[9px] font-black px-2 py-0.5 rounded-full ${monthlyRevenue >= prevMonthRevenue ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                          {monthlyRevenue >= prevMonthRevenue ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+                          %{Math.abs((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-3xl font-black text-black">₺{monthlyRevenue.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">{monthlyApptCount} randevudan</p>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Est. Net Kar</p>
+                    <h3 className="text-3xl font-black text-[#00A3AD]">₺{finNetProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
+                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">%30 gider tahminiyle</p>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Aylık Randevu</p>
+                    <h3 className="text-3xl font-black text-black">{monthlyApptCount}</h3>
+                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">Bu ay onaylanan</p>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Ort. Sepet Tutarı</p>
+                    <h3 className="text-3xl font-black text-black">₺{avgBasket.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
+                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">Randevu başına ortalama</p>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-red-50 shadow-sm hover:shadow-xl transition-all">
+                    <p className="text-[10px] font-black text-red-300 uppercase tracking-widest mb-3">İptal Kaybı</p>
+                    <h3 className="text-3xl font-black text-red-400">₺{cancellationLoss.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[9px] text-red-200 mt-2 font-bold uppercase tracking-widest">{cancelledThisMonth.length} iptalden kaybedilen</p>
+                  </div>
+                </div>
+
+                {/* CİRO GRAFİĞİ */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest">Ciro Trendi</h3>
+                    <div className="flex gap-2">
+                      {(['daily', 'weekly', 'monthly'] as const).map(v => (
+                        <button key={v} onClick={() => setFinanceChartView(v)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${financeChartView === v ? 'bg-black text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                          {v === 'daily' ? 'Günlük' : v === 'weekly' ? 'Haftalık' : 'Aylık'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {(() => {
+                    const chartData = financeChartView === 'daily' ? dailyRevChart : financeChartView === 'weekly' ? weeklyRevChart : monthlyRevChart;
+                    const maxVal = Math.max(1, ...chartData.map((d: any) => d.value));
+                    return (
+                      <div className="flex items-end gap-1.5 h-44 pt-8">
+                        {chartData.map((d: any, i: number) => {
+                          const pct = (d.value / maxVal) * 100;
+                          const isToday = financeChartView === 'daily' && d.date === today;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                              <div className="relative flex-1 w-full flex items-end">
+                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[8px] font-black text-[#00A3AD] bg-[#00A3AD]/10 px-2 py-0.5 rounded-lg pointer-events-none">
+                                  ₺{d.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
+                                </div>
+                                <div
+                                  className={`w-full rounded-t-xl transition-all duration-700 ${isToday ? 'bg-[#00A3AD]' : d.value > 0 ? 'bg-[#00A3AD]/40 group-hover:bg-[#00A3AD]/70' : 'bg-gray-100'}`}
+                                  style={{ height: `${Math.max(3, pct)}%` }}
+                                />
+                              </div>
+                              <div className="text-[7px] font-bold text-gray-400 uppercase truncate w-full text-center">{d.label}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* KAR & GİDER */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Kar & Gider Analizi — Bu Ay</h3>
+                  <div className="space-y-5">
+                    {[
+                      { label: 'Toplam Gelir', value: monthlyRevenue, pct: 100, color: 'bg-[#00A3AD]' },
+                      { label: 'Tahmini Gider (%30)', value: finEstExpenses, pct: 30, color: 'bg-gray-300' },
+                      { label: 'Net Kar', value: finNetProfit, pct: 70, color: 'bg-black' },
+                    ].map((item, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{item.label}</p>
+                          <p className="text-sm font-black text-black">₺{item.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${item.color} rounded-full transition-all duration-700`} style={{ width: `${item.pct}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* PERSONEL + HİZMET */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Personel Performansı</h3>
+                    {staffPerf.length === 0 ? (
+                      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic py-10 text-center">Personel verisi yok</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {staffPerf.map((s: any, i: number) => {
+                          const maxRev = staffPerf[0].revenue || 1;
+                          return (
+                            <div key={s.id} className={`p-4 rounded-2xl ${i === 0 && s.revenue > 0 ? 'bg-[#00A3AD]/5 border border-[#00A3AD]/20' : 'bg-gray-50'}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-[#E6F6F7] flex items-center justify-center text-[10px] font-black text-[#00A3AD] flex-shrink-0 overflow-hidden">
+                                    {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt="" /> : s.first_name?.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-black uppercase">{s.first_name} {s.last_name}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase">{s.apptCount} randevu • Ort. ₺{s.avgBasket.toFixed(0)}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-sm font-black">₺{s.revenue.toLocaleString('tr-TR')}</p>
+                                  {i === 0 && s.revenue > 0 && <p className="text-[8px] font-black text-[#00A3AD] uppercase">En Yüksek</p>}
+                                </div>
+                              </div>
+                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#00A3AD] rounded-full" style={{ width: `${Math.max(2, (s.revenue / maxRev) * 100)}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Hizmet Kârlılığı</h3>
+                    {servicePerf.length === 0 ? (
+                      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic py-10 text-center">Hizmet verisi yok</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {servicePerf.slice(0, 5).map((s: any, i: number) => {
+                          const maxRev = servicePerf[0].totalRevenue || 1;
+                          return (
+                            <div key={s.id} className={`p-4 rounded-2xl ${i === 0 && s.totalRevenue > 0 ? 'bg-[#00A3AD]/5 border border-[#00A3AD]/20' : 'bg-gray-50'}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <p className="text-xs font-black uppercase">{s.name}</p>
+                                  <p className="text-[9px] font-bold text-gray-400 uppercase">{s.salesCount} satış • Marj %{s.margin.toFixed(0)}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-sm font-black">₺{s.totalRevenue.toLocaleString('tr-TR')}</p>
+                                  {i === 0 && s.totalRevenue > 0 && <p className="text-[8px] font-black text-[#00A3AD] uppercase">En Kârlı</p>}
+                                </div>
+                              </div>
+                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#00A3AD] rounded-full" style={{ width: `${Math.max(2, (s.totalRevenue / maxRev) * 100)}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SAAT BAZLI YOĞUNLUK */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Saat Bazlı Yoğunluk Analizi</h3>
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[500px]">
+                      <div className="flex gap-1 mb-2 ml-10">
+                        {heatmapHours.map(h => (
+                          <div key={h} className="flex-1 text-center text-[7px] font-black text-gray-300">{h}</div>
+                        ))}
+                      </div>
+                      {['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'].map((day, di) => (
+                        <div key={di} className="flex gap-1 mb-1 items-center">
+                          <div className="w-10 text-[8px] font-black text-gray-400 uppercase flex-shrink-0">{day}</div>
+                          {heatmapHours.map(h => {
+                            const val = heatmapData[di][h];
+                            const intensity = val / heatmapMax;
+                            return (
+                              <div
+                                key={h}
+                                className="flex-1 h-7 rounded-md cursor-default transition-all"
+                                style={{ backgroundColor: val === 0 ? '#F9FAFB' : `rgba(0,163,173,${0.12 + intensity * 0.88})` }}
+                                title={`${day} ${h}:00 — ${val} randevu`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 mt-5 justify-end">
+                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Boş</span>
+                        {[0.12, 0.34, 0.56, 0.78, 1.0].map((o, i) => (
+                          <div key={i} className="w-5 h-4 rounded" style={{ backgroundColor: `rgba(0,163,173,${o})` }} />
+                        ))}
+                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Dolu</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* İPTAL + MÜŞTERİ + ÖNERİLER */}
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="bg-white p-10 rounded-[3rem] border border-red-50 shadow-sm">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 text-red-400">İptal Analizi</h3>
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Toplam İptal</p>
+                        <p className="text-3xl font-black text-black">{totalCancellations}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Kaybedilen Gelir</p>
+                        <p className="text-2xl font-black text-red-400">₺{cancellationLoss.toLocaleString('tr-TR')}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">İptal Oranı</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${Math.min(100, cancellationRate)}%` }} />
+                          </div>
+                          <span className="text-xs font-black text-red-400 flex-shrink-0">%{cancellationRate.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-6">Müşteri Analizi</h3>
+                    <div className="space-y-6">
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Yeni Müşteri</p>
+                        <p className="text-3xl font-black text-black">{newCust}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tekrar Gelen</p>
+                        <p className="text-3xl font-black text-[#00A3AD]">{returningCust}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Sadakat Oranı</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00A3AD] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, loyaltyRate)}%` }} />
+                          </div>
+                          <span className="text-xs font-black text-[#00A3AD] flex-shrink-0">%{loyaltyRate.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black p-10 rounded-[3rem] shadow-2xl">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Lightbulb size={16} className="text-[#00A3AD]" />
+                      <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Akıllı Öneriler</h3>
+                    </div>
+                    {smartSuggestions.length === 0 ? (
+                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest italic">Yeterli veri bekleniyor...</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {smartSuggestions.map((tip: string, i: number) => (
+                          <div key={i} className="flex gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#00A3AD] flex-shrink-0 mt-1.5" />
+                            <p className="text-[10px] font-bold text-gray-400 leading-relaxed">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* RAPORLAR */}
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Raporlar</h3>
+                  <div className="flex flex-wrap gap-4">
+                    <button onClick={() => alert('PDF raporu yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">
+                      <Download size={16} /> PDF İndir
+                    </button>
+                    <button onClick={() => alert('Excel raporu yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-gray-50 text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-200">
+                      <Download size={16} /> Excel İndir
+                    </button>
+                    <button onClick={() => alert('Muhasebeci paylaşımı yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-gray-50 text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-200">
+                      <Mail size={16} /> Muhasebeciye Gönder
+                    </button>
+                  </div>
+                  <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-5">Rapor indirme özelliği yakında aktif olacak.</p>
                 </div>
               </div>
             )}
