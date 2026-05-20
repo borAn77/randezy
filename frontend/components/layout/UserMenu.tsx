@@ -4,7 +4,7 @@ import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { User, Calendar, Gift, LogOut, ChevronDown } from "lucide-react"; // ✂️ Settings buradan silindi
 
-export default function UserMenu({ user }: { user: any }) {
+export default function UserMenu({ user, isDark = true }: { user: any; isDark?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -34,18 +34,18 @@ export default function UserMenu({ user }: { user: any }) {
     >
       <button 
         className={`flex items-center gap-3 px-5 py-2.5 rounded-2xl transition-all duration-500 border
-          ${isOpen 
-            ? 'bg-white/10 border-white/20 shadow-[0_0_25px_rgba(255,255,255,0.1)] backdrop-blur-md' 
-            : 'bg-transparent border-transparent hover:bg-white/5'}
+          ${isOpen
+            ? isDark ? 'bg-white/10 border-white/20 shadow-[0_0_25px_rgba(255,255,255,0.1)] backdrop-blur-md' : 'bg-black/5 border-black/10'
+            : 'bg-transparent border-transparent hover:bg-black/5'}
         `}
       >
         <div className="w-7 h-7 rounded-full bg-[#00A3AD] flex items-center justify-center text-[11px] font-black shadow-lg text-white uppercase">
           {displayName[0]}
         </div>
-        <span className="text-[13px] font-black uppercase tracking-widest text-white">
+        <span className={`text-[13px] font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-gray-900'}`}>
           {displayName}
         </span>
-        <ChevronDown size={14} className={`text-white/50 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`transition-transform duration-500 ${isOpen ? 'rotate-180' : ''} ${isDark ? 'text-white/50' : 'text-gray-400'}`} />
       </button>
 
       {isOpen && (

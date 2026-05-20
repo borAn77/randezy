@@ -32,11 +32,12 @@ export default function IsletmeEkle() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     category: "", shopName: "", officialTitle: "",
     city: "", district: "", neighborhood: "", street: "", buildingNo: "", doorNo: "",
-    vergiDairesi: "", vergiNo: "", mersisNo: "", iban: ""
+    vergiDairesi: "", vergiNo: "", mersisNo: ""
   });
 
   const [services, setServices] = useState<any[]>([]);
@@ -98,8 +99,7 @@ export default function IsletmeEkle() {
           door_no: formData.doorNo,
           tax_office: formData.vergiDairesi,
           tax_no: formData.vergiNo,
-          mersis_no: formData.mersisNo,
-          iban: formData.iban
+          mersis_no: formData.mersisNo
         }])
         .select()
         .single();
@@ -133,18 +133,16 @@ export default function IsletmeEkle() {
       }));
       await supabase.from('shop_hours').insert(hoursToInsert);
 
-      alert("Mükemmel! İşletmen yayına alındı ve yetkilerin güncellendi.");
-      router.push('/hesabim');
-      router.refresh(); // Değişikliği algılaması için zorla yenile
+      router.push('/dashboard');
 
     } catch (err: any) {
-      alert("Hata: " + err.message);
+      setSubmitError(err.message || "Bir hata oluştu, lütfen tekrar deneyin.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isStep1Valid = formData.category && formData.shopName && formData.city && formData.district;
+  const isStep1Valid = formData.category && formData.shopName && formData.city && formData.district && formData.street;
 
   return (
     <main className="min-h-screen bg-[#F9F9F9] text-[#111] pb-20">
@@ -222,7 +220,6 @@ export default function IsletmeEkle() {
               <section className="space-y-8">
                 <input placeholder="Vergi Dairesi" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, vergiDairesi: e.target.value})} />
                 <input placeholder="Vergi Numarası" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, vergiNo: e.target.value})} />
-                <input placeholder="IBAN (TR...)" className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-6 text-sm font-bold text-black outline-none focus:border-[#00A3AD] focus:bg-white" onChange={(e) => setFormData({...formData, iban: e.target.value})} />
               </section>
               <div className="grid grid-cols-2 gap-6 mt-12">
                 <button onClick={() => setStep(1)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50 transition-all">Geri Dön</button>
@@ -300,6 +297,9 @@ export default function IsletmeEkle() {
                   </div>
                 ))}
               </div>
+              {submitError && (
+                <p className="mt-8 text-center text-sm font-bold text-red-500 bg-red-50 rounded-2xl p-4">{submitError}</p>
+              )}
               <div className="grid grid-cols-2 gap-6 mt-12">
                 <button onClick={() => setStep(3)} className="py-8 rounded-[2rem] font-black text-xs uppercase text-gray-400 border-2 border-gray-100 hover:bg-gray-50">Geri Dön</button>
                 <button onClick={handleSubmit} disabled={loading} className="bg-[#00A3AD] text-white py-8 rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-3">
