@@ -43,6 +43,9 @@ export default function Dashboard() {
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
   const [financeChartView, setFinanceChartView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingShop, setDeletingShop] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -229,6 +232,25 @@ export default function Dashboard() {
 
     if (!error) { alert("Ayarlar kaydedildi!"); fetchInitialData(); setActiveTab("overview"); }
     else { alert("Hata: " + error.message); }
+  };
+
+  const handleDeleteShop = async () => {
+    if (!shop?.id) return;
+    setDeletingShop(true);
+    try {
+      await supabase.from('reviews').delete().eq('shop_id', shop.id);
+      await supabase.from('appointments').delete().eq('shop_id', shop.id);
+      await supabase.from('shop_hours').delete().eq('shop_id', shop.id);
+      await supabase.from('staff').delete().eq('shop_id', shop.id);
+      await supabase.from('services').delete().eq('shop_id', shop.id);
+      await supabase.from('shops').delete().eq('id', shop.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await supabase.from('profiles').update({ role: 'customer' }).eq('id', user.id);
+      router.replace('/');
+    } catch {
+      alert("Silme işlemi başarısız oldu.");
+      setDeletingShop(false);
+    }
   };
 
   const handleSaveHours = async () => {
@@ -1050,6 +1072,56 @@ export default function Dashboard() {
                 </div>
                 <button type="submit" className="w-full bg-black text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-4"><Save size={20} /> Kaydet ve Mühürle</button>
               </form>
+
+              {/* Tehlikeli Bölge */}
+              <div className="mt-16 border-t-2 border-dashed border-red-100 pt-12">
+                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2">Tehlikeli Bölge</p>
+                <p className="text-xs text-gray-400 font-medium mb-6">Bu işlem geri alınamaz. İşletmeye ait tüm veriler (randevular, personel, hizmetler, yorumlar) kalıcı olarak silinir.</p>
+                <button
+                  onClick={() => { setDeleteConfirmText(""); setShowDeleteModal(true); }}
+                  className="flex items-center gap-3 px-8 py-4 bg-red-50 text-red-500 border-2 border-red-100 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white hover:border-red-500 transition-all"
+                >
+                  <Trash2 size={16} /> İşletmeyi Kalıcı Olarak Sil
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SİLME ONAY MODALI */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+            <div className="bg-white w-full max-w-md rounded-[3.5rem] p-12 text-black animate-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-8">
+                <Trash2 size={28} className="text-red-500" />
+              </div>
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-3">Emin misin?</h3>
+              <p className="text-sm text-gray-500 font-medium mb-8">
+                Bu işlem <span className="font-black text-black">geri alınamaz</span>. Onaylamak için aşağıya işletme adını yaz:
+                <span className="block mt-2 font-black text-[#00A3AD]">"{shop?.name}"</span>
+              </p>
+              <input
+                type="text"
+                placeholder="İşletme adını yaz..."
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl p-5 text-sm font-bold text-black outline-none focus:border-red-400 mb-6"
+              />
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 py-5 rounded-2xl font-black text-xs uppercase tracking-widest border-2 border-gray-100 text-gray-400 hover:bg-gray-50 transition-all"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={handleDeleteShop}
+                  disabled={deleteConfirmText !== shop?.name || deletingShop}
+                  className="flex-1 py-5 rounded-2xl font-black text-xs uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 transition-all disabled:opacity-30"
+                >
+                  {deletingShop ? "Siliniyor..." : "Kalıcı Sil"}
+                </button>
+              </div>
             </div>
           </div>
         )}
