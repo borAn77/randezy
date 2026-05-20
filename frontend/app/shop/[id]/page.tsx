@@ -60,6 +60,8 @@ export default function ShopDetail() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const pendingService = useRef<any>(null);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
 
   const fetchReviews = async () => {
     const { data } = await supabase
@@ -77,12 +79,14 @@ export default function ShopDetail() {
       supabase.from('shops').select('*').eq('id', shopId).single(),
       supabase.from('services').select('*').eq('shop_id', shopId),
       supabase.from('shop_hours').select('*').eq('shop_id', shopId),
-    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }]) => {
+      supabase.from('staff').select('*').eq('shop_id', shopId).order('created_at', { ascending: true }),
+    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }, { data: staffData }]) => {
       if (!shopData) { setNotFound(true); return; }
       setShop(shopData);
       setGallery(shopData.gallery_urls || []);
       setServices(servicesData || []);
       setShopHours(hoursData || []);
+      setStaff(staffData || []);
     });
 
     fetchReviews();
@@ -97,6 +101,7 @@ export default function ShopDetail() {
         setSelectedService(pendingService.current);
         setSelectedDay(null);
         setSelectedTime("");
+        setSelectedStaff(null);
         setIsBooking(true);
         pendingService.current = null;
         setIsAuthOpen(false);
@@ -111,6 +116,7 @@ export default function ShopDetail() {
       setSelectedService(service);
       setSelectedDay(null);
       setSelectedTime("");
+      setSelectedStaff(null);
       setIsBooking(true);
     } else {
       pendingService.current = service;
@@ -236,7 +242,8 @@ export default function ShopDetail() {
       price: selectedService.price,
       appointment_date: localDateStr(selectedDay),
       appointment_time: selectedTime,
-      status: 'Beklemede'
+      status: 'Beklemede',
+      staff_id: selectedStaff?.id || null,
     }]);
     if (!error) { setIsBooking(false); setShowSuccess(true); } else { alert("Hata: " + error.message); }
     setLoading(false);
@@ -459,6 +466,28 @@ export default function ShopDetail() {
                 <h3 className="text-base md:text-xl font-black uppercase mb-4 md:mb-10 tracking-tighter">Özet</h3>
                 <div className="bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm space-y-4 md:space-y-6">
                   <p className="font-black text-sm md:text-lg text-[#00A3AD] uppercase">{selectedService?.name}</p>
+                  {staff.length > 0 && (
+                    <div className="border-t border-gray-50 pt-4">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Personel Seç <span className="text-gray-300 normal-case font-bold">(isteğe bağlı)</span></p>
+                      <div className="flex flex-wrap gap-3">
+                        {staff.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => setSelectedStaff(selectedStaff?.id === s.id ? null : s)}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-2xl transition-all ${selectedStaff?.id === s.id ? 'ring-2 ring-[#00A3AD] bg-[#E6F6F7]' : 'hover:bg-gray-50'}`}
+                          >
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow">
+                              {s.avatar_url
+                                ? <img src={s.avatar_url} className="w-full h-full object-cover" />
+                                : <span className="text-[#00A3AD] font-black text-sm">{s.first_name?.charAt(0)}</span>
+                              }
+                            </div>
+                            <span className="text-[8px] font-black uppercase text-gray-400 tracking-wide max-w-[48px] truncate">{s.first_name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <p className="font-black text-sm text-black">
                     {selectedDay ? `${selectedDay.getDate()} ${aylar[selectedDay.getMonth()]} ${selectedDay.getFullYear()}` : "Tarih Seçilmedi"}
                     <br /><span className="text-[#00A3AD]">{selectedTime || "--:--"}</span>

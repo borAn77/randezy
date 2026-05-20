@@ -37,6 +37,10 @@ export default function Dashboard() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
+  const [staff, setStaff] = useState<any[]>([]);
+  const [staffForm, setStaffForm] = useState({ firstName: "", lastName: "", avatarUrl: "" });
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+  const [savingStaff, setSavingStaff] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -61,15 +65,17 @@ export default function Dashboard() {
 
     if (shopData) {
       setShop(shopData);
-      const [servicesRes, appointmentsRes, hoursRes, reviewsRes] = await Promise.all([
+      const [servicesRes, appointmentsRes, hoursRes, reviewsRes, staffRes] = await Promise.all([
         supabase.from('services').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
         supabase.from('appointments').select('*, profiles(full_name, phone, email)').eq('shop_id', shopData.id).order('appointment_date', { ascending: false }),
         supabase.from('shop_hours').select('*').eq('shop_id', shopData.id).order('day_of_week', { ascending: true }),
         supabase.from('reviews').select('*, profiles(full_name)').eq('shop_id', shopData.id).order('created_at', { ascending: false }),
+        supabase.from('staff').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: true }),
       ]);
       setServices(servicesRes.data || []);
       setAppointments(appointmentsRes.data || []);
       setReviews(reviewsRes.data || []);
+      setStaff(staffRes.data || []);
 
       const hours = hoursRes.data || [];
       if (hours.length === 0) {
@@ -207,6 +213,20 @@ export default function Dashboard() {
     setShopHours(prev => prev.map((h, i) => i === index ? { ...h, [field]: value } : h));
   };
 
+  const handleStaffSubmit = async () => {
+    if (!shop?.id || !staffForm.firstName.trim() || !staffForm.lastName.trim()) return;
+    setSavingStaff(true);
+    const { error } = await supabase.from('staff').insert([{
+      shop_id: shop.id,
+      first_name: staffForm.firstName.trim(),
+      last_name: staffForm.lastName.trim(),
+      avatar_url: staffForm.avatarUrl || null,
+    }]);
+    if (error) { alert("Hata: " + error.message); }
+    else { setIsStaffModalOpen(false); fetchInitialData(); }
+    setSavingStaff(false);
+  };
+
   // Real metrics
   const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı');
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
@@ -228,6 +248,8 @@ export default function Dashboard() {
             { id: "reviews", label: "Yorumlar", icon: <MessageSquare size={18}/> },
             { id: "services", label: "Hizmet Yönetimi", icon: <Package size={18}/> },
             { id: "hours", label: "Çalışma Saatleri", icon: <Clock size={18}/> },
+            { id: "staff", label: "Personel", icon: <Users size={18}/> },
+            { id: "finance", label: "Finans", icon: <TrendingUp size={18}/> },
           ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-[#00A3AD] text-white shadow-lg shadow-[#00A3AD]/20" : "text-gray-500 hover:text-white hover:bg-white/5"}`}>
               {item.icon} {item.label}
@@ -485,6 +507,47 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* 6. PERSONEL */}
+            {activeTab === "staff" && (
+              <div className="animate-in slide-in-from-right-4">
+                <div className="flex justify-between items-center mb-12">
+                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Personel</h2>
+                  {staff.length < 10 && (
+                    <button onClick={() => { setStaffForm({ firstName: "", lastName: "", avatarUrl: "" }); setIsStaffModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Personel Ekle</button>
+                  )}
+                </div>
+                {staff.length === 0 ? (
+                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz personel eklemediniz</div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                    {staff.map((s) => (
+                      <div key={s.id} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col items-center gap-4 hover:shadow-xl transition-all">
+                        <div className="w-20 h-20 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-lg flex items-center justify-center">
+                          {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" /> : <span className="text-2xl font-black text-[#00A3AD]">{s.first_name?.charAt(0)}</span>}
+                        </div>
+                        <div className="text-center">
+                          <p className="font-black text-sm uppercase tracking-tight">{s.first_name}</p>
+                          <p className="font-bold text-xs uppercase tracking-wider text-gray-400">{s.last_name}</p>
+                        </div>
+                        <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }} className="p-2 text-red-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 7. FİNANS */}
+            {activeTab === "finance" && (
+              <div className="animate-in slide-in-from-right-4">
+                <h2 className="text-4xl font-black uppercase tracking-tighter italic mb-12">Finans</h2>
+                <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
+                  <TrendingUp size={48} className="text-gray-200 mb-6" />
+                  <p className="font-black text-gray-300 uppercase tracking-widest italic text-sm">Yakında Geliyor</p>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -531,6 +594,36 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* PERSONEL MODALI */}
+      {isStaffModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+          <div className="bg-white w-full max-w-md rounded-[4rem] p-12 relative animate-in zoom-in duration-300 text-black">
+            <button onClick={() => setIsStaffModalOpen(false)} className="absolute top-10 right-10 text-gray-300 hover:text-black transition-colors"><X size={32}/></button>
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-10">Personel Ekle</h3>
+            <div className="flex flex-col items-center gap-6">
+              <label className="relative cursor-pointer group">
+                <div className="w-28 h-28 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-xl flex items-center justify-center">
+                  {staffForm.avatarUrl ? <img src={staffForm.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-4xl font-black text-[#00A3AD]">{staffForm.firstName?.charAt(0) || "?"}</span>}
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all rounded-full">
+                  <UploadCloud size={24} className="text-white" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0]; if(!file) return;
+                  const url = await handleFileUpload(file, 'staff-avatars');
+                  if(url) setStaffForm(f => ({...f, avatarUrl: url}));
+                }} />
+              </label>
+              <input placeholder="İsim" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.firstName} onChange={e => setStaffForm(f => ({...f, firstName: e.target.value}))} />
+              <input placeholder="Soyisim" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.lastName} onChange={e => setStaffForm(f => ({...f, lastName: e.target.value}))} />
+              <button onClick={handleStaffSubmit} disabled={savingStaff || !staffForm.firstName.trim() || !staffForm.lastName.trim()} className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all disabled:opacity-30">
+                {savingStaff ? "EKLENİYOR..." : "EKLE"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SERVİS MODALI */}
       {isServiceModalOpen && (
