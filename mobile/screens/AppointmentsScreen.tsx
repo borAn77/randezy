@@ -76,7 +76,10 @@ export default function AppointmentsScreen() {
       .from('appointments')
       .update({ status: newStatus })
       .eq('id', item.id);
-    if (error) return;
+    if (error) {
+      Alert.alert('Güncelleme hatası', error.message);
+      return;
+    }
 
     setAppointments(prev => prev.map(a => a.id === item.id ? { ...a, status: newStatus } : a));
 
