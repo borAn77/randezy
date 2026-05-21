@@ -5,7 +5,7 @@ import { Session } from '@supabase/supabase-js';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from './lib/supabase';
 import LoginScreen from './screens/LoginScreen';
-import AppointmentsScreen from './screens/AppointmentsScreen';
+import CalendarScreen from './screens/CalendarScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,7 +33,7 @@ export default function App() {
       <StatusBar style="auto" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
-          <Stack.Screen name="Appointments" component={AppointmentsScreen} />
+          <Stack.Screen name="Calendar" component={CalendarScreen} />
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
