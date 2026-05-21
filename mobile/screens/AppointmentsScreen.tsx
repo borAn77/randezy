@@ -4,6 +4,7 @@ import {
   ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { FRONTEND_URL } from '../config';
 
 type Shop = { id: string; name: string; category: string };
 type Appointment = {
@@ -69,14 +70,30 @@ export default function AppointmentsScreen() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
-  const handleStatusUpdate = async (id: string, newStatus: string) => {
+  const handleStatusUpdate = async (item: Appointment, newStatus: string) => {
     const { error } = await supabase
       .from('appointments')
       .update({ status: newStatus })
-      .eq('id', id);
-    if (!error) {
-      setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
-    }
+      .eq('id', item.id);
+    if (error) return;
+
+    setAppointments(prev => prev.map(a => a.id === item.id ? { ...a, status: newStatus } : a));
+
+    if (!item.profiles?.email) return;
+    const type = newStatus === 'Onaylandı' ? 'appointment_confirmed' : 'appointment_rejected';
+    fetch(`${FRONTEND_URL}/api/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        customerEmail: item.profiles.email,
+        customerName: item.profiles.full_name || 'Müşteri',
+        shopName: shop?.name || '',
+        serviceName: item.service_name,
+        appointmentDate: item.appointment_date,
+        appointmentTime: item.appointment_time,
+      }),
+    }).catch(() => null);
   };
 
   const filtered = appointments.filter(a =>
@@ -108,13 +125,13 @@ export default function AppointmentsScreen() {
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#22c55e' }]}
-              onPress={() => handleStatusUpdate(item.id, 'Onaylandı')}
+              onPress={() => handleStatusUpdate(item, 'Onaylandı')}
             >
               <Text style={styles.actionText}>Onayla</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: '#ef4444' }]}
-              onPress={() => handleStatusUpdate(item.id, 'İptal Edildi')}
+              onPress={() => handleStatusUpdate(item, 'İptal Edildi')}
             >
               <Text style={styles.actionText}>İptal Et</Text>
             </TouchableOpacity>
