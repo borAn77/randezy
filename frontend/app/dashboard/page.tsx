@@ -5,7 +5,8 @@ import { supabase } from "../../lib/supabase";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
-  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, Star, MessageSquare,
+  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
+  Star, MessageSquare, Phone, Search,
   ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail
 } from "lucide-react";
 
@@ -45,8 +46,10 @@ export default function Dashboard() {
   const [financeChartView, setFinanceChartView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [appointmentView, setAppointmentView] = useState<'list' | 'calendar'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
-  const [calViewMode, setCalViewMode] = useState<'day' | 'week'>('day');
+  const [calViewMode, setCalViewMode] = useState<'day' | 'week' | 'month'>('day');
   const [calDayOffset, setCalDayOffset] = useState(0);
+  const [listFilter, setListFilter] = useState('all');
+  const [listSearch, setListSearch] = useState('');
   const [selectedApt, setSelectedApt] = useState<any>(null);
   const [detailRejectMode, setDetailRejectMode] = useState(false);
   const [detailRejectReason, setDetailRejectReason] = useState('');
@@ -448,7 +451,7 @@ export default function Dashboard() {
 
   // Calendar view helpers
   const calHours = Array.from({ length: 14 }, (_, i) => i + 8); // 08–21
-  const calHourH = 60; // px per hour
+  const calHourH = 64; // px per hour
   const calDayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
   const _calBase = new Date();
   const _calDay = _calBase.getDay();
@@ -480,8 +483,8 @@ export default function Dashboard() {
   const _now = new Date();
   const currentTimeTop = isCurrentDayToday ? (_now.getHours() + _now.getMinutes() / 60 - 8) * calHourH : -1;
   const dayViewColumns = [
-    { id: '__unassigned', label: 'Atanmamış' },
-    ...staff.map((s: any) => ({ id: s.id, label: `${s.first_name} ${s.last_name}` })),
+    { id: '__unassigned', label: 'Tüm Personel', avatar: null as string | null, role: '' },
+    ...staff.map((s: any) => ({ id: s.id, label: `${s.first_name} ${s.last_name}`, avatar: (s.avatar_url as string | null) || null, role: (s.role as string) || '' })),
   ];
   const getColApts = (colId: string) =>
     colId === '__unassigned'
@@ -594,275 +597,298 @@ export default function Dashboard() {
 
             {/* 3. RANDEVULAR */}
             {activeTab === "appointments" && (
-              <div className="animate-in slide-in-from-right-4">
-                {/* Header + View Toggle */}
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-black uppercase tracking-tighter italic">Randevu Trafiği</h2>
-                  <div className="flex items-center bg-white border border-gray-100 rounded-2xl p-1 shadow-sm gap-1">
+              <div className="animate-in fade-in duration-300">
+                {/* Top Controls Bar */}
+                <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
+                  {/* Navigation */}
+                  <div className="flex items-center gap-2.5">
                     <button
-                      onClick={() => setAppointmentView('calendar')}
-                      className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${appointmentView === 'calendar' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      <Calendar size={13}/> Takvim
-                    </button>
-                    <button
-                      onClick={() => setAppointmentView('list')}
-                      className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${appointmentView === 'list' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      <LayoutDashboard size={13}/> Liste
-                    </button>
+                      onClick={() => { setCalDayOffset(0); setCalendarWeekOffset(0); }}
+                      className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-[11px] font-black uppercase tracking-widest text-black hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                    >Bugün</button>
+                    <div className="flex items-center bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                      <button
+                        onClick={() => { if (calViewMode === 'day') setCalDayOffset(o => o - 1); else if (calViewMode === 'week') setCalendarWeekOffset(o => o - 1); else setCalDayOffset(o => o - 30); }}
+                        className="px-3 py-2.5 text-gray-400 hover:text-black hover:bg-gray-50 transition-all border-r border-gray-200"
+                      ><ChevronLeft size={15}/></button>
+                      <button
+                        onClick={() => { if (calViewMode === 'day') setCalDayOffset(o => o + 1); else if (calViewMode === 'week') setCalendarWeekOffset(o => o + 1); else setCalDayOffset(o => o + 30); }}
+                        className="px-3 py-2.5 text-gray-400 hover:text-black hover:bg-gray-50 transition-all"
+                      ><ChevronRight size={15}/></button>
+                    </div>
+                    <p className="text-base font-black text-black tracking-tight">
+                      {calViewMode === 'month' || appointmentView === 'list'
+                        ? calCurrentDay.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+                        : calViewMode === 'week'
+                        ? `${calWeekDays[0].toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} — ${calWeekDays[6].toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                        : calCurrentDay.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                      }
+                    </p>
+                  </div>
+                  {/* Right controls */}
+                  <div className="flex items-center gap-2">
+                    {appointmentView === 'calendar' && (
+                      <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                        {(['day', 'week', 'month'] as const).map(m => (
+                          <button key={m} onClick={() => setCalViewMode(m)}
+                            className={`px-4 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${calViewMode === m ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}
+                          >{m === 'day' ? 'Gün' : m === 'week' ? 'Hafta' : 'Ay'}</button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                      <button onClick={() => setAppointmentView('calendar')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${appointmentView === 'calendar' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}
+                      ><Calendar size={13}/> Takvim</button>
+                      <button onClick={() => setAppointmentView('list')}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${appointmentView === 'list' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-700'}`}
+                      ><LayoutDashboard size={13}/> Liste</button>
+                    </div>
                   </div>
                 </div>
 
                 {/* ── LİSTE GÖRÜNÜMÜ ── */}
                 {appointmentView === 'list' && (
-                  <>
-                    {appointments.length === 0 && (
-                      <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz randevu talebi yok</div>
-                    )}
-                    {pendingAppointments.length > 0 && (
-                      <div className="mb-10">
-                        <div className="flex items-center gap-3 mb-5">
-                          <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Bekleyen Talepler</span>
-                          <span className="min-w-[20px] h-5 px-1.5 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-[10px] font-black">{pendingAppointments.length}</span>
-                        </div>
-                        <div className="space-y-4">
-                          {pendingAppointments.map((apt) => (
-                            <div key={apt.id} className="bg-white rounded-[2.5rem] border border-orange-100 overflow-hidden group hover:border-orange-300 transition-all">
-                              <div className="p-8 flex items-center justify-between">
-                                <div className="flex items-center gap-8">
-                                  <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
-                                    <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
-                                    <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
-                                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                                      {apt.service_name}
-                                      {apt.staff && <span className="text-[#00A3AD]"> • {apt.staff.first_name} {apt.staff.last_name}</span>}
-                                      {(apt.profiles?.phone || apt.profiles?.email) && ` • ${apt.profiles?.phone || apt.profiles?.email}`}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-4 flex-shrink-0">
-                                  <span className="px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest bg-yellow-50 text-yellow-600">{apt.status}</span>
-                                  <div className="flex gap-2">
-                                    <button onClick={() => updateAppointmentStatus(apt.id, 'Onaylandı')} className="p-3 bg-black text-white rounded-xl hover:bg-green-600 transition-all" title="Onayla"><CheckCircle2 size={18}/></button>
-                                    <button onClick={() => { setRejectingId(rejectingId === apt.id ? null : apt.id); setRejectReason(""); setRejectError(""); }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all" title="Reddet"><X size={18}/></button>
-                                  </div>
-                                </div>
-                              </div>
-                              {rejectingId === apt.id && (
-                                <div className="border-t border-red-100 bg-red-50 p-6 animate-in slide-in-from-top-2">
-                                  <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3">Red Gerekçesi — En az 10 kelime yazın</p>
-                                  <textarea rows={3} placeholder="Müşteriye iletilecek red açıklamasını yazın..." className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none mb-2" value={rejectReason} onChange={e => { setRejectReason(e.target.value); setRejectError(""); }} />
-                                  {rejectError && <p className="text-[11px] font-bold text-red-500 mb-2">{rejectError}</p>}
-                                  <div className="flex gap-3">
-                                    <button onClick={() => handleReject(apt.id)} className="bg-red-500 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-600 transition-all">Reddet ve Gönder</button>
-                                    <button onClick={() => { setRejectingId(null); setRejectReason(""); setRejectError(""); }} className="bg-white text-gray-400 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:text-black transition-all">Vazgeç</button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                  <div>
+                    {/* Filter bar */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex items-center gap-2 flex-wrap">
+                      <div className="flex gap-1.5 flex-wrap">
+                        {[
+                          { val: 'all', label: 'Tümü', count: appointments.length },
+                          { val: 'Beklemede', label: 'Bekleyen', count: appointments.filter((a:any)=>a.status==='Beklemede').length },
+                          { val: 'Onaylandı', label: 'Onaylı', count: appointments.filter((a:any)=>a.status==='Onaylandı').length },
+                          { val: 'İptal Edildi', label: 'İptal', count: appointments.filter((a:any)=>a.status==='İptal Edildi').length },
+                          { val: 'Tamamlandı', label: 'Tamamlanan', count: appointments.filter((a:any)=>a.status==='Tamamlandı').length },
+                          { val: 'Gelmedi', label: 'Gelmedi', count: appointments.filter((a:any)=>a.status==='Gelmedi').length },
+                        ].map(f => (
+                          <button key={f.val} onClick={() => setListFilter(f.val)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${listFilter === f.val ? 'bg-black text-white shadow-sm' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                          >
+                            {f.label}
+                            {f.count > 0 && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${listFilter === f.val ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-500'}`}>{f.count}</span>}
+                          </button>
+                        ))}
                       </div>
-                    )}
-                    {otherAppointments.length > 0 && (
-                      <div>
-                        {pendingAppointments.length > 0 && (
-                          <div className="flex items-center gap-4 mb-6">
-                            <div className="flex-1 h-px bg-gray-100"></div>
-                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest px-2">Onaylı & Geçmiş</span>
-                            <div className="flex-1 h-px bg-gray-100"></div>
-                          </div>
-                        )}
-                        <div className="space-y-4">
-                          {otherAppointments.map((apt) => (
-                            <div key={apt.id} className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden group hover:border-[#00A3AD] transition-all">
-                              <div className="p-8 flex items-center justify-between">
-                                <div className="flex items-center gap-8">
-                                  <div className="bg-black text-[#00A3AD] px-6 py-4 rounded-2xl font-black text-center flex-shrink-0">
-                                    <p className="text-[9px] uppercase opacity-50">{apt.appointment_date}</p>
-                                    <p className="text-lg">{apt.appointment_time?.slice(0,5) ?? "--:--"}</p>
-                                  </div>
-                                  <div>
-                                    <h4 className="text-xl font-black uppercase">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h4>
-                                    <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">
-                                      {apt.service_name}
-                                      {apt.staff && <span className="text-[#00A3AD]"> • {apt.staff.first_name} {apt.staff.last_name}</span>}
-                                      {(apt.profiles?.phone || apt.profiles?.email) && ` • ${apt.profiles?.phone || apt.profiles?.email}`}
-                                    </p>
-                                    {apt.cancel_reason && <p className="text-[10px] font-bold text-red-400 mt-1 italic">Red gerekçesi: {apt.cancel_reason}</p>}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-4 flex-shrink-0">
-                                  <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${apt.status === 'Onaylandı' ? 'bg-green-50 text-green-600' : apt.status === 'İptal Edildi' ? 'bg-red-50 text-red-500' : 'bg-yellow-50 text-yellow-600'}`}>{apt.status}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="ml-auto flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+                        <Search size={13} className="text-gray-400 flex-shrink-0"/>
+                        <input type="text" placeholder="Müşteri ara..." className="bg-transparent outline-none text-xs font-bold text-black placeholder-gray-400 w-32"
+                          value={listSearch} onChange={e => setListSearch(e.target.value)} />
                       </div>
-                    )}
-                  </>
+                    </div>
+                    {/* Rows */}
+                    {(() => {
+                      let filtered = appointments as any[];
+                      if (listFilter !== 'all') filtered = filtered.filter((a:any) => a.status === listFilter);
+                      if (listSearch.trim()) filtered = filtered.filter((a:any) =>
+                        (a.profiles?.full_name||'').toLowerCase().includes(listSearch.toLowerCase()) ||
+                        (a.service_name||'').toLowerCase().includes(listSearch.toLowerCase())
+                      );
+                      if (filtered.length === 0) return (
+                        <div className="py-20 text-center bg-white rounded-3xl border-2 border-dashed border-gray-100">
+                          <p className="font-black text-gray-300 uppercase tracking-widest italic text-sm">Randevu bulunamadı</p>
+                        </div>
+                      );
+                      const monthNames = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+                      const borderCls: Record<string,string> = { 'Beklemede':'border-l-amber-400','Onaylandı':'border-l-emerald-500','İptal Edildi':'border-l-red-400','Tamamlandı':'border-l-blue-500','Gelmedi':'border-l-gray-300' };
+                      const badgeCls: Record<string,string> = { 'Beklemede':'bg-amber-50 text-amber-700','Onaylandı':'bg-emerald-50 text-emerald-700','İptal Edildi':'bg-red-50 text-red-600','Tamamlandı':'bg-blue-50 text-blue-700','Gelmedi':'bg-gray-100 text-gray-600' };
+                      return (
+                        <div className="space-y-2">
+                          {filtered.map((apt:any) => {
+                            const dp = (apt.appointment_date||'').split('-');
+                            const monthLabel = dp[1] ? monthNames[parseInt(dp[1])-1] : '';
+                            return (
+                              <div key={apt.id}
+                                className={`bg-white rounded-2xl border border-gray-100 border-l-4 ${borderCls[apt.status]||'border-l-gray-300'} shadow-sm hover:shadow-md hover:border-gray-200 transition-all cursor-pointer group`}
+                                onClick={()=>{ setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
+                              >
+                                <div className="flex items-center px-5 py-4 gap-4">
+                                  <div className="flex-shrink-0 w-14 text-center">
+                                    <p className="text-xl font-black text-black leading-none">{apt.appointment_time?.slice(0,5) ?? '--:--'}</p>
+                                    <p className="text-[9px] font-black text-gray-400 uppercase mt-1">{dp[2]} {monthLabel}</p>
+                                  </div>
+                                  <div className="w-px h-10 bg-gray-100 flex-shrink-0"/>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-black text-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                      <span className="text-[11px] font-bold text-gray-500 truncate">{apt.service_name}</span>
+                                      {apt.staff && <span className="text-[11px] font-bold text-[#00A3AD] truncate">· {apt.staff.first_name} {apt.staff.last_name}</span>}
+                                      {apt.profiles?.phone && <span className="text-[11px] text-gray-400 truncate">· {apt.profiles.phone}</span>}
+                                    </div>
+                                  </div>
+                                  <p className="text-sm font-black text-black flex-shrink-0 hidden md:block">₺{apt.price}</p>
+                                  <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex-shrink-0 ${badgeCls[apt.status]||'bg-gray-100 text-gray-600'}`}>{apt.status}</span>
+                                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                    {apt.status === 'Beklemede' && (
+                                      <button onClick={e=>{e.stopPropagation();updateAppointmentStatus(apt.id,'Onaylandı');}} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-all" title="Onayla"><CheckCircle2 size={14}/></button>
+                                    )}
+                                    {apt.profiles?.phone && (
+                                      <a href={`tel:${apt.profiles.phone}`} onClick={e=>e.stopPropagation()} className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-all"><Phone size={14}/></a>
+                                    )}
+                                  </div>
+                                  <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0"/>
+                                </div>
+                                {apt.cancel_reason && (
+                                  <p className="px-5 pb-3 text-[10px] font-bold text-red-400 italic truncate">Red: {apt.cancel_reason}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
 
                 {/* ── TAKVİM GÖRÜNÜMÜ ── */}
                 {appointmentView === 'calendar' && (
-                  <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                    {/* Toolbar */}
-                    <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 gap-4 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => { setCalDayOffset(0); setCalendarWeekOffset(0); }}
-                          className="px-5 py-2.5 bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all"
-                        >Bugün</button>
-                        <button
-                          onClick={() => calViewMode === 'day' ? setCalDayOffset(o => o - 1) : setCalendarWeekOffset(o => o - 1)}
-                          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none"
-                        >‹</button>
-                        <button
-                          onClick={() => calViewMode === 'day' ? setCalDayOffset(o => o + 1) : setCalendarWeekOffset(o => o + 1)}
-                          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none"
-                        >›</button>
-                        <p className="text-[11px] font-black text-black uppercase tracking-widest">
-                          {calViewMode === 'day'
-                            ? calCurrentDay.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                            : `${calWeekDays[0].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} — ${calWeekDays[6].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`
-                          }
-                        </p>
-                      </div>
-                      <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1 gap-1">
-                        <button
-                          onClick={() => setCalViewMode('day')}
-                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${calViewMode === 'day' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
-                        >Günlük</button>
-                        <button
-                          onClick={() => setCalViewMode('week')}
-                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${calViewMode === 'week' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
-                        >Haftalık</button>
-                      </div>
-                    </div>
-
+                  <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                     {/* Renk açıklamaları */}
-                    <div className="flex items-center gap-5 px-8 py-3 border-b border-gray-100 bg-gray-50/60 flex-wrap">
+                    <div className="flex items-center gap-5 px-6 py-3 border-b border-gray-100 flex-wrap">
                       {[
-                        { label: 'Beklemede', cls: 'bg-yellow-400' },
+                        { label: 'Beklemede', cls: 'bg-amber-400' },
                         { label: 'Onaylandı', cls: 'bg-emerald-500' },
-                        { label: 'İptal Edildi', cls: 'bg-red-500' },
+                        { label: 'İptal Edildi', cls: 'bg-red-400' },
                         { label: 'Tamamlandı', cls: 'bg-blue-500' },
                         { label: 'Gelmedi', cls: 'bg-gray-400' },
                       ].map(s => (
                         <div key={s.label} className="flex items-center gap-1.5">
-                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.cls}`} />
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{s.label}</span>
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.cls}`} />
+                          <span className="text-[11px] font-bold text-gray-500">{s.label}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Calendar body */}
-                    <div style={{ overflowY: 'auto', maxHeight: '660px' }}>
-                      {calViewMode === 'day' ? (
-                        /* ── GÜNLÜK GÖRÜNÜM ── */
-                        <div style={{ overflowX: 'auto' }}>
-                          <div style={{ minWidth: `${52 + dayViewColumns.length * 160}px` }}>
-                            {/* Personel sütun başlıkları */}
-                            <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
-                              <div style={{ width: '52px', flexShrink: 0 }} />
-                              {dayViewColumns.map((col) => (
-                                <div key={col.id} style={{ width: '160px', flexShrink: 0 }} className="text-center py-3 border-l border-gray-100">
-                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest truncate px-2">{col.label}</p>
+                    {calViewMode === 'day' && (
+                      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '700px' }}>
+                        <div style={{ minWidth: `${64 + Math.max(dayViewColumns.length, 1) * 160}px` }}>
+                          {/* Staff column headers with avatars */}
+                          <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
+                            <div style={{ width: '64px', flexShrink: 0 }} />
+                            {dayViewColumns.map((col) => (
+                              <div key={col.id} style={{ width: '160px', flexShrink: 0 }} className="border-l border-gray-100 py-3 px-2 flex flex-col items-center gap-1.5">
+                                <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm ${col.id === '__unassigned' ? 'bg-gray-100' : 'bg-[#E6F6F7]'}`}>
+                                  {col.id === '__unassigned' ? (
+                                    <Users size={16} className="text-gray-400" />
+                                  ) : col.avatar ? (
+                                    <img src={col.avatar} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <span className="text-sm font-black text-[#00A3AD]">{col.label.charAt(0)}</span>
+                                  )}
                                 </div>
-                              ))}
-                            </div>
-                            {/* Saat grid + kartlar */}
-                            <div className="flex relative">
-                              <div style={{ width: '52px', flexShrink: 0 }}>
-                                {calHours.map(h => (
-                                  <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-2 pt-1.5">
-                                    <span className="text-[8px] font-black text-gray-300">{h}:00</span>
-                                  </div>
-                                ))}
+                                <p className="text-[10px] font-black text-gray-700 text-center truncate w-full">{col.label}</p>
+                                {col.role && <p className="text-[8px] font-bold text-gray-400 uppercase text-center truncate w-full">{col.role}</p>}
                               </div>
-                              {dayViewColumns.map((col) => {
-                                const colApts = getColApts(col.id);
+                            ))}
+                          </div>
+                          {/* Time grid */}
+                          <div className="flex relative">
+                            {/* Time axis with current-time badge */}
+                            <div style={{ width: '64px', flexShrink: 0 }} className="relative">
+                              {calHours.map(h => {
+                                const rowTop = (h - 8) * calHourH;
+                                const showBadge = isCurrentDayToday && currentTimeTop >= rowTop && currentTimeTop < rowTop + calHourH;
                                 return (
-                                  <div
-                                    key={col.id}
-                                    style={{ width: '160px', flexShrink: 0, height: `${calHours.length * calHourH}px` }}
-                                    className="border-l border-gray-100 relative"
-                                  >
-                                    {calHours.map(h => (
-                                      <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
-                                    ))}
-                                    {calHours.map(h => (
-                                      <div key={`hh${h}`} className="absolute w-full border-b border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
-                                    ))}
-                                    {colApts.map((apt: any) => {
-                                      const parts = (apt.appointment_time || '08:00').split(':');
-                                      const aH = Math.max(8, Math.min(20, parseInt(parts[0]) || 8));
-                                      const aM = parseInt(parts[1]) || 0;
-                                      const top = (aH - 8) * calHourH + (aM / 60) * calHourH;
-                                      const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
-                                      const height = Math.max(32, (dur / 60) * calHourH);
-                                      const cls = calStatusCls[apt.status] || 'bg-gray-300 border-gray-400 text-gray-800';
-                                      return (
-                                        <div
-                                          key={apt.id}
-                                          className={`absolute left-1 right-1 rounded-lg border-l-4 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-xl hover:z-10 hover:scale-[1.02] transition-all duration-150 ${cls}`}
-                                          style={{ top: `${top}px`, height: `${height}px` }}
-                                          onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
-                                        >
-                                          <p className="text-[9px] font-black truncate leading-tight">{apt.profiles?.full_name || 'Misafir'}</p>
-                                          <p className="text-[8px] opacity-80 truncate">{apt.appointment_time?.slice(0, 5)} · {apt.service_name}</p>
-                                          {height >= 52 && <p className="text-[8px] opacity-60 truncate">₺{apt.price}</p>}
-                                        </div>
-                                      );
-                                    })}
+                                  <div key={h} style={{ height: `${calHourH}px` }} className="relative border-b border-gray-50 flex items-start justify-end pr-3 pt-1.5">
+                                    {showBadge ? (
+                                      <span className="absolute right-1.5 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10 leading-none"
+                                        style={{ top: `${Math.max(2, currentTimeTop - rowTop - 8)}px` }}>
+                                        {`${String(_now.getHours()).padStart(2,'0')}:${String(_now.getMinutes()).padStart(2,'0')}`}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] font-semibold text-gray-300">{`${h}:00`}</span>
+                                    )}
                                   </div>
                                 );
                               })}
-                              {/* Şimdiki zaman göstergesi */}
-                              {currentTimeTop >= 0 && currentTimeTop <= calHours.length * calHourH && (
-                                <div
-                                  className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
-                                  style={{ top: `${currentTimeTop}px` }}
-                                >
-                                  <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0 -translate-x-1.5" style={{ marginLeft: '52px' }} />
-                                  <div className="flex-1 h-[2px] bg-red-500 opacity-80" />
-                                </div>
-                              )}
                             </div>
+                            {/* Staff columns */}
+                            {dayViewColumns.map((col) => {
+                              const colApts = getColApts(col.id);
+                              return (
+                                <div key={col.id}
+                                  style={{ width: '160px', flexShrink: 0, height: `${calHours.length * calHourH}px` }}
+                                  className="border-l border-gray-100 relative">
+                                  {calHours.map(h => (
+                                    <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
+                                  ))}
+                                  {calHours.map(h => (
+                                    <div key={`hh${h}`} className="absolute w-full border-b border-dashed border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
+                                  ))}
+                                  {colApts.map((apt: any) => {
+                                    const tParts = (apt.appointment_time || '08:00').split(':');
+                                    const aH = Math.max(8, Math.min(20, parseInt(tParts[0]) || 8));
+                                    const aM = parseInt(tParts[1]) || 0;
+                                    const topPx = (aH - 8) * calHourH + (aM / 60) * calHourH;
+                                    const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
+                                    const heightPx = Math.max(44, (dur / 60) * calHourH);
+                                    const endMin = aH * 60 + aM + dur;
+                                    const endH = Math.floor(endMin / 60), endM = endMin % 60;
+                                    const aptColors: Record<string,string> = {
+                                      'Beklemede': 'bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100',
+                                      'Onaylandı': 'bg-emerald-50 border-emerald-400 text-emerald-900 hover:bg-emerald-100',
+                                      'İptal Edildi': 'bg-red-50 border-red-400 text-red-900 hover:bg-red-100',
+                                      'Tamamlandı': 'bg-blue-50 border-blue-400 text-blue-900 hover:bg-blue-100',
+                                      'Gelmedi': 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100',
+                                    };
+                                    const cls = aptColors[apt.status] || 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100';
+                                    return (
+                                      <div key={apt.id}
+                                        className={`absolute left-1.5 right-1.5 rounded-xl border-l-[3px] overflow-hidden cursor-pointer hover:shadow-md hover:z-10 transition-all duration-150 ${cls}`}
+                                        style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                                        onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}>
+                                        <div className="px-2.5 py-2 h-full flex flex-col">
+                                          <p className="text-[9px] font-semibold opacity-60 leading-none mb-1">
+                                            {`${String(aH).padStart(2,'0')}:${String(aM).padStart(2,'0')} – ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`}
+                                          </p>
+                                          <p className="text-[11px] font-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                          {heightPx >= 54 && <p className="text-[9px] opacity-70 truncate mt-0.5">{apt.service_name}</p>}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                            {/* Current time red line */}
+                            {isCurrentDayToday && currentTimeTop >= 0 && currentTimeTop <= calHours.length * calHourH && (
+                              <div className="absolute z-30 pointer-events-none flex items-center"
+                                style={{ top: `${currentTimeTop}px`, left: '64px', right: 0 }}>
+                                <div className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 -translate-x-1.5" />
+                                <div className="flex-1 h-[2px] bg-red-500/50" />
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ) : (
-                        /* ── HAFTALIK GÖRÜNÜM ── */
-                        <div style={{ minWidth: '700px' }}>
+                      </div>
+                    )}
+
+                    {calViewMode === 'week' && (
+                      <div style={{ overflowY: 'auto', maxHeight: '700px', minWidth: '720px', overflowX: 'auto' }}>
+                        <div style={{ minWidth: '720px' }}>
                           <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
-                            <div style={{ width: '52px', flexShrink: 0 }} />
+                            <div style={{ width: '64px', flexShrink: 0 }} />
                             {calWeekDays.map((day, i) => {
                               const ds = day.toISOString().split('T')[0];
                               const isToday = ds === today;
                               const cnt = appointments.filter((a: any) => a.appointment_date === ds).length;
                               return (
-                                <div
-                                  key={i}
+                                <div key={i}
                                   className={`flex-1 text-center py-3 border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-all ${isToday ? 'bg-[#00A3AD]/5' : ''}`}
-                                  onClick={() => { setCalViewMode('day'); const offset = Math.round((day.getTime() - new Date(new Date().setHours(0,0,0,0)).getTime()) / 86400000); setCalDayOffset(offset); }}
+                                  onClick={() => { const off = Math.round((day.getTime() - new Date(new Date().setHours(0,0,0,0)).getTime()) / 86400000); setCalDayOffset(off); setCalViewMode('day'); }}
                                 >
-                                  <p className={`text-[8px] font-black uppercase tracking-widest ${isToday ? 'text-[#00A3AD]' : 'text-gray-400'}`}>{calDayNames[i]}</p>
-                                  <div className={`text-base font-black mx-auto w-8 h-8 flex items-center justify-center rounded-full ${isToday ? 'bg-[#00A3AD] text-white' : 'text-black'}`}>{day.getDate()}</div>
-                                  {cnt > 0 && <p className="text-[7px] font-black text-[#00A3AD] uppercase mt-0.5">{cnt} randevu</p>}
+                                  <p className={`text-[10px] font-black uppercase tracking-widest ${isToday ? 'text-[#00A3AD]' : 'text-gray-400'}`}>{calDayNames[i]}</p>
+                                  <div className={`text-sm font-black mx-auto w-8 h-8 flex items-center justify-center rounded-full mt-0.5 ${isToday ? 'bg-[#00A3AD] text-white' : 'text-black'}`}>{day.getDate()}</div>
+                                  {cnt > 0 && <p className="text-[9px] font-bold text-[#00A3AD] mt-0.5">{cnt}</p>}
                                 </div>
                               );
                             })}
                           </div>
                           <div className="flex">
-                            <div style={{ width: '52px', flexShrink: 0 }}>
+                            <div style={{ width: '64px', flexShrink: 0 }}>
                               {calHours.map(h => (
-                                <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-2 pt-1.5">
-                                  <span className="text-[8px] font-black text-gray-300">{h}:00</span>
+                                <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-3 pt-1.5">
+                                  <span className="text-[11px] font-semibold text-gray-300">{`${h}:00`}</span>
                                 </div>
                               ))}
                             </div>
@@ -871,37 +897,33 @@ export default function Dashboard() {
                               const isToday = ds === today;
                               const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
                               return (
-                                <div
-                                  key={di}
+                                <div key={di}
                                   className={`flex-1 border-l border-gray-100 relative ${isToday ? 'bg-[#00A3AD]/[0.02]' : ''}`}
-                                  style={{ height: `${calHours.length * calHourH}px` }}
-                                >
+                                  style={{ height: `${calHours.length * calHourH}px` }}>
                                   {calHours.map(h => (
                                     <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
                                   ))}
                                   {calHours.map(h => (
-                                    <div key={`hh${h}`} className="absolute w-full border-b border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
+                                    <div key={`hh${h}`} className="absolute w-full border-b border-dashed border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
                                   ))}
                                   {dayApts.map((apt: any) => {
-                                    const parts = (apt.appointment_time || '08:00').split(':');
-                                    const aH = Math.max(8, Math.min(20, parseInt(parts[0]) || 8));
-                                    const aM = parseInt(parts[1]) || 0;
-                                    const top = (aH - 8) * calHourH + (aM / 60) * calHourH;
+                                    const tParts = (apt.appointment_time || '08:00').split(':');
+                                    const aH = Math.max(8, Math.min(20, parseInt(tParts[0]) || 8));
+                                    const aM = parseInt(tParts[1]) || 0;
+                                    const topPx = (aH - 8) * calHourH + (aM / 60) * calHourH;
                                     const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
-                                    const height = Math.max(32, (dur / 60) * calHourH);
-                                    const cls = calStatusCls[apt.status] || 'bg-gray-300 border-gray-400 text-gray-800';
+                                    const heightPx = Math.max(32, (dur / 60) * calHourH);
+                                    const aptColors: Record<string,string> = { 'Beklemede':'bg-amber-50 border-amber-400 text-amber-900','Onaylandı':'bg-emerald-50 border-emerald-400 text-emerald-900','İptal Edildi':'bg-red-50 border-red-400 text-red-900','Tamamlandı':'bg-blue-50 border-blue-400 text-blue-900','Gelmedi':'bg-gray-50 border-gray-300 text-gray-700' };
+                                    const cls = aptColors[apt.status] || 'bg-gray-50 border-gray-300 text-gray-700';
                                     return (
-                                      <div
-                                        key={apt.id}
-                                        className={`absolute left-0.5 right-0.5 rounded-lg border-l-4 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-xl hover:z-10 hover:scale-[1.02] transition-all duration-150 ${cls}`}
-                                        style={{ top: `${top}px`, height: `${height}px` }}
-                                        onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
-                                      >
-                                        <p className="text-[9px] font-black truncate leading-tight">{apt.profiles?.full_name || 'Misafir'}</p>
-                                        <p className="text-[8px] opacity-80 truncate">{apt.appointment_time?.slice(0, 5)} · {apt.service_name}</p>
-                                        {apt.staff && height >= 52 && (
-                                          <p className="text-[8px] opacity-70 truncate">{apt.staff.first_name} {apt.staff.last_name}</p>
-                                        )}
+                                      <div key={apt.id}
+                                        className={`absolute left-0.5 right-0.5 rounded-lg border-l-[3px] overflow-hidden cursor-pointer hover:shadow-md hover:z-10 transition-all duration-150 ${cls}`}
+                                        style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                                        onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}>
+                                        <div className="px-2 py-1.5">
+                                          <p className="text-[10px] font-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                          {heightPx >= 46 && <p className="text-[8px] opacity-70 truncate">{apt.appointment_time?.slice(0,5)} · {apt.service_name}</p>}
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -910,31 +932,75 @@ export default function Dashboard() {
                             })}
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    {/* Alt özet çubuğu */}
-                    <div className="border-t border-gray-100 px-8 py-4 bg-gray-50/60 flex items-center gap-6 flex-wrap">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Günlük Özet</p>
+                    {calViewMode === 'month' && (() => {
+                      const mStart = new Date(calCurrentDay); mStart.setDate(1); mStart.setHours(0,0,0,0);
+                      const firstDow = mStart.getDay();
+                      const offset = firstDow === 0 ? 6 : firstDow - 1;
+                      const mEnd = new Date(mStart); mEnd.setMonth(mEnd.getMonth()+1); mEnd.setDate(0);
+                      const cells: Date[] = [];
+                      for (let i = offset; i > 0; i--) { const d = new Date(mStart); d.setDate(d.getDate()-i); cells.push(d); }
+                      for (let i = 1; i <= mEnd.getDate(); i++) { const d = new Date(mStart); d.setDate(i); cells.push(d); }
+                      while (cells.length % 7 !== 0) { const d = new Date(cells[cells.length-1]); d.setDate(d.getDate()+1); cells.push(d); }
+                      const mColors: Record<string,string> = { 'Beklemede':'bg-amber-400','Onaylandı':'bg-emerald-500','İptal Edildi':'bg-red-400','Tamamlandı':'bg-blue-500','Gelmedi':'bg-gray-400' };
+                      return (
+                        <div>
+                          <div className="grid grid-cols-7 border-b border-gray-100">
+                            {['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(d => (
+                              <div key={d} className="py-2 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">{d}</div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-7">
+                            {cells.map((day, i) => {
+                              const ds = day.toISOString().split('T')[0];
+                              const isThisMonth = day.getMonth() === mStart.getMonth();
+                              const isTodayCell = ds === today;
+                              const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              return (
+                                <div key={i}
+                                  className={`min-h-[90px] border-b border-r border-gray-100 p-2 cursor-pointer hover:bg-gray-50 transition-all ${!isThisMonth ? 'opacity-25' : ''} ${isTodayCell ? 'bg-[#00A3AD]/5' : ''}`}
+                                  onClick={() => { const off = Math.round((day.getTime()-new Date(new Date().setHours(0,0,0,0)).getTime())/86400000); setCalDayOffset(off); setCalViewMode('day'); }}>
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-black mb-1 ${isTodayCell ? 'bg-[#00A3AD] text-white' : 'text-gray-700'}`}>{day.getDate()}</div>
+                                  {dayApts.slice(0,3).map((apt: any) => (
+                                    <div key={apt.id}
+                                      className={`text-[9px] font-bold text-white px-1.5 py-0.5 rounded-md mb-0.5 truncate ${mColors[apt.status]||'bg-gray-400'}`}
+                                      onClick={e=>{e.stopPropagation();setSelectedApt(apt);setDetailRejectMode(false);setDetailRejectReason('');setDetailRejectError('');}}>
+                                      {apt.appointment_time?.slice(0,5)} {apt.profiles?.full_name?.split(' ')[0]||'Misafir'}
+                                    </div>
+                                  ))}
+                                  {dayApts.length > 3 && <p className="text-[9px] font-bold text-gray-400">+{dayApts.length-3}</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Bottom summary bar */}
+                    <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-5 flex-wrap">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Özet:</p>
                       {[
                         { label: 'Toplam', value: calCurrentDayApts.length, cls: 'text-black' },
-                        { label: 'Beklemede', value: calCurrentDayApts.filter((a: any) => a.status === 'Beklemede').length, cls: 'text-yellow-500' },
+                        { label: 'Beklemede', value: calCurrentDayApts.filter((a: any) => a.status === 'Beklemede').length, cls: 'text-amber-500' },
                         { label: 'Onaylı', value: calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı').length, cls: 'text-emerald-600' },
                         { label: 'İptal', value: calCurrentDayApts.filter((a: any) => a.status === 'İptal Edildi').length, cls: 'text-red-500' },
                       ].map((s) => (
                         <div key={s.label} className="flex items-center gap-1.5">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{s.label}:</span>
+                          <span className="text-[10px] text-gray-400 font-bold">{s.label}:</span>
                           <span className={`text-sm font-black ${s.cls}`}>{s.value}</span>
                         </div>
                       ))}
                       {(() => {
                         const decided = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı' || a.status === 'İptal Edildi').length;
                         const approved = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı').length;
-                        if (decided === 0) return null;
+                        if (!decided) return null;
                         return (
                           <div className="flex items-center gap-1.5 ml-auto">
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Onay Oranı:</span>
-                            <span className="text-sm font-black text-[#00A3AD]">%{Math.round(approved / decided * 100)}</span>
+                            <span className="text-[10px] text-gray-400 font-bold">Onay Oranı:</span>
+                            <span className="text-sm font-black text-[#00A3AD]">%{Math.round(approved/decided*100)}</span>
                           </div>
                         );
                       })()}
@@ -1541,79 +1607,81 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* RANDEVU DETAY PANELİ */}
-      {selectedApt && (
-        <>
-          <div
-            className="fixed inset-0 z-[150] bg-black/30 backdrop-blur-sm"
-            onClick={() => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
-          />
-          <div className="fixed top-0 right-0 bottom-0 z-[160] w-full max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-black uppercase tracking-tighter">Randevu Detayı</h3>
-              <button
-                onClick={() => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-400 hover:text-black"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* RANDEVU DETAY MODALİ */}
+      {selectedApt && (() => {
+        const close = () => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); };
+        const nameParts = (selectedApt.profiles?.full_name || 'M').split(' ');
+        const initials = nameParts.map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+        const aptId = (selectedApt.id as string)?.slice(-8)?.toUpperCase() || '--------';
+        const timeline = [
+          { label: 'Randevu oluşturuldu', time: selectedApt.created_at as string | null, color: 'bg-blue-400' },
+          ...(selectedApt.status !== 'Beklemede' ? [{
+            label: `Durum güncellendi: ${selectedApt.status}`,
+            time: (selectedApt.updated_at || selectedApt.created_at) as string | null,
+            color: selectedApt.status === 'Onaylandı' ? 'bg-emerald-400' : selectedApt.status === 'İptal Edildi' ? 'bg-red-400' : selectedApt.status === 'Tamamlandı' ? 'bg-blue-500' : 'bg-gray-400',
+          }] : []),
+        ];
+        return (
+          <>
+            <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" onClick={close} />
+            <div className="fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[520px] max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200 p-8 space-y-6">
 
-            <div className="flex-1 p-8 space-y-5">
-              {/* Durum + tarih */}
-              <div className="flex items-center justify-between">
-                <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${calStatusCls[selectedApt.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                  {selectedApt.status}
-                </span>
-                <span className="text-[9px] font-bold text-gray-400 uppercase">{selectedApt.appointment_date} · {selectedApt.appointment_time?.slice(0, 5)}</span>
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className={`inline-block text-[10px] font-black uppercase px-3 py-1 rounded-full border ${calStatusCls[selectedApt.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                    {selectedApt.status}
+                  </span>
+                  <p className="text-[10px] font-bold text-gray-400 mt-1.5 uppercase tracking-widest">Randevu #{aptId}</p>
+                </div>
+                <button onClick={close} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-400 hover:text-black">
+                  <X size={20} />
+                </button>
               </div>
 
-              {/* Müşteri */}
-              <div className="bg-gray-50 rounded-[2rem] p-6">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Müşteri</p>
-                <h4 className="text-xl font-black uppercase text-black mb-3">{selectedApt.profiles?.full_name || 'Misafir'}</h4>
+              {/* Müşteri kartı */}
+              <div className="flex items-center gap-4 bg-gray-50 rounded-2xl p-5">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#00A3AD] to-[#007a82] flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-black text-lg">{initials}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-lg font-black text-black truncate">{selectedApt.profiles?.full_name || 'Misafir'}</h4>
+                  {selectedApt.profiles?.email && (
+                    <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.profiles.email}</p>
+                  )}
+                </div>
                 {selectedApt.profiles?.phone && (
-                  <div className="flex gap-2">
-                    <a
-                      href={`tel:${selectedApt.profiles.phone}`}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all"
-                    >📞 Ara</a>
-                    <a
-                      href={`https://wa.me/${selectedApt.profiles.phone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all"
-                    >💬 WhatsApp</a>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <a href={`tel:${selectedApt.profiles.phone}`} className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-xl hover:bg-[#00A3AD] transition-all" title="Ara">
+                      <Phone size={16} />
+                    </a>
+                    <a href={`https://wa.me/${(selectedApt.profiles.phone as string).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all" title="WhatsApp">
+                      <MessageSquare size={16} />
+                    </a>
                   </div>
-                )}
-                {selectedApt.profiles?.email && (
-                  <p className="text-[10px] font-bold text-gray-400 mt-3">{selectedApt.profiles.email}</p>
                 )}
               </div>
 
-              {/* Randevu bilgileri */}
-              <div className="bg-gray-50 rounded-[2rem] p-6 space-y-3">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Randevu</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase">Hizmet</span>
-                  <span className="text-sm font-black text-black">{selectedApt.service_name}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase">Fiyat</span>
-                  <span className="text-sm font-black text-[#00A3AD]">₺{selectedApt.price}</span>
-                </div>
-                {selectedApt.staff && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-black text-gray-400 uppercase">Personel</span>
-                    <span className="text-sm font-black text-black">{selectedApt.staff.first_name} {selectedApt.staff.last_name}</span>
+              {/* Detay grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { label: 'Tarih', value: selectedApt.appointment_date },
+                  { label: 'Saat', value: (selectedApt.appointment_time as string)?.slice(0, 5) || '--:--' },
+                  { label: 'Hizmet', value: selectedApt.service_name },
+                  { label: 'Personel', value: selectedApt.staff ? `${selectedApt.staff.first_name} ${selectedApt.staff.last_name}` : 'Atanmadı' },
+                  { label: 'Fiyat', value: `₺${selectedApt.price}` },
+                  { label: 'Süre', value: selectedApt.duration_minutes ? `${selectedApt.duration_minutes} dk` : '—' },
+                ] as { label: string; value: string }[]).map(({ label, value }) => (
+                  <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+                    <p className="text-sm font-black text-black truncate">{value}</p>
                   </div>
-                )}
+                ))}
               </div>
 
               {/* Red gerekçesi */}
               {selectedApt.cancel_reason && (
-                <div className="bg-red-50 border border-red-100 rounded-[2rem] p-6">
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-5">
                   <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-2">Red Gerekçesi</p>
                   <p className="text-sm text-red-500 font-medium">{selectedApt.cancel_reason}</p>
                 </div>
@@ -1621,41 +1689,41 @@ export default function Dashboard() {
 
               {/* Aksiyon butonları */}
               {!detailRejectMode && (
-                <div className="space-y-3 pt-2">
+                <div className="flex flex-col gap-2">
                   {selectedApt.status === 'Beklemede' && (
-                    <button onClick={handleDetailApprove} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all">
+                    <button onClick={handleDetailApprove} className="w-full py-3.5 bg-emerald-500 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 transition-all">
                       ✓ Onayla
                     </button>
                   )}
                   {selectedApt.status === 'Onaylandı' && (
-                    <button onClick={handleDetailComplete} className="w-full py-4 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all">
-                      ✓ Tamamlandı
+                    <button onClick={handleDetailComplete} className="w-full py-3.5 bg-blue-500 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-blue-600 transition-all">
+                      ✓ Tamamlandı İşaretle
                     </button>
                   )}
                   {(selectedApt.status === 'Beklemede' || selectedApt.status === 'Onaylandı') && (
                     <>
-                      <button onClick={() => setDetailRejectMode(true)} className="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-                        ✕ Reddet
+                      <button onClick={() => setDetailRejectMode(true)} className="w-full py-3.5 bg-red-50 text-red-500 border border-red-100 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
+                        ✕ Reddet / İptal Et
                       </button>
-                      <button onClick={handleDetailNoShow} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
+                      <button onClick={handleDetailNoShow} className="w-full py-3.5 bg-gray-100 text-gray-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-gray-200 transition-all">
                         ⚠ Gelmedi (No-Show)
                       </button>
                     </>
                   )}
-                  <button onClick={handleDetailDelete} className="w-full py-4 bg-gray-50 text-gray-400 border border-gray-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all">
-                    🗑 Randevuyu Sil
+                  <button onClick={handleDetailDelete} className="w-full py-3 text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-red-500 transition-colors">
+                    🗑 Randevuyu Kalıcı Sil
                   </button>
                 </div>
               )}
 
               {/* Red formu */}
               {detailRejectMode && (
-                <div className="bg-red-50 rounded-[2rem] p-6 space-y-4 animate-in slide-in-from-top-2">
+                <div className="bg-red-50 rounded-2xl p-5 space-y-4 animate-in slide-in-from-top-2">
                   <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Red Gerekçesi — En az 10 kelime</p>
                   <textarea
                     rows={4}
                     placeholder="Müşteriye iletilecek red açıklamasını yazın..."
-                    className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none"
+                    className="w-full bg-white rounded-xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none"
                     value={detailRejectReason}
                     onChange={e => { setDetailRejectReason(e.target.value); setDetailRejectError(''); }}
                   />
@@ -1666,10 +1734,29 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+
+              {/* Aktivite zaman çizelgesi */}
+              <div>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-4">Aktivite</p>
+                <div className="space-y-3">
+                  {timeline.map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0 ${item.color}`} />
+                      <div>
+                        <p className="text-xs font-bold text-black">{item.label}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">
+                          {item.time ? new Date(item.time).toLocaleString('tr-TR') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
-          </div>
-        </>
-      )}
+          </>
+        );
+      })()}
     </div>
   );
 }
