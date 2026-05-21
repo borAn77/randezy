@@ -2,19 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { START_HOUR, END_HOUR, PIXELS_PER_MINUTE, TIME_AXIS_WIDTH } from '../../constants/layout';
 
-const SLOT_HEIGHT = 30 * PIXELS_PER_MINUTE; // 30 minutes per slot
+const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;
 
 export default function TimeAxis() {
-  const slots = [];
-  for (let h = START_HOUR; h <= END_HOUR; h++) {
-    slots.push(h);
-  }
+  const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
 
   return (
     <View style={[styles.container, { width: TIME_AXIS_WIDTH }]}>
-      {slots.map((h, i) => (
-        <View key={h} style={[styles.slot, { height: i < slots.length - 1 ? SLOT_HEIGHT : 1 }]}>
-          <Text style={styles.label}>{String(h).padStart(2, '0')}:00</Text>
+      {hours.map((h, i) => (
+        <View key={h} style={[styles.slot, { height: i < hours.length - 1 ? HOUR_HEIGHT : 20 }]}>
+          <Text style={[styles.label, h === new Date().getHours() && styles.labelNow]}>
+            {String(h).padStart(2, '0')}:00
+          </Text>
         </View>
       ))}
     </View>
@@ -23,13 +22,13 @@ export default function TimeAxis() {
 
 const styles = StyleSheet.create({
   container: { paddingTop: 0 },
-  slot: { justifyContent: 'flex-start' },
+  slot: { justifyContent: 'flex-start', alignItems: 'flex-end', paddingRight: 10 },
   label: {
     fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '500',
-    paddingTop: 2,
-    paddingRight: 8,
-    textAlign: 'right',
+    color: '#b0bec5',
+    fontWeight: '600',
+    paddingTop: 3,
+    lineHeight: 14,
   },
+  labelNow: { color: '#ef4444', fontWeight: '800' },
 });
