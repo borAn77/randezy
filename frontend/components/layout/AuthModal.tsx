@@ -26,7 +26,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) alert("Google Giriş Hatası: " + error.message);
   };

@@ -152,17 +152,7 @@ export default function HesabimPage() {
             {/* SADECE İŞLETME SAHİPLERİNE GÖZÜKEN BUTONLAR */}
             {isOwner && (
               <>
-                <button 
-                  onClick={() => setActiveTab("isletme-yonetimi")}
-                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'isletme-yonetimi' ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Store size={18} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">İşletme Yönetimi</span>
-                  </div>
-                  <ChevronRight size={14} />
-                </button>
-                <button 
+                <button
                   onClick={() => setActiveTab("isletme-randevular")}
                   className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'isletme-randevular' ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                 >
