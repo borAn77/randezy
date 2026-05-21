@@ -72,6 +72,7 @@ class Business(Base):
     opening_hours: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     cover_image_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    push_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped[User] = relationship("User", back_populates="businesses")

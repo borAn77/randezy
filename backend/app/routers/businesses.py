@@ -87,6 +87,21 @@ def update_business(
     return business
 
 
+@router.put("/me/push-token", status_code=204)
+def register_push_token(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    token = payload.get("token", "")
+    business = db.execute(
+        select(Business).where(Business.owner_id == user.supabase_id)
+    ).scalar_one_or_none()
+    if business:
+        business.push_token = token
+        db.commit()
+
+
 @router.post("/{business_id}/services", response_model=ServiceOut, status_code=201)
 def add_service(
     business_id: uuid.UUID,

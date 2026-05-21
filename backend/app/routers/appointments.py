@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app import email as email_service
+from app import push as push_service
 from app.models import Appointment, AppointmentStatus, Business, Service, Staff, User
 from app.schemas import AppointmentCreate, AppointmentDetail, AppointmentOut
 
@@ -78,6 +79,17 @@ def create_appointment(
         start_time=appointment.start_time,
         staff_name=staff_name,
     )
+
+    if business.push_token:
+        date_str = appointment.start_time.strftime("%d.%m.%Y %H:%M")
+        background_tasks.add_task(
+            push_service.send_push,
+            token=business.push_token,
+            title="Yeni Randevu 📅",
+            body=f"{user.full_name or 'Müşteri'} — {service.name} · {date_str}",
+            data={"type": "new_appointment", "appointment_id": str(appointment.id)},
+        )
+
     return appointment
 
 
