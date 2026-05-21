@@ -12,12 +12,14 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
+  console.log("[notify] resend configured:", !!resend);
   if (!resend) {
     return NextResponse.json({ ok: false, reason: "RESEND_API_KEY not configured" });
   }
 
   const body = await req.json();
   const { type } = body;
+  console.log("[notify] type:", type, "| body keys:", Object.keys(body).join(","));
 
   try {
     if (type === "new_appointment") {
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[notify]", err);
+    console.error("[notify] error:", err);
     return NextResponse.json({ ok: false });
   }
 }
@@ -50,12 +52,14 @@ async function handleNewAppointment(body: {
     .single();
 
   let ownerEmail = ownerProfile?.email;
+  console.log("[notify] ownerProfile email:", ownerEmail ?? "null");
   if (!ownerEmail) {
     const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(body.ownerId);
     ownerEmail = authUser?.user?.email;
+    console.log("[notify] auth fallback email:", ownerEmail ?? "null");
   }
 
-  if (!ownerEmail) return;
+  if (!ownerEmail) { console.log("[notify] no owner email, aborting"); return; }
 
   const dateStr = formatDate(body.appointmentDate);
 
@@ -108,7 +112,8 @@ async function handleStatusChange(
     }
   }
 
-  if (!email) return;
+  console.log("[notify] customer email:", email ?? "null");
+  if (!email) { console.log("[notify] no customer email, aborting"); return; }
 
   const dateStr = formatDate(body.appointmentDate);
   const isConfirmed = status === "confirmed";
