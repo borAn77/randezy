@@ -72,7 +72,6 @@ export default function AppointmentsScreen() {
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const handleStatusUpdate = async (item: Appointment, newStatus: string) => {
-    Alert.alert('DEBUG', `email: ${item.profiles?.email ?? 'YOK'} | status: ${newStatus}`);
     const { error } = await supabase
       .from('appointments')
       .update({ status: newStatus })
@@ -84,30 +83,21 @@ export default function AppointmentsScreen() {
 
     setAppointments(prev => prev.map(a => a.id === item.id ? { ...a, status: newStatus } : a));
 
-    if (!item.profiles?.email) {
-      Alert.alert('Bilgi', `Durum güncellendi fakat müşteri email bulunamadı (profiles.email = null). Kullanıcı ID: ${item.user_id ?? 'yok'}`);
-      return;
-    }
     const type = newStatus === 'Onaylandı' ? 'appointment_confirmed' : 'appointment_rejected';
-    try {
-      const res = await fetch(`${FRONTEND_URL}/api/notify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type,
-          customerEmail: item.profiles.email,
-          customerName: item.profiles.full_name || 'Müşteri',
-          shopName: shop?.name || '',
-          serviceName: item.service_name,
-          appointmentDate: item.appointment_date,
-          appointmentTime: item.appointment_time,
-        }),
-      });
-      const json = await res.json();
-      if (!json.ok) Alert.alert('Email hatası', json.reason ?? 'Notify başarısız');
-    } catch (e: any) {
-      Alert.alert('Email hatası', e?.message ?? 'Notify isteği atılamadı');
-    }
+    fetch(`${FRONTEND_URL}/api/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        appointmentId: item.id,
+        customerEmail: item.profiles?.email,
+        customerName: item.profiles?.full_name || 'Müşteri',
+        shopName: shop?.name || '',
+        serviceName: item.service_name,
+        appointmentDate: item.appointment_date,
+        appointmentTime: item.appointment_time,
+      }),
+    }).catch(() => null);
   };
 
   const filtered = appointments.filter(a =>
