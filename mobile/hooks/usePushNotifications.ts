@@ -44,11 +44,16 @@ async function getExpoPushToken(): Promise<string | null> {
 
 async function registerTokenWithBackend(token: string) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
+  if (!session) { console.log('[push] no session'); return; }
 
-  // Attach Supabase JWT so the Python backend can identify the user
+  console.log('[push] registering token:', token.slice(0, 30) + '...');
   setAuthToken(session.access_token);
-  await api.put('/businesses/me/push-token', { token });
+  try {
+    await api.put('/businesses/me/push-token', { token });
+    console.log('[push] token saved to backend ✓');
+  } catch (e: any) {
+    console.log('[push] save failed:', e?.response?.status, e?.message);
+  }
 }
 
 export function usePushNotifications() {
