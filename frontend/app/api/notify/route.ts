@@ -76,24 +76,40 @@ async function handleNewAppointment(body: {
 
 async function handleStatusChange(
   body: {
-    customerEmail: string;
+    customerEmail?: string;
     customerName: string;
     shopName: string;
     serviceName: string;
     appointmentDate: string;
     appointmentTime: string;
+    appointmentId?: string;
     reason?: string;
   },
   status: "confirmed" | "rejected"
 ) {
-  if (!body.customerEmail) return;
+  let email = body.customerEmail;
+
+  // profiles join null döndüyse appointment'tan auth.users üzerinden email al
+  if (!email && body.appointmentId) {
+    const { data: apt } = await supabaseAdmin
+      .from("appointments")
+      .select("user_id")
+      .eq("id", body.appointmentId)
+      .single();
+    if (apt?.user_id) {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(apt.user_id);
+      email = authUser?.user?.email;
+    }
+  }
+
+  if (!email) return;
 
   const dateStr = formatDate(body.appointmentDate);
   const isConfirmed = status === "confirmed";
 
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
-    to: body.customerEmail,
+    to: email,
     subject: isConfirmed
       ? `Randevunuz Onaylandı — ${body.shopName}`
       : `Randevunuz İptal Edildi — ${body.shopName}`,

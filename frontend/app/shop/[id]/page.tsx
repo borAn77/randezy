@@ -295,6 +295,13 @@ export default function ShopDetail() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); setIsBooking(false); setIsAuthOpen(true); return; }
+
+    // Müşteri profili yoksa oluştur — email join'inin çalışması için gerekli
+    await supabase.from('profiles').upsert(
+      { id: session.user.id, email: session.user.email },
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+
     const { error } = await supabase.from('appointments').insert([{
       user_id: session.user.id,
       shop_id: shopId,
