@@ -147,14 +147,15 @@ export default function Dashboard() {
       fetchInitialData();
       if (newStatus === 'Onaylandı') {
         const apt = appointments.find(a => a.id === id);
-        if (apt?.profiles?.email) {
+        if (apt) {
           fetch('/api/notify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'appointment_confirmed',
-              customerEmail: apt.profiles.email,
-              customerName: apt.profiles.full_name || 'Müşteri',
+              appointmentId: apt.id,
+              customerEmail: apt.profiles?.email,
+              customerName: apt.profiles?.full_name || 'Müşteri',
               shopName: shop?.name || '',
               serviceName: apt.service_name,
               appointmentDate: apt.appointment_date,
@@ -178,14 +179,15 @@ export default function Dashboard() {
     setRejectReason("");
     setRejectError("");
     fetchInitialData();
-    if (apt?.profiles?.email) {
+    if (apt) {
       fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'appointment_rejected',
-          customerEmail: apt.profiles.email,
-          customerName: apt.profiles.full_name || 'Müşteri',
+          appointmentId: apt.id,
+          customerEmail: apt.profiles?.email,
+          customerName: apt.profiles?.full_name || 'Müşteri',
           shopName: shop?.name || '',
           serviceName: apt.service_name,
           appointmentDate: apt.appointment_date,
