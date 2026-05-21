@@ -43,8 +43,14 @@ export default function Dashboard() {
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
   const [financeChartView, setFinanceChartView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
-  const [appointmentView, setAppointmentView] = useState<'list' | 'calendar'>('list');
+  const [appointmentView, setAppointmentView] = useState<'list' | 'calendar'>('calendar');
   const [calendarWeekOffset, setCalendarWeekOffset] = useState(0);
+  const [calViewMode, setCalViewMode] = useState<'day' | 'week'>('day');
+  const [calDayOffset, setCalDayOffset] = useState(0);
+  const [selectedApt, setSelectedApt] = useState<any>(null);
+  const [detailRejectMode, setDetailRejectMode] = useState(false);
+  const [detailRejectReason, setDetailRejectReason] = useState('');
+  const [detailRejectError, setDetailRejectError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingShop, setDeletingShop] = useState(false);
@@ -198,6 +204,63 @@ export default function Dashboard() {
         }),
       }).catch(() => {});
     }
+  };
+
+  const handleDetailApprove = async () => {
+    if (!selectedApt) return;
+    await updateAppointmentStatus(selectedApt.id, 'Onaylandı');
+    setSelectedApt((prev: any) => prev ? { ...prev, status: 'Onaylandı' } : null);
+  };
+
+  const handleDetailRejectSubmit = async () => {
+    if (!selectedApt) return;
+    const words = detailRejectReason.trim().split(/\s+/).filter(Boolean);
+    if (words.length < 10) {
+      setDetailRejectError(`En az 10 kelime gerekli. Şu an: ${words.length} kelime.`);
+      return;
+    }
+    const apt = selectedApt;
+    await supabase.from('appointments').update({ status: 'İptal Edildi', cancel_reason: detailRejectReason.trim() }).eq('id', apt.id);
+    setSelectedApt(null);
+    setDetailRejectMode(false);
+    setDetailRejectReason('');
+    setDetailRejectError('');
+    fetchInitialData();
+    fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'appointment_rejected',
+        appointmentId: apt.id,
+        customerEmail: apt.profiles?.email,
+        customerName: apt.profiles?.full_name || 'Müşteri',
+        shopName: shop?.name || '',
+        serviceName: apt.service_name,
+        appointmentDate: apt.appointment_date,
+        appointmentTime: apt.appointment_time?.slice(0, 5),
+        reason: detailRejectReason.trim(),
+      }),
+    }).catch(() => {});
+  };
+
+  const handleDetailDelete = async () => {
+    if (!selectedApt) return;
+    if (!confirm('Bu randevuyu kalıcı olarak silmek istediğinize emin misiniz?')) return;
+    await supabase.from('appointments').delete().eq('id', selectedApt.id);
+    setSelectedApt(null);
+    fetchInitialData();
+  };
+
+  const handleDetailNoShow = async () => {
+    if (!selectedApt) return;
+    await updateAppointmentStatus(selectedApt.id, 'Gelmedi');
+    setSelectedApt((prev: any) => prev ? { ...prev, status: 'Gelmedi' } : null);
+  };
+
+  const handleDetailComplete = async () => {
+    if (!selectedApt) return;
+    await updateAppointmentStatus(selectedApt.id, 'Tamamlandı');
+    setSelectedApt((prev: any) => prev ? { ...prev, status: 'Tamamlandı' } : null);
   };
 
   const handleSettingsSubmit = async (e: any) => {
@@ -405,6 +468,26 @@ export default function Dashboard() {
     'Gelmedi': 'bg-gray-400 border-gray-500 text-white',
   };
 
+  const calCurrentDay = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + calDayOffset);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+  const calCurrentDayStr = calCurrentDay.toISOString().split('T')[0];
+  const calCurrentDayApts = appointments.filter((a: any) => a.appointment_date === calCurrentDayStr);
+  const isCurrentDayToday = calCurrentDayStr === today;
+  const _now = new Date();
+  const currentTimeTop = isCurrentDayToday ? (_now.getHours() + _now.getMinutes() / 60 - 8) * calHourH : -1;
+  const dayViewColumns = [
+    { id: '__unassigned', label: 'Atanmamış' },
+    ...staff.map((s: any) => ({ id: s.id, label: `${s.first_name} ${s.last_name}` })),
+  ];
+  const getColApts = (colId: string) =>
+    colId === '__unassigned'
+      ? calCurrentDayApts.filter((a: any) => !a.staff_id)
+      : calCurrentDayApts.filter((a: any) => a.staff_id === colId);
+
   if (loading) return <div className="h-screen bg-black flex items-center justify-center font-black text-[#00A3AD] animate-pulse uppercase tracking-[0.5em]">RANDEZY.PRO YÜKLENİYOR...</div>;
 
   return (
@@ -517,16 +600,16 @@ export default function Dashboard() {
                   <h2 className="text-3xl font-black uppercase tracking-tighter italic">Randevu Trafiği</h2>
                   <div className="flex items-center bg-white border border-gray-100 rounded-2xl p-1 shadow-sm gap-1">
                     <button
-                      onClick={() => setAppointmentView('list')}
-                      className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${appointmentView === 'list' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      <LayoutDashboard size={13}/> Liste
-                    </button>
-                    <button
                       onClick={() => setAppointmentView('calendar')}
                       className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${appointmentView === 'calendar' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
                     >
                       <Calendar size={13}/> Takvim
+                    </button>
+                    <button
+                      onClick={() => setAppointmentView('list')}
+                      className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${appointmentView === 'list' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
+                    >
+                      <LayoutDashboard size={13}/> Liste
                     </button>
                   </div>
                 </div>
@@ -628,20 +711,38 @@ export default function Dashboard() {
                 {/* ── TAKVİM GÖRÜNÜMÜ ── */}
                 {appointmentView === 'calendar' && (
                   <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                    {/* Hafta navigasyonu */}
-                    <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100">
-                      <button onClick={() => setCalendarWeekOffset(o => o - 1)} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none">‹</button>
-                      <div className="text-center">
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 gap-4 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => { setCalDayOffset(0); setCalendarWeekOffset(0); }}
+                          className="px-5 py-2.5 bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all"
+                        >Bugün</button>
+                        <button
+                          onClick={() => calViewMode === 'day' ? setCalDayOffset(o => o - 1) : setCalendarWeekOffset(o => o - 1)}
+                          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none"
+                        >‹</button>
+                        <button
+                          onClick={() => calViewMode === 'day' ? setCalDayOffset(o => o + 1) : setCalendarWeekOffset(o => o + 1)}
+                          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none"
+                        >›</button>
                         <p className="text-[11px] font-black text-black uppercase tracking-widest">
-                          {calWeekDays[0].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} — {calWeekDays[6].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          {calViewMode === 'day'
+                            ? calCurrentDay.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                            : `${calWeekDays[0].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} — ${calWeekDays[6].toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                          }
                         </p>
-                        {calendarWeekOffset !== 0 && (
-                          <button onClick={() => setCalendarWeekOffset(0)} className="text-[9px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline mt-0.5">
-                            Bu Haftaya Dön
-                          </button>
-                        )}
                       </div>
-                      <button onClick={() => setCalendarWeekOffset(o => o + 1)} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-500 font-black text-xl select-none">›</button>
+                      <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-1 gap-1">
+                        <button
+                          onClick={() => setCalViewMode('day')}
+                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${calViewMode === 'day' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
+                        >Günlük</button>
+                        <button
+                          onClick={() => setCalViewMode('week')}
+                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${calViewMode === 'week' ? 'bg-black text-white shadow' : 'text-gray-400 hover:text-black'}`}
+                        >Haftalık</button>
+                      </div>
                     </div>
 
                     {/* Renk açıklamaları */}
@@ -660,86 +761,183 @@ export default function Dashboard() {
                       ))}
                     </div>
 
-                    {/* Takvim grid */}
+                    {/* Calendar body */}
                     <div style={{ overflowY: 'auto', maxHeight: '660px' }}>
-                      <div style={{ minWidth: '700px' }}>
-                        {/* Gün başlıkları */}
-                        <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
-                          <div style={{ width: '52px', flexShrink: 0 }} />
-                          {calWeekDays.map((day, i) => {
-                            const ds = day.toISOString().split('T')[0];
-                            const isToday = ds === today;
-                            const cnt = appointments.filter((a: any) => a.appointment_date === ds).length;
-                            return (
-                              <div key={i} className={`flex-1 text-center py-3 border-l border-gray-100 ${isToday ? 'bg-[#00A3AD]/5' : ''}`}>
-                                <p className={`text-[8px] font-black uppercase tracking-widest ${isToday ? 'text-[#00A3AD]' : 'text-gray-400'}`}>{calDayNames[i]}</p>
-                                <div className={`text-base font-black mx-auto w-8 h-8 flex items-center justify-center rounded-full ${isToday ? 'bg-[#00A3AD] text-white' : 'text-black'}`}>{day.getDate()}</div>
-                                {cnt > 0 && <p className="text-[7px] font-black text-[#00A3AD] uppercase mt-0.5">{cnt} randevu</p>}
+                      {calViewMode === 'day' ? (
+                        /* ── GÜNLÜK GÖRÜNÜM ── */
+                        <div style={{ overflowX: 'auto' }}>
+                          <div style={{ minWidth: `${52 + dayViewColumns.length * 160}px` }}>
+                            {/* Personel sütun başlıkları */}
+                            <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
+                              <div style={{ width: '52px', flexShrink: 0 }} />
+                              {dayViewColumns.map((col) => (
+                                <div key={col.id} style={{ width: '160px', flexShrink: 0 }} className="text-center py-3 border-l border-gray-100">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest truncate px-2">{col.label}</p>
+                                </div>
+                              ))}
+                            </div>
+                            {/* Saat grid + kartlar */}
+                            <div className="flex relative">
+                              <div style={{ width: '52px', flexShrink: 0 }}>
+                                {calHours.map(h => (
+                                  <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-2 pt-1.5">
+                                    <span className="text-[8px] font-black text-gray-300">{h}:00</span>
+                                  </div>
+                                ))}
                               </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* Saat satırları + randevu blokları */}
-                        <div className="flex">
-                          {/* Saat etiketleri */}
-                          <div style={{ width: '52px', flexShrink: 0 }}>
-                            {calHours.map(h => (
-                              <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-2 pt-1.5">
-                                <span className="text-[8px] font-black text-gray-300">{h}:00</span>
-                              </div>
-                            ))}
+                              {dayViewColumns.map((col) => {
+                                const colApts = getColApts(col.id);
+                                return (
+                                  <div
+                                    key={col.id}
+                                    style={{ width: '160px', flexShrink: 0, height: `${calHours.length * calHourH}px` }}
+                                    className="border-l border-gray-100 relative"
+                                  >
+                                    {calHours.map(h => (
+                                      <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
+                                    ))}
+                                    {calHours.map(h => (
+                                      <div key={`hh${h}`} className="absolute w-full border-b border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
+                                    ))}
+                                    {colApts.map((apt: any) => {
+                                      const parts = (apt.appointment_time || '08:00').split(':');
+                                      const aH = Math.max(8, Math.min(20, parseInt(parts[0]) || 8));
+                                      const aM = parseInt(parts[1]) || 0;
+                                      const top = (aH - 8) * calHourH + (aM / 60) * calHourH;
+                                      const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
+                                      const height = Math.max(32, (dur / 60) * calHourH);
+                                      const cls = calStatusCls[apt.status] || 'bg-gray-300 border-gray-400 text-gray-800';
+                                      return (
+                                        <div
+                                          key={apt.id}
+                                          className={`absolute left-1 right-1 rounded-lg border-l-4 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-xl hover:z-10 hover:scale-[1.02] transition-all duration-150 ${cls}`}
+                                          style={{ top: `${top}px`, height: `${height}px` }}
+                                          onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
+                                        >
+                                          <p className="text-[9px] font-black truncate leading-tight">{apt.profiles?.full_name || 'Misafir'}</p>
+                                          <p className="text-[8px] opacity-80 truncate">{apt.appointment_time?.slice(0, 5)} · {apt.service_name}</p>
+                                          {height >= 52 && <p className="text-[8px] opacity-60 truncate">₺{apt.price}</p>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })}
+                              {/* Şimdiki zaman göstergesi */}
+                              {currentTimeTop >= 0 && currentTimeTop <= calHours.length * calHourH && (
+                                <div
+                                  className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
+                                  style={{ top: `${currentTimeTop}px` }}
+                                >
+                                  <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0 -translate-x-1.5" style={{ marginLeft: '52px' }} />
+                                  <div className="flex-1 h-[2px] bg-red-500 opacity-80" />
+                                </div>
+                              )}
+                            </div>
                           </div>
-
-                          {/* Gün sütunları */}
-                          {calWeekDays.map((day, di) => {
-                            const ds = day.toISOString().split('T')[0];
-                            const isToday = ds === today;
-                            const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
-                            return (
-                              <div
-                                key={di}
-                                className={`flex-1 border-l border-gray-100 relative ${isToday ? 'bg-[#00A3AD]/[0.02]' : ''}`}
-                                style={{ height: `${calHours.length * calHourH}px` }}
-                              >
-                                {/* Tam saat çizgileri */}
-                                {calHours.map(h => (
-                                  <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
-                                ))}
-                                {/* Yarım saat çizgileri */}
-                                {calHours.map(h => (
-                                  <div key={`hh${h}`} className="absolute w-full border-b border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
-                                ))}
-
-                                {/* Randevu kartları */}
-                                {dayApts.map((apt: any) => {
-                                  const parts = (apt.appointment_time || '08:00').split(':');
-                                  const aH = Math.max(8, Math.min(20, parseInt(parts[0]) || 8));
-                                  const aM = parseInt(parts[1]) || 0;
-                                  const top = (aH - 8) * calHourH + (aM / 60) * calHourH;
-                                  const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
-                                  const height = Math.max(32, (dur / 60) * calHourH);
-                                  const cls = calStatusCls[apt.status] || 'bg-gray-300 border-gray-400 text-gray-800';
-                                  return (
-                                    <div
-                                      key={apt.id}
-                                      className={`absolute left-0.5 right-0.5 rounded-lg border-l-4 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-xl hover:z-10 hover:scale-[1.02] transition-all duration-150 ${cls}`}
-                                      style={{ top: `${top}px`, height: `${height}px` }}
-                                      title={`${apt.profiles?.full_name || 'Misafir'} — ${apt.service_name} — ${apt.appointment_time?.slice(0, 5)}`}
-                                    >
-                                      <p className="text-[9px] font-black truncate leading-tight">{apt.profiles?.full_name || 'Misafir'}</p>
-                                      <p className="text-[8px] opacity-80 truncate">{apt.appointment_time?.slice(0, 5)} · {apt.service_name}</p>
-                                      {apt.staff && height >= 52 && (
-                                        <p className="text-[8px] opacity-70 truncate">{apt.staff.first_name} {apt.staff.last_name}</p>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
                         </div>
-                      </div>
+                      ) : (
+                        /* ── HAFTALIK GÖRÜNÜM ── */
+                        <div style={{ minWidth: '700px' }}>
+                          <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
+                            <div style={{ width: '52px', flexShrink: 0 }} />
+                            {calWeekDays.map((day, i) => {
+                              const ds = day.toISOString().split('T')[0];
+                              const isToday = ds === today;
+                              const cnt = appointments.filter((a: any) => a.appointment_date === ds).length;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex-1 text-center py-3 border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-all ${isToday ? 'bg-[#00A3AD]/5' : ''}`}
+                                  onClick={() => { setCalViewMode('day'); const offset = Math.round((day.getTime() - new Date(new Date().setHours(0,0,0,0)).getTime()) / 86400000); setCalDayOffset(offset); }}
+                                >
+                                  <p className={`text-[8px] font-black uppercase tracking-widest ${isToday ? 'text-[#00A3AD]' : 'text-gray-400'}`}>{calDayNames[i]}</p>
+                                  <div className={`text-base font-black mx-auto w-8 h-8 flex items-center justify-center rounded-full ${isToday ? 'bg-[#00A3AD] text-white' : 'text-black'}`}>{day.getDate()}</div>
+                                  {cnt > 0 && <p className="text-[7px] font-black text-[#00A3AD] uppercase mt-0.5">{cnt} randevu</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex">
+                            <div style={{ width: '52px', flexShrink: 0 }}>
+                              {calHours.map(h => (
+                                <div key={h} style={{ height: `${calHourH}px` }} className="border-b border-gray-50 flex items-start justify-end pr-2 pt-1.5">
+                                  <span className="text-[8px] font-black text-gray-300">{h}:00</span>
+                                </div>
+                              ))}
+                            </div>
+                            {calWeekDays.map((day, di) => {
+                              const ds = day.toISOString().split('T')[0];
+                              const isToday = ds === today;
+                              const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              return (
+                                <div
+                                  key={di}
+                                  className={`flex-1 border-l border-gray-100 relative ${isToday ? 'bg-[#00A3AD]/[0.02]' : ''}`}
+                                  style={{ height: `${calHours.length * calHourH}px` }}
+                                >
+                                  {calHours.map(h => (
+                                    <div key={h} className="absolute w-full border-b border-gray-100" style={{ top: `${(h - 8) * calHourH}px` }} />
+                                  ))}
+                                  {calHours.map(h => (
+                                    <div key={`hh${h}`} className="absolute w-full border-b border-gray-50" style={{ top: `${(h - 8) * calHourH + calHourH / 2}px` }} />
+                                  ))}
+                                  {dayApts.map((apt: any) => {
+                                    const parts = (apt.appointment_time || '08:00').split(':');
+                                    const aH = Math.max(8, Math.min(20, parseInt(parts[0]) || 8));
+                                    const aM = parseInt(parts[1]) || 0;
+                                    const top = (aH - 8) * calHourH + (aM / 60) * calHourH;
+                                    const dur = services.find((s: any) => s.name === apt.service_name)?.duration || 60;
+                                    const height = Math.max(32, (dur / 60) * calHourH);
+                                    const cls = calStatusCls[apt.status] || 'bg-gray-300 border-gray-400 text-gray-800';
+                                    return (
+                                      <div
+                                        key={apt.id}
+                                        className={`absolute left-0.5 right-0.5 rounded-lg border-l-4 px-1.5 py-1 overflow-hidden cursor-pointer hover:shadow-xl hover:z-10 hover:scale-[1.02] transition-all duration-150 ${cls}`}
+                                        style={{ top: `${top}px`, height: `${height}px` }}
+                                        onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
+                                      >
+                                        <p className="text-[9px] font-black truncate leading-tight">{apt.profiles?.full_name || 'Misafir'}</p>
+                                        <p className="text-[8px] opacity-80 truncate">{apt.appointment_time?.slice(0, 5)} · {apt.service_name}</p>
+                                        {apt.staff && height >= 52 && (
+                                          <p className="text-[8px] opacity-70 truncate">{apt.staff.first_name} {apt.staff.last_name}</p>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Alt özet çubuğu */}
+                    <div className="border-t border-gray-100 px-8 py-4 bg-gray-50/60 flex items-center gap-6 flex-wrap">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Günlük Özet</p>
+                      {[
+                        { label: 'Toplam', value: calCurrentDayApts.length, cls: 'text-black' },
+                        { label: 'Beklemede', value: calCurrentDayApts.filter((a: any) => a.status === 'Beklemede').length, cls: 'text-yellow-500' },
+                        { label: 'Onaylı', value: calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı').length, cls: 'text-emerald-600' },
+                        { label: 'İptal', value: calCurrentDayApts.filter((a: any) => a.status === 'İptal Edildi').length, cls: 'text-red-500' },
+                      ].map((s) => (
+                        <div key={s.label} className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{s.label}:</span>
+                          <span className={`text-sm font-black ${s.cls}`}>{s.value}</span>
+                        </div>
+                      ))}
+                      {(() => {
+                        const decided = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı' || a.status === 'İptal Edildi').length;
+                        const approved = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı').length;
+                        if (decided === 0) return null;
+                        return (
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Onay Oranı:</span>
+                            <span className="text-sm font-black text-[#00A3AD]">%{Math.round(approved / decided * 100)}</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1341,6 +1539,136 @@ export default function Dashboard() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* RANDEVU DETAY PANELİ */}
+      {selectedApt && (
+        <>
+          <div
+            className="fixed inset-0 z-[150] bg-black/30 backdrop-blur-sm"
+            onClick={() => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
+          />
+          <div className="fixed top-0 right-0 bottom-0 z-[160] w-full max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-black uppercase tracking-tighter">Randevu Detayı</h3>
+              <button
+                onClick={() => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-all text-gray-400 hover:text-black"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 p-8 space-y-5">
+              {/* Durum + tarih */}
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full border ${calStatusCls[selectedApt.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                  {selectedApt.status}
+                </span>
+                <span className="text-[9px] font-bold text-gray-400 uppercase">{selectedApt.appointment_date} · {selectedApt.appointment_time?.slice(0, 5)}</span>
+              </div>
+
+              {/* Müşteri */}
+              <div className="bg-gray-50 rounded-[2rem] p-6">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Müşteri</p>
+                <h4 className="text-xl font-black uppercase text-black mb-3">{selectedApt.profiles?.full_name || 'Misafir'}</h4>
+                {selectedApt.profiles?.phone && (
+                  <div className="flex gap-2">
+                    <a
+                      href={`tel:${selectedApt.profiles.phone}`}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all"
+                    >📞 Ara</a>
+                    <a
+                      href={`https://wa.me/${selectedApt.profiles.phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-600 transition-all"
+                    >💬 WhatsApp</a>
+                  </div>
+                )}
+                {selectedApt.profiles?.email && (
+                  <p className="text-[10px] font-bold text-gray-400 mt-3">{selectedApt.profiles.email}</p>
+                )}
+              </div>
+
+              {/* Randevu bilgileri */}
+              <div className="bg-gray-50 rounded-[2rem] p-6 space-y-3">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Randevu</p>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase">Hizmet</span>
+                  <span className="text-sm font-black text-black">{selectedApt.service_name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase">Fiyat</span>
+                  <span className="text-sm font-black text-[#00A3AD]">₺{selectedApt.price}</span>
+                </div>
+                {selectedApt.staff && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-gray-400 uppercase">Personel</span>
+                    <span className="text-sm font-black text-black">{selectedApt.staff.first_name} {selectedApt.staff.last_name}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Red gerekçesi */}
+              {selectedApt.cancel_reason && (
+                <div className="bg-red-50 border border-red-100 rounded-[2rem] p-6">
+                  <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-2">Red Gerekçesi</p>
+                  <p className="text-sm text-red-500 font-medium">{selectedApt.cancel_reason}</p>
+                </div>
+              )}
+
+              {/* Aksiyon butonları */}
+              {!detailRejectMode && (
+                <div className="space-y-3 pt-2">
+                  {selectedApt.status === 'Beklemede' && (
+                    <button onClick={handleDetailApprove} className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all">
+                      ✓ Onayla
+                    </button>
+                  )}
+                  {selectedApt.status === 'Onaylandı' && (
+                    <button onClick={handleDetailComplete} className="w-full py-4 bg-blue-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all">
+                      ✓ Tamamlandı
+                    </button>
+                  )}
+                  {(selectedApt.status === 'Beklemede' || selectedApt.status === 'Onaylandı') && (
+                    <>
+                      <button onClick={() => setDetailRejectMode(true)} className="w-full py-4 bg-red-50 text-red-500 border border-red-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
+                        ✕ Reddet
+                      </button>
+                      <button onClick={handleDetailNoShow} className="w-full py-4 bg-gray-100 text-gray-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
+                        ⚠ Gelmedi (No-Show)
+                      </button>
+                    </>
+                  )}
+                  <button onClick={handleDetailDelete} className="w-full py-4 bg-gray-50 text-gray-400 border border-gray-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-all">
+                    🗑 Randevuyu Sil
+                  </button>
+                </div>
+              )}
+
+              {/* Red formu */}
+              {detailRejectMode && (
+                <div className="bg-red-50 rounded-[2rem] p-6 space-y-4 animate-in slide-in-from-top-2">
+                  <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Red Gerekçesi — En az 10 kelime</p>
+                  <textarea
+                    rows={4}
+                    placeholder="Müşteriye iletilecek red açıklamasını yazın..."
+                    className="w-full bg-white rounded-2xl p-4 text-sm font-bold text-black outline-none border-2 border-transparent focus:border-red-400 resize-none"
+                    value={detailRejectReason}
+                    onChange={e => { setDetailRejectReason(e.target.value); setDetailRejectError(''); }}
+                  />
+                  {detailRejectError && <p className="text-[11px] font-bold text-red-500">{detailRejectError}</p>}
+                  <div className="flex gap-3">
+                    <button onClick={handleDetailRejectSubmit} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all">Gönder</button>
+                    <button onClick={() => { setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }} className="flex-1 py-3 bg-white text-gray-400 border border-gray-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:text-black transition-all">Vazgeç</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
