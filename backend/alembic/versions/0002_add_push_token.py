@@ -14,7 +14,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('businesses', sa.Column('push_token', sa.String(), nullable=True))
+    # IF NOT EXISTS makes this safe to re-run if column was added manually
+    op.execute("ALTER TABLE businesses ADD COLUMN IF NOT EXISTS push_token TEXT")
 
 
 def downgrade() -> None:

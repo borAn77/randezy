@@ -1,11 +1,16 @@
 import os
+import sys
 from logging.config import fileConfig
+
+# Ensure the backend root is on the path so `app` is importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-load_dotenv()
+# Load .env from the backend root regardless of where alembic is invoked
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), encoding="utf-8-sig")
 
 config = context.config
 
