@@ -49,13 +49,19 @@ async function handleNewAppointment(body: {
     .eq("id", body.ownerId)
     .single();
 
-  if (!ownerProfile?.email) return;
+  let ownerEmail = ownerProfile?.email;
+  if (!ownerEmail) {
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(body.ownerId);
+    ownerEmail = authUser?.user?.email;
+  }
+
+  if (!ownerEmail) return;
 
   const dateStr = formatDate(body.appointmentDate);
 
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
-    to: ownerProfile.email,
+    to: ownerEmail,
     subject: `Yeni Randevu — ${body.serviceName}`,
     html: emailTemplate({
       title: "Yeni Randevu Geldi!",
