@@ -9,6 +9,7 @@ import { FRONTEND_URL } from '../config';
 type Shop = { id: string; name: string; category: string };
 type Appointment = {
   id: string;
+  user_id?: string;
   appointment_date: string;
   appointment_time: string;
   status: string;
@@ -50,7 +51,7 @@ export default function AppointmentsScreen() {
 
       const { data: apts, error: aptErr } = await supabase
         .from('appointments')
-        .select('id, appointment_date, appointment_time, status, service_name, price, profiles(full_name, phone, email)')
+        .select('id, user_id, appointment_date, appointment_time, status, service_name, price, profiles(full_name, phone, email)')
         .eq('shop_id', s.id)
         .order('appointment_date', { ascending: false });
 
@@ -79,21 +80,30 @@ export default function AppointmentsScreen() {
 
     setAppointments(prev => prev.map(a => a.id === item.id ? { ...a, status: newStatus } : a));
 
-    if (!item.profiles?.email) return;
+    if (!item.profiles?.email) {
+      Alert.alert('Bilgi', `Durum güncellendi fakat müşteri email bulunamadı (profiles.email = null). Kullanıcı ID: ${item.user_id ?? 'yok'}`);
+      return;
+    }
     const type = newStatus === 'Onaylandı' ? 'appointment_confirmed' : 'appointment_rejected';
-    fetch(`${FRONTEND_URL}/api/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type,
-        customerEmail: item.profiles.email,
-        customerName: item.profiles.full_name || 'Müşteri',
-        shopName: shop?.name || '',
-        serviceName: item.service_name,
-        appointmentDate: item.appointment_date,
-        appointmentTime: item.appointment_time,
-      }),
-    }).catch(() => null);
+    try {
+      const res = await fetch(`${FRONTEND_URL}/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          customerEmail: item.profiles.email,
+          customerName: item.profiles.full_name || 'Müşteri',
+          shopName: shop?.name || '',
+          serviceName: item.service_name,
+          appointmentDate: item.appointment_date,
+          appointmentTime: item.appointment_time,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) Alert.alert('Email hatası', json.reason ?? 'Notify başarısız');
+    } catch (e: any) {
+      Alert.alert('Email hatası', e?.message ?? 'Notify isteği atılamadı');
+    }
   };
 
   const filtered = appointments.filter(a =>
