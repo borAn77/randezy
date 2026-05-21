@@ -15,6 +15,11 @@ def get_current_user(
 ) -> User:
     token = authorization.removeprefix("Bearer ").strip()
     try:
+        header = jwt.get_unverified_header(token)
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Header decode hatası: {e}")
+
+    try:
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
@@ -22,7 +27,7 @@ def get_current_user(
             audience="authenticated",
         )
     except JWTError as e:
-        raise HTTPException(status_code=401, detail=f"JWT hatası: {e}")
+        raise HTTPException(status_code=401, detail=f"JWT hatası (alg={header.get('alg')}): {e}")
 
     supabase_id: str = payload["sub"]
     email: str = payload.get("email", "")
