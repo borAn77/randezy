@@ -21,8 +21,8 @@ def get_current_user(
             algorithms=["HS256"],
             audience="authenticated",
         )
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Geçersiz veya süresi dolmuş token")
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"JWT hatası: {e}")
 
     supabase_id: str = payload["sub"]
     email: str = payload.get("email", "")
