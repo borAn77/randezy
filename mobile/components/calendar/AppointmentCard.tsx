@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function AppointmentCard({ apt, col, cols, totalWidth, onPress }: Props) {
-  const config = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG['Beklemede'];
+  const cfg = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG['Beklemede'];
   const top = topForTime(apt.appointment_time);
   const height = heightForDuration(apt.duration_minutes);
 
@@ -22,61 +22,58 @@ export default function AppointmentCard({ apt, col, cols, totalWidth, onPress }:
   const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
   const isPast = apt.appointment_date < todayStr
     || (apt.appointment_date === todayStr && apt.appointment_time.slice(0, 5) < nowTime);
-
   const isCancelled = apt.status === 'İptal Edildi';
+
   const GAP = 3;
   const colWidth = totalWidth / cols;
-  const cardLeft = col * colWidth + GAP;
-  const cardWidth = colWidth - GAP * 2;
-
-  const endMinutes = parseInt(apt.appointment_time.split(':')[0]) * 60
+  const endMin = parseInt(apt.appointment_time.split(':')[0]) * 60
     + parseInt(apt.appointment_time.split(':')[1]) + apt.duration_minutes;
-  const endHH = String(Math.floor(endMinutes / 60)).padStart(2, '0');
-  const endMM = String(endMinutes % 60).padStart(2, '0');
+  const endStr = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
+  const staffName = apt.staff ? `${apt.staff.first_name ?? ''} ${apt.staff.last_name ?? ''}`.trim() : null;
 
   return (
     <TouchableOpacity
       onPress={() => onPress(apt)}
-      activeOpacity={0.85}
+      activeOpacity={0.82}
       style={[
         styles.card,
         {
           top: top + 1,
           height: Math.max(height - 2, 36),
-          left: cardLeft,
-          width: cardWidth,
-          backgroundColor: config.bg,
-          borderLeftColor: config.border,
-          opacity: (isPast || isCancelled) ? 0.65 : 1,
+          left: col * colWidth + GAP,
+          width: colWidth - GAP * 2,
+          backgroundColor: cfg.bg,
+          borderLeftColor: cfg.border,
+          opacity: (isPast || isCancelled) ? 0.62 : 1,
         },
       ]}
     >
-      {/* Color accent bar */}
-      <View style={[styles.accent, { backgroundColor: config.border }]} />
-
-      <View style={styles.inner}>
-        <Text
-          style={[styles.name, { color: config.text }, isCancelled && styles.strike]}
-          numberOfLines={1}
-        >
-          {apt.profiles?.full_name || apt.profiles?.email || 'Misafir'}
+      {/* Time row */}
+      <View style={styles.timeRow}>
+        <Text style={[styles.timeText, { color: cfg.text }]}>
+          {formatTime(apt.appointment_time)}
+          {height > 44 ? ` – ${endStr}` : ''}
         </Text>
-
-        {height > 50 && (
-          <Text style={[styles.service, { color: config.text }]} numberOfLines={1}>
-            {apt.service_name}
-          </Text>
-        )}
-
-        {height > 72 && (
-          <Text style={[styles.timeRange, { color: config.text }]}>
-            {formatTime(apt.appointment_time)} – {endHH}:{endMM}
-          </Text>
-        )}
+        <View style={[styles.iconBadge, { backgroundColor: cfg.iconBg }]}>
+          <Text style={[styles.icon, { color: cfg.text }]}>{cfg.icon}</Text>
+        </View>
       </View>
 
-      {height > 46 && apt.price > 0 && (
-        <Text style={[styles.price, { color: config.text }]}>₺{apt.price}</Text>
+      {/* Customer */}
+      <Text style={[styles.name, { color: cfg.text }, isCancelled && styles.strike]} numberOfLines={1}>
+        {apt.profiles?.full_name || apt.profiles?.email || 'Misafir'}
+      </Text>
+
+      {height > 62 && (
+        <Text style={[styles.service, { color: cfg.text }]} numberOfLines={1}>
+          {apt.service_name}
+        </Text>
+      )}
+
+      {height > 82 && staffName && (
+        <Text style={[styles.staff, { color: cfg.text }]} numberOfLines={1}>
+          👤 {staffName}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -87,33 +84,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderLeftWidth: 4,
     borderRadius: 10,
-    flexDirection: 'row',
+    paddingHorizontal: 7,
+    paddingVertical: 5,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOpacity: 0.07,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    elevation: 3,
   },
-  accent: {
-    width: 0,
-  },
-  inner: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    justifyContent: 'center',
-    gap: 2,
-  },
-  name: { fontSize: 13, fontWeight: '800', letterSpacing: -0.2 },
-  service: { fontSize: 11, fontWeight: '500', opacity: 0.8 },
-  timeRange: { fontSize: 10, fontWeight: '600', opacity: 0.7, marginTop: 1 },
-  price: {
-    fontSize: 11,
-    fontWeight: '700',
-    paddingRight: 8,
-    paddingTop: 5,
-    opacity: 0.85,
-  },
+  timeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  timeText: { fontSize: 10, fontWeight: '700' },
+  iconBadge: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  icon: { fontSize: 8, fontWeight: '900' },
+  name: { fontSize: 12, fontWeight: '800', marginTop: 2, letterSpacing: -0.2 },
+  service: { fontSize: 10, fontWeight: '500', marginTop: 1, opacity: 0.85 },
+  staff: { fontSize: 9, fontWeight: '500', marginTop: 2, opacity: 0.7 },
   strike: { textDecorationLine: 'line-through' },
 });
