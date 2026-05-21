@@ -72,6 +72,7 @@ export default function AppointmentsScreen() {
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   const handleStatusUpdate = async (item: Appointment, newStatus: string) => {
+    Alert.alert('DEBUG', `email: ${item.profiles?.email ?? 'YOK'} | status: ${newStatus}`);
     const { error } = await supabase
       .from('appointments')
       .update({ status: newStatus })
