@@ -1,92 +1,89 @@
 import React, { useCallback, useRef } from 'react';
 import {
   View, ScrollView, StyleSheet, RefreshControl,
-  Text, ActivityIndicator, useWindowDimensions,
+  Text, useWindowDimensions, PanResponder, Animated,
 } from 'react-native';
 import { Appointment } from '../../types/appointment';
 import { useAppointments } from '../../contexts/AppointmentsContext';
 import TimeAxis from './TimeAxis';
 import AppointmentCard from './AppointmentCard';
 import CurrentTimeIndicator from './CurrentTimeIndicator';
+import SkeletonDay from './SkeletonDay';
 import { TOTAL_HEIGHT, minutesFromDayStart } from '../../utils/time';
-import {
-  TIME_AXIS_WIDTH, PIXELS_PER_MINUTE, START_HOUR,
-} from '../../constants/layout';
-import { isSameDay } from '../../utils/date';
+import { TIME_AXIS_WIDTH, PIXELS_PER_MINUTE, START_HOUR } from '../../constants/layout';
+import { isSameDay, addDays } from '../../utils/date';
 import { BRAND } from '../../constants/colors';
 
-interface LayoutItem {
-  apt: Appointment;
-  col: number;
-  cols: number;
-}
+interface LayoutItem { apt: Appointment; col: number; cols: number }
 
 function layoutAppointments(appointments: Appointment[]): LayoutItem[] {
   if (!appointments.length) return [];
-
   const placed: LayoutItem[] = [];
-
   for (const apt of appointments) {
     const start = minutesFromDayStart(apt.appointment_time);
     const end = start + apt.duration_minutes;
-
     const taken = new Set<number>();
     for (const p of placed) {
-      const pStart = minutesFromDayStart(p.apt.appointment_time);
-      const pEnd = pStart + p.apt.duration_minutes;
-      if (start < pEnd && end > pStart) taken.add(p.col);
+      const pS = minutesFromDayStart(p.apt.appointment_time);
+      if (start < pS + p.apt.duration_minutes && end > pS) taken.add(p.col);
     }
-
-    let col = 0;
-    while (taken.has(col)) col++;
+    let col = 0; while (taken.has(col)) col++;
     placed.push({ apt, col, cols: 1 });
   }
-
-  // Recalculate cols for each overlapping group
   for (let i = 0; i < placed.length; i++) {
     const a = placed[i];
-    const aStart = minutesFromDayStart(a.apt.appointment_time);
-    const aEnd = aStart + a.apt.duration_minutes;
+    const aS = minutesFromDayStart(a.apt.appointment_time), aE = aS + a.apt.duration_minutes;
     let maxCol = a.col;
-
     for (let j = 0; j < placed.length; j++) {
       if (i === j) continue;
       const b = placed[j];
-      const bStart = minutesFromDayStart(b.apt.appointment_time);
-      const bEnd = bStart + b.apt.duration_minutes;
-      if (aStart < bEnd && aEnd > bStart) {
-        maxCol = Math.max(maxCol, b.col);
-      }
+      const bS = minutesFromDayStart(b.apt.appointment_time);
+      if (aS < bS + b.apt.duration_minutes && aE > bS) maxCol = Math.max(maxCol, b.col);
     }
-
     placed[i].cols = maxCol + 1;
   }
-
   return placed;
 }
 
-interface Props {
-  onPressAppointment: (apt: Appointment) => void;
-}
+interface Props { onPressAppointment: (apt: Appointment) => void }
 
 export default function DayView({ onPressAppointment }: Props) {
-  const { appointments, loading, error, refresh, selectedDate } = useAppointments();
+  const { appointments, loading, error, refresh, selectedDate, setSelectedDate } = useAppointments();
   const { width } = useWindowDimensions();
   const gridWidth = width - TIME_AXIS_WIDTH - 16;
   const scrollRef = useRef<ScrollView>(null);
-
   const isToday = isSameDay(selectedDate, new Date());
+  const translateX = useRef(new Animated.Value(0)).current;
 
   const scrollToNow = useCallback(() => {
     const now = new Date();
-    const minutes = (now.getHours() - START_HOUR) * 60 + now.getMinutes();
-    const y = Math.max(0, minutes * PIXELS_PER_MINUTE - 100);
+    const y = Math.max(0, (now.getHours() - START_HOUR) * 60 * PIXELS_PER_MINUTE - 140);
     scrollRef.current?.scrollTo({ y, animated: true });
   }, []);
 
   React.useEffect(() => {
+    translateX.setValue(0);
     if (isToday) setTimeout(scrollToNow, 300);
-  }, [isToday, scrollToNow]);
+    else scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [isToday, scrollToNow, selectedDate]);
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 18 && Math.abs(g.dy) < 60,
+    onPanResponderMove: (_, g) => { translateX.setValue(g.dx * 0.25); },
+    onPanResponderRelease: (_, g) => {
+      if (g.dx < -55) {
+        Animated.timing(translateX, { toValue: -30, duration: 120, useNativeDriver: true }).start(() => {
+          setSelectedDate(addDays(selectedDate, 1));
+        });
+      } else if (g.dx > 55) {
+        Animated.timing(translateX, { toValue: 30, duration: 120, useNativeDriver: true }).start(() => {
+          setSelectedDate(addDays(selectedDate, -1));
+        });
+      } else {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      }
+    },
+  })).current;
 
   const items = layoutAppointments(appointments);
 
@@ -96,107 +93,77 @@ export default function DayView({ onPressAppointment }: Props) {
       style={styles.scroll}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={refresh} tintColor={BRAND} />
-      }
+      refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={BRAND} />}
     >
       {error && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
-          <Text style={styles.retryText} onPress={refresh}>Tekrar dene</Text>
+          <Text style={styles.retry} onPress={refresh}>Tekrar dene →</Text>
         </View>
       )}
 
-      <View style={styles.grid}>
-        {/* Time axis */}
+      <Animated.View style={[styles.grid, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
         <TimeAxis />
 
-        {/* Appointment area */}
         <View style={[styles.aptArea, { width: gridWidth, height: TOTAL_HEIGHT }]}>
-          {/* Hour lines */}
+          {/* Alternating hour bands */}
           {Array.from({ length: 14 }, (_, i) => (
-            <View
-              key={i}
-              style={[styles.hourLine, { top: i * 60 * PIXELS_PER_MINUTE }]}
-            />
+            <View key={`b${i}`} style={[styles.band, {
+              top: i * 60 * PIXELS_PER_MINUTE,
+              height: 60 * PIXELS_PER_MINUTE,
+              backgroundColor: i % 2 === 0 ? '#fff' : '#fafbfd',
+            }]} />
           ))}
-          {/* Half-hour lines */}
+          {Array.from({ length: 15 }, (_, i) => (
+            <View key={`l${i}`} style={[styles.hourLine, { top: i * 60 * PIXELS_PER_MINUTE }]} />
+          ))}
           {Array.from({ length: 14 }, (_, i) => (
-            <View
-              key={`h${i}`}
-              style={[styles.halfLine, { top: (i * 60 + 30) * PIXELS_PER_MINUTE }]}
-            />
+            <View key={`h${i}`} style={[styles.halfLine, { top: (i * 60 + 30) * PIXELS_PER_MINUTE }]} />
           ))}
 
-          {/* Current time */}
           {isToday && <CurrentTimeIndicator />}
 
-          {/* Appointment cards */}
-          {items.map(({ apt, col, cols }) => (
-            <AppointmentCard
-              key={apt.id}
-              apt={apt}
-              col={col}
-              cols={cols}
-              totalWidth={gridWidth - 4}
-              onPress={onPressAppointment}
-            />
-          ))}
+          {loading
+            ? <SkeletonDay />
+            : items.map(({ apt, col, cols }) => (
+                <AppointmentCard
+                  key={apt.id}
+                  apt={apt} col={col} cols={cols}
+                  totalWidth={gridWidth - 6}
+                  onPress={onPressAppointment}
+                />
+              ))
+          }
 
-          {/* Empty state */}
           {!loading && appointments.length === 0 && !error && (
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>📅</Text>
-              <Text style={styles.emptyText}>Bu gün randevu yok</Text>
-            </View>
-          )}
-
-          {loading && appointments.length === 0 && (
-            <View style={styles.empty}>
-              <ActivityIndicator color={BRAND} />
+              <Text style={styles.emptyTitle}>Bu gün randevu yok</Text>
+              <Text style={styles.emptySub}>Müşteriler randevu aldığında burada görünür</Text>
             </View>
           )}
         </View>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  content: { paddingVertical: 8 },
-  grid: { flexDirection: 'row', paddingHorizontal: 8 },
-  aptArea: { position: 'relative' },
-  hourLine: {
-    position: 'absolute',
-    left: 0, right: 0,
-    height: 1,
-    backgroundColor: '#e2e8f0',
-  },
-  halfLine: {
-    position: 'absolute',
-    left: 0, right: 0,
-    height: 1,
-    backgroundColor: '#f1f5f9',
-  },
-  empty: {
-    position: 'absolute',
-    top: 80, left: 0, right: 0,
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyIcon: { fontSize: 32 },
-  emptyText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
+  scroll: { flex: 1, backgroundColor: '#f8fafc' },
+  content: { paddingTop: 6, paddingBottom: 60 },
+  grid: { flexDirection: 'row', paddingLeft: 6, paddingRight: 6 },
+  aptArea: { position: 'relative', overflow: 'hidden' },
+  band: { position: 'absolute', left: 0, right: 0 },
+  hourLine: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#e2e8f0' },
+  halfLine: { position: 'absolute', left: 10, right: 0, height: 1, backgroundColor: '#f0f4f8' },
+  empty: { position: 'absolute', top: 100, left: 0, right: 0, alignItems: 'center', gap: 8, paddingHorizontal: 32 },
+  emptyIcon: { fontSize: 44, marginBottom: 4 },
+  emptyTitle: { color: '#64748b', fontSize: 17, fontWeight: '700' },
+  emptySub: { color: '#94a3b8', fontSize: 13, textAlign: 'center', lineHeight: 18 },
   errorBanner: {
-    backgroundColor: '#fff1f2',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 12,
-    borderRadius: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#fff1f2', marginHorizontal: 12, marginBottom: 8,
+    padding: 12, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between',
   },
   errorText: { color: '#e11d48', fontSize: 13, flex: 1 },
-  retryText: { color: BRAND, fontSize: 13, fontWeight: '700', marginLeft: 8 },
+  retry: { color: BRAND, fontSize: 13, fontWeight: '700', marginLeft: 8 },
 });

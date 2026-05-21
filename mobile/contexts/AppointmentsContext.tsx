@@ -1,57 +1,82 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Appointment, AppointmentStatus } from '../types/appointment';
+import { Appointment, AppointmentStatus, StaffMember } from '../types/appointment';
 import {
-  fetchDayAppointments, fetchWeekAppointments,
-  updateStatus, reschedule, clearShopCache,
+  fetchDayAppointments, fetchWeekAppointments, fetchStaff,
+  updateStatus, reschedule, deleteAppointment, clearShopCache,
 } from '../services/appointments';
 import { toDateStr, getWeekDays } from '../utils/date';
 
-type ViewMode = 'day' | 'week';
+export type ViewMode = 'day' | 'week';
+export type TabMode = 'calendar' | 'list';
+
+export interface DailyStats {
+  total: number; confirmed: number; pending: number;
+  cancelled: number; noShow: number; occupancyPct: number;
+}
 
 interface AppointmentsCtx {
-  viewMode: ViewMode;
-  setViewMode: (m: ViewMode) => void;
-  selectedDate: Date;
-  setSelectedDate: (d: Date) => void;
+  tabMode: TabMode; setTabMode: (m: TabMode) => void;
+  viewMode: ViewMode; setViewMode: (m: ViewMode) => void;
+  selectedDate: Date; setSelectedDate: (d: Date) => void;
+  selectedStaffId: string | null; setSelectedStaffId: (id: string | null) => void;
   appointments: Appointment[];
   weekAppointments: Appointment[];
-  loading: boolean;
-  error: string | null;
+  staff: StaffMember[];
+  stats: DailyStats;
+  loading: boolean; error: string | null;
   refresh: () => void;
   doUpdateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
   doReschedule: (id: string, date: string, time: string) => Promise<void>;
+  doDelete: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<AppointmentsCtx | null>(null);
 
+function calcStats(apts: Appointment[]): DailyStats {
+  const total = apts.length;
+  const confirmed = apts.filter(a => a.status === 'Onaylandı').length;
+  const pending = apts.filter(a => a.status === 'Beklemede').length;
+  const cancelled = apts.filter(a => a.status === 'İptal Edildi').length;
+  const noShow = apts.filter(a => a.status === 'Gelmedi').length;
+  const totalMinutes = 14 * 60; // 8:00 - 22:00
+  const usedMinutes = apts
+    .filter(a => a.status === 'Onaylandı' || a.status === 'Tamamlandı')
+    .reduce((s, a) => s + a.duration_minutes, 0);
+  const occupancyPct = Math.min(100, Math.round(usedMinutes / totalMinutes * 100));
+  return { total, confirmed, pending, cancelled, noShow, occupancyPct };
+}
+
 export function AppointmentsProvider({ children }: { children: React.ReactNode }) {
+  const [tabMode, setTabMode] = useState<TabMode>('calendar');
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [weekAppointments, setWeekAppointments] = useState<Appointment[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const refreshToken = useRef(0);
+  const token = useRef(0);
 
   const load = useCallback(async (date: Date) => {
-    setLoading(true);
-    setError(null);
-    const token = ++refreshToken.current;
+    setLoading(true); setError(null);
+    const t = ++token.current;
     try {
+      const [staffData] = await Promise.all([fetchStaff()]);
+      if (t === token.current) setStaff(staffData);
+
       if (viewMode === 'day') {
         const data = await fetchDayAppointments(toDateStr(date));
-        if (token === refreshToken.current) setAppointments(data);
+        if (t === token.current) setAppointments(data);
       } else {
         const week = getWeekDays(date);
-        const start = toDateStr(week[0]);
-        const end = toDateStr(week[6]);
-        const data = await fetchWeekAppointments(start, end);
-        if (token === refreshToken.current) setWeekAppointments(data);
+        const data = await fetchWeekAppointments(toDateStr(week[0]), toDateStr(week[6]));
+        if (t === token.current) setWeekAppointments(data);
       }
     } catch (e: any) {
-      if (token === refreshToken.current) setError(e?.message ?? 'Veri yüklenemedi');
+      if (t === token.current) setError(e?.message ?? 'Veri yüklenemedi');
     } finally {
-      if (token === refreshToken.current) setLoading(false);
+      if (t === token.current) setLoading(false);
     }
   }, [viewMode]);
 
@@ -59,25 +84,36 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
 
   const refresh = useCallback(() => { clearShopCache(); load(selectedDate); }, [load, selectedDate]);
 
+  const visibleApts = selectedStaffId
+    ? appointments.filter(a => a.staff_id === selectedStaffId)
+    : appointments;
+
+  const stats = calcStats(visibleApts);
+
   const doUpdateStatus = useCallback(async (id: string, status: AppointmentStatus) => {
-    // Optimistic update
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     setWeekAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     await updateStatus(id, status);
   }, []);
 
   const doReschedule = useCallback(async (id: string, date: string, time: string) => {
-    await reschedule(id, date, time);
-    refresh();
+    await reschedule(id, date, time); refresh();
   }, [refresh]);
+
+  const doDelete = useCallback(async (id: string) => {
+    setAppointments(prev => prev.filter(a => a.id !== id));
+    setWeekAppointments(prev => prev.filter(a => a.id !== id));
+    await deleteAppointment(id);
+  }, []);
 
   return (
     <Ctx.Provider value={{
-      viewMode, setViewMode,
+      tabMode, setTabMode, viewMode, setViewMode,
       selectedDate, setSelectedDate,
-      appointments, weekAppointments,
-      loading, error, refresh,
-      doUpdateStatus, doReschedule,
+      selectedStaffId, setSelectedStaffId,
+      appointments: visibleApts, weekAppointments,
+      staff, stats, loading, error, refresh,
+      doUpdateStatus, doReschedule, doDelete,
     }}>
       {children}
     </Ctx.Provider>
@@ -86,6 +122,6 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
 
 export function useAppointments() {
   const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useAppointments must be used inside AppointmentsProvider');
+  if (!ctx) throw new Error('useAppointments must be inside AppointmentsProvider');
   return ctx;
 }
