@@ -70,7 +70,9 @@ export default function ShopDetail() {
   const [serviceStaffFilter, setServiceStaffFilter] = useState<any>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [nearbyShops, setNearbyShops] = useState<any[]>([]);
   const heroRef = useRef<HTMLDivElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => {
@@ -87,6 +89,28 @@ export default function ShopDetail() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isBooking]);
+
+  useEffect(() => {
+    if (!shop?.id || !shop?.city) return;
+    supabase
+      .from('shops')
+      .select('id, name, category, city, district, image_url, gallery_urls, services(price), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating)')
+      .neq('id', shop.id)
+      .eq('city', shop.city)
+      .limit(12)
+      .then(({ data }) => {
+        if (!data) return;
+        const sorted = [...data].sort((a: any, b: any) => {
+          const catA = a.category === shop.category ? 0 : 1;
+          const catB = b.category === shop.category ? 0 : 1;
+          if (catA !== catB) return catA - catB;
+          const rA = a.reviews?.length ? a.reviews.reduce((s: number, r: any) => s + r.rating, 0) / a.reviews.length : 0;
+          const rB = b.reviews?.length ? b.reviews.reduce((s: number, r: any) => s + r.rating, 0) / b.reviews.length : 0;
+          return rB - rA;
+        });
+        setNearbyShops(sorted);
+      });
+  }, [shop?.id, shop?.city, shop?.category]);
 
   const toggleFavorite = useCallback(async () => {
     if (!currentUserId) { setIsAuthOpen(true); return; }
@@ -377,6 +401,21 @@ export default function ShopDetail() {
       alert("Hata: " + error.message);
     }
     setLoading(false);
+  };
+
+  const getNearbyTodayOpen = (hours: any[]) => {
+    const idx = new Date().getDay();
+    const h = hours?.find((h: any) => h.day_of_week === idx);
+    return h && !h.is_closed;
+  };
+  const getNearbyMinPrice = (svcs: any[]) => {
+    if (!svcs?.length) return null;
+    const min = Math.min(...svcs.map((s: any) => Number(s.price) || Infinity));
+    return min === Infinity ? null : min;
+  };
+  const getNearbyRating = (revs: any[]) => {
+    if (!revs?.length) return null;
+    return (revs.reduce((s: number, r: any) => s + r.rating, 0) / revs.length).toFixed(1);
   };
 
   const aylar = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -818,6 +857,116 @@ export default function ShopDetail() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Bölgendeki Diğer İşletmeler */}
+        <div className="mt-20 md:mt-28 pb-12 md:pb-20">
+          <div className="flex items-end justify-between mb-6 md:mb-8">
+            <div>
+              <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-[#222] border-b-4 border-[#00A3AD] inline-block pb-0.5">Bölgendeki Diğer İşletmeler</h2>
+              <p className="text-xs text-gray-400 font-medium mt-2 md:mt-3 max-w-md">Yakınındaki benzer işletmeleri keşfet ve uygun randevu saatlerini kaçırma.</p>
+            </div>
+            {nearbyShops.length > 1 && (
+              <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-6">
+                <button
+                  onClick={() => carouselRef.current?.scrollBy({ left: -284, behavior: 'smooth' })}
+                  className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <button
+                  onClick={() => carouselRef.current?.scrollBy({ left: 284, behavior: 'smooth' })}
+                  className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {nearbyShops.length === 0 ? (
+            <div className="text-center py-14 bg-gray-50 rounded-[2rem] border border-gray-100">
+              <p className="text-[11px] font-black text-gray-300 uppercase tracking-[0.2em]">Yakında önerilecek işletmeler burada görünecek.</p>
+            </div>
+          ) : (
+            <div
+              ref={carouselRef}
+              className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory -mx-1 px-1"
+            >
+              {nearbyShops.map((s: any) => {
+                const todayOpen = getNearbyTodayOpen(s.shop_hours);
+                const minPrice = getNearbyMinPrice(s.services);
+                const rating = getNearbyRating(s.reviews);
+                const cover = s.image_url || s.gallery_urls?.[0] || null;
+                const sameCategory = s.category === shop.category;
+
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => router.push(`/shop/${s.id}`)}
+                    className="flex-shrink-0 w-52 md:w-60 snap-start cursor-pointer group"
+                  >
+                    {/* Card image */}
+                    <div className="relative h-44 md:h-52 rounded-[1.5rem] overflow-hidden bg-gray-100 mb-3 shadow-sm group-hover:shadow-2xl transition-all duration-300 group-hover:-translate-y-1.5">
+                      {cover
+                        ? <img src={cover} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={s.name} />
+                        : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50"><ImageIcon size={28} className="text-gray-300" /></div>
+                      }
+                      {/* Overlay gradient */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+
+                      {/* Rating badge */}
+                      {rating && (
+                        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-xl shadow-sm">
+                          <span className="text-yellow-400 text-[10px]">★</span>
+                          <span className="text-[11px] font-black text-[#222]">{rating}</span>
+                          {s.reviews?.length > 0 && (
+                            <span className="text-[9px] font-bold text-gray-400">({s.reviews.length})</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Today available badge */}
+                      {todayOpen && (
+                        <div className="absolute top-3 right-3">
+                          <span className="bg-[#00A3AD] text-white px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
+                            Bugün uygun
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Same category tag */}
+                      {sameCategory && (
+                        <div className="absolute bottom-3 left-3">
+                          <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wide">
+                            {s.category}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card info */}
+                    <div className="px-0.5">
+                      <p className="font-black text-[13px] text-[#222] uppercase tracking-tight leading-tight truncate group-hover:text-[#00A3AD] transition-colors duration-200">
+                        {s.name}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-0.5 truncate">
+                        {s.district && s.city ? `${s.district}, ${s.city}` : s.city || s.district}
+                      </p>
+                      {minPrice && (
+                        <p className="text-[11px] font-black text-gray-500 mt-1.5">
+                          ₺{minPrice}<span className="font-medium text-gray-400">'den başlayan</span>
+                        </p>
+                      )}
+                      <button className="mt-3 w-full py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-[#00A3AD] hover:text-white hover:border-[#00A3AD] font-black text-[10px] uppercase tracking-widest text-gray-400 transition-all duration-200 shadow-sm">
+                        İncele
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
