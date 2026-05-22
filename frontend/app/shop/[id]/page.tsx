@@ -71,6 +71,7 @@ export default function ShopDetail() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [nearbyShops, setNearbyShops] = useState<any[]>([]);
+  const [nearbyAvailability, setNearbyAvailability] = useState<Record<number, boolean>>({});
   const heroRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -92,23 +93,65 @@ export default function ShopDetail() {
 
   useEffect(() => {
     if (!shop?.id || !shop?.city) return;
+    const todayStr = localDateStr(new Date());
+
     supabase
       .from('shops')
-      .select('id, name, category, city, district, image_url, gallery_urls, services(price), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating)')
+      .select('id, name, category, city, district, image_url, gallery_urls, services(price, duration), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating), campaigns(id, type, discount_value, start_date, end_date, is_active)')
       .neq('id', shop.id)
       .eq('city', shop.city)
       .limit(12)
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (!data) return;
-        const sorted = [...data].sort((a: any, b: any) => {
-          const catA = a.category === shop.category ? 0 : 1;
-          const catB = b.category === shop.category ? 0 : 1;
-          if (catA !== catB) return catA - catB;
-          const rA = a.reviews?.length ? a.reviews.reduce((s: number, r: any) => s + r.rating, 0) / a.reviews.length : 0;
-          const rB = b.reviews?.length ? b.reviews.reduce((s: number, r: any) => s + r.rating, 0) / b.reviews.length : 0;
-          return rB - rA;
+
+        // Batch fetch today's booked appointment count per shop
+        const shopIds = data.map((s: any) => s.id);
+        const { data: todayApts } = await supabase
+          .from('appointments')
+          .select('shop_id')
+          .in('shop_id', shopIds)
+          .eq('appointment_date', todayStr)
+          .neq('status', 'İptal Edildi');
+
+        const bookedByShop: Record<number, number> = {};
+        (todayApts || []).forEach((a: any) => {
+          bookedByShop[a.shop_id] = (bookedByShop[a.shop_id] || 0) + 1;
         });
-        setNearbyShops(sorted);
+
+        // Real availability: open today + at least one free slot exists
+        const calcAvailable = (s: any): boolean => {
+          const todayIdx = new Date().getDay();
+          const h = s.shop_hours?.find((h: any) => h.day_of_week === todayIdx);
+          if (!h || h.is_closed) return false;
+          const [oH, oM] = h.open_time.split(':').map(Number);
+          const [cH, cM] = h.close_time.split(':').map(Number);
+          const totalMin = (cH * 60 + cM) - (oH * 60 + oM);
+          const minDur = s.services?.length
+            ? Math.min(...s.services.map((sv: any) => Number(sv.duration) || 60))
+            : 60;
+          const totalSlots = Math.max(0, Math.floor(totalMin / minDur));
+          return totalSlots > (bookedByShop[s.id] || 0);
+        };
+
+        const availability: Record<number, boolean> = {};
+        data.forEach((s: any) => { availability[s.id] = calcAvailable(s); });
+        setNearbyAvailability(availability);
+
+        const hasActiveCampaign = (s: any) =>
+          s.campaigns?.some((c: any) => c.is_active && c.start_date <= todayStr && c.end_date >= todayStr);
+
+        // Multi-criteria score: category match + rating + review count + real availability + active campaign
+        const scoreShop = (s: any): number => {
+          const revs = s.reviews || [];
+          const avg = revs.length ? revs.reduce((sum: number, r: any) => sum + r.rating, 0) / revs.length : 0;
+          return (s.category === shop.category ? 30 : 0)
+            + avg * 8
+            + Math.min(revs.length, 30) * 0.5
+            + (availability[s.id] ? 25 : 0)
+            + (hasActiveCampaign(s) ? 15 : 0);
+        };
+
+        setNearbyShops([...data].sort((a: any, b: any) => scoreShop(b) - scoreShop(a)));
       });
   }, [shop?.id, shop?.city, shop?.category]);
 
@@ -894,11 +937,21 @@ export default function ShopDetail() {
               className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory -mx-1 px-1"
             >
               {nearbyShops.map((s: any) => {
-                const todayOpen = getNearbyTodayOpen(s.shop_hours);
+                const todayOpen = nearbyAvailability[s.id] ?? false;
                 const minPrice = getNearbyMinPrice(s.services);
                 const rating = getNearbyRating(s.reviews);
                 const cover = s.image_url || s.gallery_urls?.[0] || null;
                 const sameCategory = s.category === shop.category;
+                const todayStr = localDateStr(new Date());
+                const activeCampaign = s.campaigns?.find((c: any) =>
+                  c.is_active && c.start_date <= todayStr && c.end_date >= todayStr
+                );
+                const campaignLabel = activeCampaign
+                  ? activeCampaign.type === 'percentage' ? `%${activeCampaign.discount_value} İndirim`
+                  : activeCampaign.type === 'fixed' ? `₺${activeCampaign.discount_value} İndirim`
+                  : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
+                  : 'Son Dakika'
+                  : null;
 
                 return (
                   <div
@@ -931,6 +984,15 @@ export default function ShopDetail() {
                         <div className="absolute top-3 right-3">
                           <span className="bg-[#00A3AD] text-white px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
                             Bugün uygun
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Campaign badge */}
+                      {campaignLabel && (
+                        <div className="absolute bottom-3 right-3">
+                          <span className="bg-amber-400 text-black px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
+                            {campaignLabel}
                           </span>
                         </div>
                       )}
@@ -1126,6 +1188,26 @@ export default function ShopDetail() {
                   <p className="text-2xl md:text-3xl font-black pt-3 md:pt-4 border-t border-gray-50">{selectedService?.price} ₺</p>
                 </div>
               </div>
+              {(shop?.cancellation_policy || shop?.no_show_policy || shop?.deposit_info || shop?.free_cancel_hours) && (
+                <div className="mt-4 text-center space-y-2">
+                  {shop?.deposit_info && (
+                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 rounded-xl px-3 py-2">
+                      {shop.deposit_info}
+                    </p>
+                  )}
+                  <p className="text-[9px] font-bold text-gray-300 leading-relaxed">
+                    Onaylayarak{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setShowCancellationModal(true); }}
+                      className="text-[#00A3AD] hover:underline font-black"
+                    >
+                      iptal ve koşulları
+                    </button>
+                    {' '}kabul etmiş olursunuz.
+                  </p>
+                </div>
+              )}
               <button onClick={handleBookingConfirm} disabled={!selectedTime || !selectedDay || loading} className="w-full mt-4 bg-[#00A3AD] text-white py-5 md:py-8 rounded-[1.5rem] md:rounded-[2rem] font-black uppercase tracking-widest shadow-2xl disabled:opacity-20 hover:scale-95 transition-all text-sm md:text-base">
                 {loading ? "Kaydediliyor..." : "Onayla"}
               </button>

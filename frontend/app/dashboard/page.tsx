@@ -7,7 +7,7 @@ import {
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
   Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
   Star, MessageSquare, Phone, Search,
-  ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail
+  ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent
 } from "lucide-react";
 
 const cities = [
@@ -58,6 +58,11 @@ export default function Dashboard() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingShop, setDeletingShop] = useState(false);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+  const [campaignForm, setCampaignForm] = useState({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [] as number[], is_active: true });
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -93,6 +98,9 @@ export default function Dashboard() {
       setAppointments(appointmentsRes.data || []);
       setReviews(reviewsRes.data || []);
       setStaff(staffRes.data || []);
+
+      const campaignsRes = await supabase.from('campaigns').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: false });
+      setCampaigns(campaignsRes.data || []);
 
       const hours = hoursRes.data || [];
       if (hours.length === 0) {
@@ -332,6 +340,38 @@ export default function Dashboard() {
     }
   };
 
+  const handleCampaignSubmit = async () => {
+    if (!shop?.id || !campaignForm.title || !campaignForm.start_date || !campaignForm.end_date) return;
+    setSavingCampaign(true);
+    const payload = {
+      shop_id: shop.id,
+      title: campaignForm.title,
+      type: campaignForm.type,
+      discount_value: campaignForm.discount_value ? parseFloat(campaignForm.discount_value) : null,
+      start_date: campaignForm.start_date,
+      end_date: campaignForm.end_date,
+      service_ids: campaignForm.service_ids,
+      is_active: campaignForm.is_active,
+    };
+    const { error } = editingCampaign
+      ? await supabase.from('campaigns').update(payload).eq('id', editingCampaign.id)
+      : await supabase.from('campaigns').insert([payload]);
+    if (!error) {
+      setIsCampaignModalOpen(false);
+      setEditingCampaign(null);
+      setCampaignForm({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [], is_active: true });
+      const res = await supabase.from('campaigns').select('*').eq('shop_id', shop.id).order('created_at', { ascending: false });
+      setCampaigns(res.data || []);
+    }
+    setSavingCampaign(false);
+  };
+
+  const handleDeleteCampaign = async (id: number) => {
+    if (!confirm("Bu kampanya silinsin mi?")) return;
+    await supabase.from('campaigns').delete().eq('id', id);
+    setCampaigns(prev => prev.filter(c => c.id !== id));
+  };
+
   const handleSaveHours = async () => {
     if (!shop?.id) return;
     setSavingHours(true);
@@ -533,6 +573,7 @@ export default function Dashboard() {
             { id: "hours", label: "Çalışma Saatleri", icon: <Clock size={18}/> },
             { id: "staff", label: "Personel", icon: <Users size={18}/> },
             { id: "finance", label: "Finans", icon: <TrendingUp size={18}/> },
+            { id: "campaigns", label: "Kampanyalar", icon: <Tag size={18}/> },
           ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-[#00A3AD] text-white shadow-lg shadow-[#00A3AD]/20" : "text-gray-500 hover:text-white hover:bg-white/5"}`}>
               {item.icon} {item.label}
@@ -1497,6 +1538,80 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* 8. KAMPANYALAR */}
+            {activeTab === "campaigns" && (
+              <div className="animate-in slide-in-from-right-4">
+                <div className="flex justify-between items-center mb-12">
+                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Kampanyalar</h2>
+                  <button
+                    onClick={() => { setEditingCampaign(null); setCampaignForm({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [], is_active: true }); setIsCampaignModalOpen(true); }}
+                    className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"
+                  >
+                    <Plus size={18} /> Kampanya Oluştur
+                  </button>
+                </div>
+
+                {campaigns.length === 0 ? (
+                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">
+                    Henüz kampanya oluşturmadınız
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {campaigns.map((c) => {
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const isActive = c.is_active && c.start_date <= todayStr && c.end_date >= todayStr;
+                      const isUpcoming = c.start_date > todayStr;
+                      const isExpired = c.end_date < todayStr;
+                      const typeLabel = c.type === 'percentage' ? `%${c.discount_value} İndirim`
+                        : c.type === 'fixed' ? `₺${c.discount_value} İndirim`
+                        : c.type === 'today_special' ? 'Bugüne Özel'
+                        : 'Son Dakika';
+                      return (
+                        <div key={c.id} className={`bg-white p-8 rounded-[2rem] border shadow-sm flex items-center gap-6 hover:shadow-xl transition-all ${isActive ? 'border-[#00A3AD]/30' : 'border-gray-100'}`}>
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[#00A3AD]' : isUpcoming ? 'bg-amber-100' : 'bg-gray-100'}`}>
+                            <Percent size={22} className={isActive ? 'text-white' : isUpcoming ? 'text-amber-500' : 'text-gray-400'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-1">
+                              <p className="font-black text-sm uppercase tracking-tight text-black">{c.title}</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isActive ? 'bg-[#00A3AD] text-white' : isUpcoming ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                                {isActive ? 'Aktif' : isUpcoming ? 'Yakında' : 'Sona Erdi'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-bold text-[#00A3AD] uppercase tracking-wide">{typeLabel}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                              {c.start_date} → {c.end_date}
+                              {c.service_ids?.length > 0 && ` · ${c.service_ids.length} hizmet`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <button
+                              onClick={async () => {
+                                await supabase.from('campaigns').update({ is_active: !c.is_active }).eq('id', c.id);
+                                setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x));
+                              }}
+                              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${c.is_active ? 'bg-[#00A3AD]/10 text-[#00A3AD] hover:bg-red-50 hover:text-red-500' : 'bg-gray-100 text-gray-400 hover:bg-[#00A3AD]/10 hover:text-[#00A3AD]'}`}
+                            >
+                              {c.is_active ? 'Durdur' : 'Aktif Et'}
+                            </button>
+                            <button
+                              onClick={() => { setEditingCampaign(c); setCampaignForm({ title: c.title, type: c.type, discount_value: c.discount_value?.toString() || "", start_date: c.start_date, end_date: c.end_date, service_ids: c.service_ids || [], is_active: c.is_active }); setIsCampaignModalOpen(true); }}
+                              className="p-2 text-gray-400 hover:text-[#00A3AD] transition-colors"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -1643,6 +1758,105 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* KAMPANYA MODALI */}
+      {isCampaignModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+          <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 relative animate-in zoom-in duration-300 text-black overflow-y-auto max-h-[90vh]">
+            <button onClick={() => { setIsCampaignModalOpen(false); setEditingCampaign(null); }} className="absolute top-10 right-10 text-gray-300 hover:text-black transition-colors"><X size={28}/></button>
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-8">{editingCampaign ? "Kampanyayı Düzenle" : "Kampanya Oluştur"}</h3>
+            <div className="space-y-5">
+              <input
+                placeholder="Kampanya başlığı *"
+                className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                value={campaignForm.title}
+                onChange={e => setCampaignForm(f => ({ ...f, title: e.target.value }))}
+              />
+              <div className="relative">
+                <select
+                  className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black appearance-none"
+                  value={campaignForm.type}
+                  onChange={e => setCampaignForm(f => ({ ...f, type: e.target.value }))}
+                >
+                  <option value="percentage">Yüzde İndirim (%)</option>
+                  <option value="fixed">Sabit Tutar İndirimi (₺)</option>
+                  <option value="today_special">Bugüne Özel</option>
+                  <option value="last_minute">Son Dakika</option>
+                </select>
+                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+              </div>
+              {(campaignForm.type === 'percentage' || campaignForm.type === 'fixed') && (
+                <input
+                  type="number"
+                  placeholder={campaignForm.type === 'percentage' ? "İndirim oranı (%) *" : "İndirim tutarı (₺) *"}
+                  className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                  value={campaignForm.discount_value}
+                  onChange={e => setCampaignForm(f => ({ ...f, discount_value: e.target.value }))}
+                />
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="ml-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">Başlangıç</label>
+                  <input
+                    type="date"
+                    className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                    value={campaignForm.start_date}
+                    onChange={e => setCampaignForm(f => ({ ...f, start_date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="ml-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">Bitiş</label>
+                  <input
+                    type="date"
+                    className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                    value={campaignForm.end_date}
+                    onChange={e => setCampaignForm(f => ({ ...f, end_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              {services.length > 0 && (
+                <div>
+                  <label className="ml-4 text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 block">Hizmet Seç (isteğe bağlı — boşsa tümü geçerli)</label>
+                  <div className="bg-gray-50 rounded-3xl p-4 space-y-2 max-h-40 overflow-y-auto">
+                    {services.map((svc: any) => (
+                      <label key={svc.id} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={campaignForm.service_ids.includes(svc.id)}
+                          onChange={e => setCampaignForm(f => ({
+                            ...f,
+                            service_ids: e.target.checked
+                              ? [...f.service_ids, svc.id]
+                              : f.service_ids.filter(id => id !== svc.id)
+                          }))}
+                          className="accent-[#00A3AD] w-4 h-4"
+                        />
+                        <span className="text-sm font-bold text-black group-hover:text-[#00A3AD] transition-colors">{svc.name} — ₺{svc.price}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={campaignForm.is_active}
+                  onChange={e => setCampaignForm(f => ({ ...f, is_active: e.target.checked }))}
+                  className="accent-[#00A3AD] w-5 h-5"
+                />
+                <span className="font-black text-sm text-black">Hemen aktif et</span>
+              </label>
+              <button
+                onClick={handleCampaignSubmit}
+                disabled={savingCampaign || !campaignForm.title || !campaignForm.start_date || !campaignForm.end_date}
+                className="w-full bg-[#00A3AD] text-white py-5 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all disabled:opacity-30"
+              >
+                {savingCampaign ? "KAYDEDİLİYOR..." : editingCampaign ? "GÜNCELLE" : "YAYINLA"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PERSONEL MODALI */}
       {isStaffModalOpen && (
