@@ -847,9 +847,36 @@ export default function ShopDetail() {
               </button>
             </div>
             <div className="space-y-4 text-[13px] text-gray-600 font-medium leading-relaxed">
-              <p>Seçilen hizmetler için hizmet sağlayıcı, gelmeme (no-show) veya son dakika iptali durumunda iptal ücreti uygulama hakkını saklı tutar. Randevuya ciddi geç kalınması da gelmeme olarak değerlendirilebilir.</p>
-              <p>İptal ücreti uygulanıp uygulanmayacağına dair nihai karar hizmet sağlayıcıya aittir.</p>
-              <p>İptal ücreti yalnızca politika ihlali durumunda tahsil edilebilir. Müşteri randevuya zamanında gelirse veya rezervasyon sırasında belirtilen makul süre içinde iptal ederse ücret alınamaz.</p>
+              {shop?.free_cancel_hours && (
+                <div className="bg-[#E6F6F7] rounded-xl px-4 py-3 text-[#00A3AD] font-black text-[12px] uppercase tracking-wide">
+                  Ücretsiz iptal: randevudan {shop.free_cancel_hours} saat öncesine kadar
+                </div>
+              )}
+              {shop?.cancellation_policy ? (
+                <p>{shop.cancellation_policy}</p>
+              ) : (
+                <>
+                  <p>Seçilen hizmetler için hizmet sağlayıcı, gelmeme (no-show) veya son dakika iptali durumunda iptal ücreti uygulama hakkını saklı tutar. Randevuya ciddi geç kalınması da gelmeme olarak değerlendirilebilir.</p>
+                  <p>İptal ücreti uygulanıp uygulanmayacağına dair nihai karar hizmet sağlayıcıya aittir.</p>
+                  <p>İptal ücreti yalnızca politika ihlali durumunda tahsil edilebilir. Müşteri randevuya zamanında gelirse veya rezervasyon sırasında belirtilen makul süre içinde iptal ederse ücret alınamaz.</p>
+                </>
+              )}
+              {shop?.no_show_policy && (
+                <>
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gelmeme Politikası</p>
+                    <p>{shop.no_show_policy}</p>
+                  </div>
+                </>
+              )}
+              {shop?.deposit_info && (
+                <>
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Depozito</p>
+                    <p>{shop.deposit_info}</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

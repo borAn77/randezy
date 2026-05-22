@@ -40,7 +40,8 @@ export default function Dashboard() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
   const [staff, setStaff] = useState<any[]>([]);
-  const [staffForm, setStaffForm] = useState({ firstName: "", lastName: "", avatarUrl: "" });
+  const [staffForm, setStaffForm] = useState({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" });
+  const [editingStaff, setEditingStaff] = useState<any>(null);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [savingStaff, setSavingStaff] = useState(false);
   const [financeChartView, setFinanceChartView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -291,6 +292,8 @@ export default function Dashboard() {
       tax_no: fd.get('tax_no') as string,
       category: shop?.category || 'BERBER',
       shop_phone: fd.get('phone') as string,
+      email: fd.get('email') as string,
+      instagram: fd.get('instagram') as string,
       description: fd.get('bio') as string,
       iban: fd.get('iban') as string,
       city: fd.get('city') as string,
@@ -298,6 +301,12 @@ export default function Dashboard() {
       neighborhood: fd.get('neighborhood') as string,
       street: fd.get('street') as string,
       building_no: fd.get('building_no') as string,
+      postal_code: fd.get('postal_code') as string,
+      maps_link: fd.get('maps_link') as string,
+      free_cancel_hours: parseInt(fd.get('free_cancel_hours') as string) || 24,
+      cancellation_policy: fd.get('cancellation_policy') as string,
+      no_show_policy: fd.get('no_show_policy') as string,
+      deposit_info: fd.get('deposit_info') as string,
     });
 
     if (!error) { alert("Ayarlar kaydedildi!"); fetchInitialData(); setActiveTab("overview"); }
@@ -347,15 +356,31 @@ export default function Dashboard() {
   const handleStaffSubmit = async () => {
     if (!shop?.id || !staffForm.firstName.trim() || !staffForm.lastName.trim()) return;
     setSavingStaff(true);
-    const { error } = await supabase.from('staff').insert([{
+    const payload: any = {
       shop_id: shop.id,
       first_name: staffForm.firstName.trim(),
       last_name: staffForm.lastName.trim(),
       avatar_url: staffForm.avatarUrl || null,
-    }]);
+      role: staffForm.role.trim() || null,
+      specialty: staffForm.specialty.trim() || null,
+    };
+    const { error } = editingStaff
+      ? await supabase.from('staff').update(payload).eq('id', editingStaff.id)
+      : await supabase.from('staff').insert([payload]);
     if (error) { alert("Hata: " + error.message); }
-    else { setIsStaffModalOpen(false); fetchInitialData(); }
+    else {
+      setIsStaffModalOpen(false);
+      setEditingStaff(null);
+      setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" });
+      fetchInitialData();
+    }
     setSavingStaff(false);
+  };
+
+  const openStaffEdit = (s: any) => {
+    setEditingStaff(s);
+    setStaffForm({ firstName: s.first_name || "", lastName: s.last_name || "", avatarUrl: s.avatar_url || "", role: s.role || "", specialty: s.specialty || "" });
+    setIsStaffModalOpen(true);
   };
 
   // Real metrics
@@ -1108,7 +1133,18 @@ export default function Dashboard() {
                       )}
                     </div>
                   ))}
-                  <button onClick={handleSaveHours} disabled={savingHours} className="w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs mt-4 hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-3">
+                  {/* Apply to all */}
+                  <div className="flex gap-3 pt-2">
+                    {shopHours.filter(h => !h.is_closed).slice(0, 1).map((ref, _) => (
+                      <button key="apply-all" type="button"
+                        onClick={() => setShopHours(prev => prev.map(h => h.is_closed ? h : { ...h, open_time: ref.open_time, close_time: ref.close_time }))}
+                        className="flex-1 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                      >
+                        Tüm Haftaya Uygula ({ref.open_time?.slice(0,5)} – {ref.close_time?.slice(0,5)})
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={handleSaveHours} disabled={savingHours} className="w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs mt-2 hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-3">
                     <Save size={18}/> {savingHours ? "Kaydediliyor..." : "Saatleri Kaydet"}
                   </button>
                 </div>
@@ -1121,23 +1157,27 @@ export default function Dashboard() {
                 <div className="flex justify-between items-center mb-12">
                   <h2 className="text-4xl font-black uppercase tracking-tighter italic">Personel</h2>
                   {staff.length < 10 && (
-                    <button onClick={() => { setStaffForm({ firstName: "", lastName: "", avatarUrl: "" }); setIsStaffModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Personel Ekle</button>
+                    <button onClick={() => { setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); setIsStaffModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Personel Ekle</button>
                   )}
                 </div>
                 {staff.length === 0 ? (
                   <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz personel eklemediniz</div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {staff.map((s) => (
-                      <div key={s.id} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col items-center gap-4 hover:shadow-xl transition-all">
-                        <div className="w-20 h-20 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-lg flex items-center justify-center">
-                          {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" /> : <span className="text-2xl font-black text-[#00A3AD]">{s.first_name?.charAt(0)}</span>}
+                      <div key={s.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all flex items-center gap-5">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-md flex items-center justify-center flex-shrink-0">
+                          {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} /> : <span className="text-2xl font-black text-[#00A3AD]">{s.first_name?.charAt(0)}</span>}
                         </div>
-                        <div className="text-center">
-                          <p className="font-black text-sm uppercase tracking-tight">{s.first_name}</p>
-                          <p className="font-bold text-xs uppercase tracking-wider text-gray-400">{s.last_name}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm uppercase tracking-tight text-black leading-tight">{s.first_name} {s.last_name}</p>
+                          {s.role && <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mt-0.5">{s.role}</p>}
+                          {s.specialty && <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate">{s.specialty}</p>}
                         </div>
-                        <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }} className="p-2 text-red-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <button onClick={() => openStaffEdit(s)} className="p-2 text-gray-400 hover:text-[#00A3AD] transition-colors" title="Düzenle"><Edit3 size={15}/></button>
+                          <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }} className="p-2 text-gray-300 hover:text-red-500 transition-colors" title="Sil"><Trash2 size={15}/></button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1478,7 +1518,10 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İletişim Hattı</label><input name="phone" defaultValue={shop?.shop_phone} required className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
                   <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">IBAN</label><input name="iban" defaultValue={shop?.iban} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">E-posta</label><input name="email" type="email" defaultValue={shop?.email} placeholder="info@isletme.com" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Instagram</label><input name="instagram" defaultValue={shop?.instagram} placeholder="@kullaniciadi" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
                 </div>
+
                 {/* ADRES */}
                 <div className="border-t border-gray-100 pt-10">
                   <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-6">Adres Bilgileri</p>
@@ -1495,8 +1538,55 @@ export default function Dashboard() {
                     <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mahalle</label><input name="neighborhood" defaultValue={shop?.neighborhood} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
                     <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sokak / Cadde</label><input name="street" defaultValue={shop?.street} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
                     <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Bina No</label><input name="building_no" defaultValue={shop?.building_no} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Posta Kodu</label><input name="postal_code" defaultValue={shop?.postal_code} placeholder="34000" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  </div>
+                  <div className="space-y-2 mt-6">
+                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Google Maps Linki</label>
+                    <input name="maps_link" defaultValue={shop?.maps_link} placeholder="https://maps.google.com/..." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                  </div>
+                  {/* Map preview */}
+                  {(shop?.district || shop?.city) && (
+                    <div className="mt-6 rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
+                      <div className="h-48">
+                        <iframe
+                          title="Harita önizleme"
+                          className="w-full h-full border-0"
+                          loading="lazy"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent([shop.street, shop.building_no, shop.neighborhood, shop.district, shop.city].filter(Boolean).join(', '))}&output=embed&z=15`}
+                        />
+                      </div>
+                      <div className="px-5 py-3 bg-gray-50">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Harita Önizleme — Adres değiştikten sonra kaydedin</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* İPTAL POLİTİKASI */}
+                <div className="border-t border-gray-100 pt-10">
+                  <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-2">İptal & No-Show Politikası</p>
+                  <p className="text-xs text-gray-400 font-medium mb-6">Bu metin, müşterilerin işletme profilinizde "İptal Politikası" butonuna tıkladığında gösterilir.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Ücretsiz İptal Süresi (saat)</label>
+                      <input name="free_cancel_hours" type="number" min="0" max="168" defaultValue={shop?.free_cancel_hours ?? 24} placeholder="24" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                      <p className="ml-6 text-[9px] text-gray-300 font-bold uppercase tracking-widest">Randevudan kaç saat önce ücretsiz iptal edilebilir</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Depozito Bilgisi</label>
+                      <input name="deposit_info" defaultValue={shop?.deposit_info} placeholder="örn. Randevu tutarının %30'u" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                    </div>
+                  </div>
+                  <div className="space-y-2 mt-6">
+                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İptal Politikası Metni</label>
+                    <textarea name="cancellation_policy" rows={4} defaultValue={shop?.cancellation_policy} placeholder="Randevunuzu belirtilen süre içinde iptal etmezseniz veya randevuya gelmezseniz işletme iptal/no-show politikası uygulayabilir. Nihai karar hizmet sağlayıcıya aittir." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black resize-none" />
+                  </div>
+                  <div className="space-y-2 mt-6">
+                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">No-Show Açıklaması</label>
+                    <textarea name="no_show_policy" rows={3} defaultValue={shop?.no_show_policy} placeholder="Randevuya haber vermeksizin gelmeyen müşteriler için uygulanan politika..." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black resize-none" />
                   </div>
                 </div>
+
                 <button type="submit" className="w-full bg-black text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-4"><Save size={20} /> Kaydet ve Mühürle</button>
               </form>
 
@@ -1557,16 +1647,16 @@ export default function Dashboard() {
       {/* PERSONEL MODALI */}
       {isStaffModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
-          <div className="bg-white w-full max-w-md rounded-[4rem] p-12 relative animate-in zoom-in duration-300 text-black">
-            <button onClick={() => setIsStaffModalOpen(false)} className="absolute top-10 right-10 text-gray-300 hover:text-black transition-colors"><X size={32}/></button>
-            <h3 className="text-3xl font-black uppercase tracking-tighter mb-10">Personel Ekle</h3>
-            <div className="flex flex-col items-center gap-6">
+          <div className="bg-white w-full max-w-md rounded-[4rem] p-10 relative animate-in zoom-in duration-300 text-black overflow-y-auto max-h-[90vh]">
+            <button onClick={() => { setIsStaffModalOpen(false); setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); }} className="absolute top-8 right-8 text-gray-300 hover:text-black transition-colors"><X size={28}/></button>
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-8">{editingStaff ? "Personeli Düzenle" : "Personel Ekle"}</h3>
+            <div className="flex flex-col items-center gap-5">
               <label className="relative cursor-pointer group">
-                <div className="w-28 h-28 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-xl flex items-center justify-center">
-                  {staffForm.avatarUrl ? <img src={staffForm.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-4xl font-black text-[#00A3AD]">{staffForm.firstName?.charAt(0) || "?"}</span>}
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-xl flex items-center justify-center">
+                  {staffForm.avatarUrl ? <img src={staffForm.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-3xl font-black text-[#00A3AD]">{staffForm.firstName?.charAt(0) || "?"}</span>}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all rounded-full">
-                  <UploadCloud size={24} className="text-white" />
+                  <UploadCloud size={20} className="text-white" />
                 </div>
                 <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                   const file = e.target.files?.[0]; if(!file) return;
@@ -1574,10 +1664,14 @@ export default function Dashboard() {
                   if(url) setStaffForm(f => ({...f, avatarUrl: url}));
                 }} />
               </label>
-              <input placeholder="İsim" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.firstName} onChange={e => setStaffForm(f => ({...f, firstName: e.target.value}))} />
-              <input placeholder="Soyisim" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.lastName} onChange={e => setStaffForm(f => ({...f, lastName: e.target.value}))} />
-              <button onClick={handleStaffSubmit} disabled={savingStaff || !staffForm.firstName.trim() || !staffForm.lastName.trim()} className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all disabled:opacity-30">
-                {savingStaff ? "EKLENİYOR..." : "EKLE"}
+              <div className="w-full grid grid-cols-2 gap-4">
+                <input placeholder="İsim *" className="p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.firstName} onChange={e => setStaffForm(f => ({...f, firstName: e.target.value}))} />
+                <input placeholder="Soyisim *" className="p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.lastName} onChange={e => setStaffForm(f => ({...f, lastName: e.target.value}))} />
+              </div>
+              <input placeholder="Rol (örn. Kuaför, Berber)" className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.role} onChange={e => setStaffForm(f => ({...f, role: e.target.value}))} />
+              <input placeholder="Uzmanlık (örn. Saç Boyama, Fade)" className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={staffForm.specialty} onChange={e => setStaffForm(f => ({...f, specialty: e.target.value}))} />
+              <button onClick={handleStaffSubmit} disabled={savingStaff || !staffForm.firstName.trim() || !staffForm.lastName.trim()} className="w-full bg-[#00A3AD] text-white py-5 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all disabled:opacity-30">
+                {savingStaff ? "KAYDEDİLİYOR..." : editingStaff ? "GÜNCELLE" : "EKLE"}
               </button>
             </div>
           </div>
