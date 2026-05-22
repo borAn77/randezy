@@ -72,6 +72,7 @@ export default function ShopDetail() {
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [nearbyShops, setNearbyShops] = useState<any[]>([]);
   const [nearbyAvailability, setNearbyAvailability] = useState<Record<number, boolean>>({});
+  const [nearbyFillRate, setNearbyFillRate] = useState<Record<number, number>>({});
   const heroRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +98,7 @@ export default function ShopDetail() {
 
     supabase
       .from('shops')
-      .select('id, name, category, city, district, image_url, gallery_urls, services(price, duration), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating), campaigns(id, type, discount_value, start_date, end_date, is_active)')
+      .select('id, name, category, city, district, image_url, gallery_urls, created_at, is_promoted, services(price, duration), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating), campaigns(id, type, discount_value, start_date, end_date, is_active)')
       .neq('id', shop.id)
       .eq('city', shop.city)
       .limit(12)
@@ -137,18 +138,38 @@ export default function ShopDetail() {
         data.forEach((s: any) => { availability[s.id] = calcAvailable(s); });
         setNearbyAvailability(availability);
 
+        const calcFillRate = (s: any): number => {
+          const todayIdx = new Date().getDay();
+          const h = s.shop_hours?.find((h: any) => h.day_of_week === todayIdx);
+          if (!h || h.is_closed) return 0;
+          const [oH, oM] = h.open_time.split(':').map(Number);
+          const [cH, cM] = h.close_time.split(':').map(Number);
+          const totalMin = (cH * 60 + cM) - (oH * 60 + oM);
+          const minDur = s.services?.length
+            ? Math.min(...s.services.map((sv: any) => Number(sv.duration) || 60))
+            : 60;
+          const totalSlots = Math.max(1, Math.floor(totalMin / minDur));
+          return (bookedByShop[s.id] || 0) / totalSlots;
+        };
+
+        const fillRates: Record<number, number> = {};
+        data.forEach((s: any) => { fillRates[s.id] = calcFillRate(s); });
+        setNearbyFillRate(fillRates);
+
         const hasActiveCampaign = (s: any) =>
           s.campaigns?.some((c: any) => c.is_active && c.start_date <= todayStr && c.end_date >= todayStr);
 
-        // Multi-criteria score: category match + rating + review count + real availability + active campaign
         const scoreShop = (s: any): number => {
           const revs = s.reviews || [];
           const avg = revs.length ? revs.reduce((sum: number, r: any) => sum + r.rating, 0) / revs.length : 0;
+          const fr = fillRates[s.id] || 0;
           return (s.category === shop.category ? 30 : 0)
             + avg * 8
             + Math.min(revs.length, 30) * 0.5
             + (availability[s.id] ? 25 : 0)
-            + (hasActiveCampaign(s) ? 15 : 0);
+            + (hasActiveCampaign(s) ? 15 : 0)
+            + (s.is_promoted ? 50 : 0)
+            + (fr > 0.6 ? 10 : 0);
         };
 
         setNearbyShops([...data].sort((a: any, b: any) => scoreShop(b) - scoreShop(a)));
@@ -938,133 +959,164 @@ export default function ShopDetail() {
         </div>
 
         {/* Bölgendeki Diğer İşletmeler */}
-        <div className="mt-20 md:mt-28 pb-12 md:pb-20">
-          <div className="flex items-end justify-between mb-6 md:mb-8">
-            <div>
-              <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-[#222] border-b-4 border-[#00A3AD] inline-block pb-0.5">Bölgendeki Diğer İşletmeler</h2>
-              <p className="text-xs text-gray-400 font-medium mt-2 md:mt-3 max-w-md">Yakınındaki benzer işletmeleri keşfet ve uygun randevu saatlerini kaçırma.</p>
-            </div>
-            {nearbyShops.length > 1 && (
-              <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-6">
-                <button
-                  onClick={() => carouselRef.current?.scrollBy({ left: -284, behavior: 'smooth' })}
-                  className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <button
-                  onClick={() => carouselRef.current?.scrollBy({ left: 284, behavior: 'smooth' })}
-                  className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
-                >
-                  <ChevronRight size={15} />
-                </button>
+        {(() => {
+          const availableCount = nearbyShops.filter((s: any) => nearbyAvailability[s.id]).length;
+          const maxReviewCount = nearbyShops.length
+            ? Math.max(...nearbyShops.map((s: any) => s.reviews?.length || 0))
+            : 0;
+          return (
+            <div className="mt-20 md:mt-28 pb-12 md:pb-20">
+              <div className="flex items-end justify-between mb-6 md:mb-8">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-[#222] border-b-4 border-[#00A3AD] inline-block pb-0.5">Bölgendeki Diğer İşletmeler</h2>
+                  <p className="text-xs text-gray-400 font-medium mt-2 md:mt-3 max-w-md">
+                    {availableCount > 0
+                      ? <><span className="text-[#00A3AD] font-black">{availableCount} işletme</span> bugün müsait — uygun randevunu kaçırma.</>
+                      : 'Yakınındaki benzer işletmeleri keşfet ve uygun randevu saatlerini kaçırma.'
+                    }
+                  </p>
+                </div>
+                {nearbyShops.length > 1 && (
+                  <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-6">
+                    <button
+                      onClick={() => carouselRef.current?.scrollBy({ left: -260, behavior: 'smooth' })}
+                      className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                    >
+                      <ChevronLeft size={15} />
+                    </button>
+                    <button
+                      onClick={() => carouselRef.current?.scrollBy({ left: 260, behavior: 'smooth' })}
+                      className="p-3 rounded-2xl border border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                    >
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {nearbyShops.length === 0 ? (
-            <div className="text-center py-14 bg-gray-50 rounded-[2rem] border border-gray-100">
-              <p className="text-[11px] font-black text-gray-300 uppercase tracking-[0.2em]">Yakında önerilecek işletmeler burada görünecek.</p>
-            </div>
-          ) : (
-            <div
-              ref={carouselRef}
-              className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory -mx-1 px-1"
-            >
-              {nearbyShops.map((s: any) => {
-                const todayOpen = nearbyAvailability[s.id] ?? false;
-                const minPrice = getNearbyMinPrice(s.services);
-                const rating = getNearbyRating(s.reviews);
-                const cover = s.image_url || s.gallery_urls?.[0] || null;
-                const sameCategory = s.category === shop.category;
-                const todayStr = localDateStr(new Date());
-                const activeCampaign = s.campaigns?.find((c: any) =>
-                  c.is_active && c.start_date <= todayStr && c.end_date >= todayStr
-                );
-                const campaignLabel = activeCampaign
-                  ? activeCampaign.type === 'percentage' ? `%${activeCampaign.discount_value} İndirim`
-                  : activeCampaign.type === 'fixed' ? `₺${activeCampaign.discount_value} İndirim`
-                  : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
-                  : 'Son Dakika'
-                  : null;
+              {nearbyShops.length === 0 ? (
+                <div className="text-center py-14 bg-gray-50 rounded-[2rem] border border-gray-100">
+                  <p className="text-[11px] font-black text-gray-300 uppercase tracking-[0.2em]">Yakında önerilecek işletmeler burada görünecek.</p>
+                </div>
+              ) : (
+                <div
+                  ref={carouselRef}
+                  className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory -mx-1 px-1"
+                >
+                  {nearbyShops.map((s: any) => {
+                    const todayOpen = nearbyAvailability[s.id] ?? false;
+                    const fillRate = nearbyFillRate[s.id] ?? 0;
+                    const minPrice = getNearbyMinPrice(s.services);
+                    const rating = getNearbyRating(s.reviews);
+                    const reviewCount = s.reviews?.length || 0;
+                    const cover = s.image_url || s.gallery_urls?.[0] || null;
+                    const todayStr = localDateStr(new Date());
 
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => router.push(`/shop/${s.id}`)}
-                    className="flex-shrink-0 w-52 md:w-60 snap-start cursor-pointer group"
-                  >
-                    {/* Card image */}
-                    <div className="relative h-44 md:h-52 rounded-[1.5rem] overflow-hidden bg-gray-100 mb-3 shadow-sm group-hover:shadow-2xl transition-all duration-300 group-hover:-translate-y-1.5">
-                      {cover
-                        ? <img src={cover} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={s.name} />
-                        : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50"><ImageIcon size={28} className="text-gray-300" /></div>
-                      }
-                      {/* Overlay gradient */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                    const activeCampaign = s.campaigns?.find((c: any) =>
+                      c.is_active && c.start_date <= todayStr && c.end_date >= todayStr
+                    );
+                    const campaignLabel = activeCampaign
+                      ? activeCampaign.type === 'percentage' ? `%${activeCampaign.discount_value} İndirim`
+                      : activeCampaign.type === 'fixed' ? `₺${activeCampaign.discount_value} İndirim`
+                      : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
+                      : 'Son Dakika'
+                      : null;
 
-                      {/* Rating badge */}
-                      {rating && (
-                        <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-xl shadow-sm">
-                          <span className="text-yellow-400 text-[10px]">★</span>
-                          <span className="text-[11px] font-black text-[#222]">{rating}</span>
-                          {s.reviews?.length > 0 && (
-                            <span className="text-[9px] font-bold text-gray-400">({s.reviews.length})</span>
+                    const availabilityBadge = todayOpen
+                      ? fillRate > 0.7
+                        ? { label: 'Son Dakika', bg: 'bg-red-500' }
+                        : { label: 'Bugün Uygun', bg: 'bg-[#00A3AD]' }
+                      : fillRate > 0.5
+                        ? { label: 'Hızlı Doluyor', bg: 'bg-orange-500' }
+                        : null;
+
+                    const isNew = s.created_at
+                      && (Date.now() - new Date(s.created_at).getTime()) < 30 * 24 * 60 * 60 * 1000;
+                    const isMostPopular = reviewCount >= 5 && reviewCount === maxReviewCount;
+
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => router.push(`/shop/${s.id}`)}
+                        className="flex-shrink-0 w-52 md:w-[15.5rem] snap-start cursor-pointer group"
+                      >
+                        {/* Card image */}
+                        <div className="relative h-44 md:h-52 rounded-[1.5rem] overflow-hidden bg-gray-100 mb-3 shadow-sm group-hover:shadow-2xl transition-all duration-300 group-hover:-translate-y-1.5">
+                          {cover
+                            ? <img src={cover} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={s.name} />
+                            : <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50"><ImageIcon size={28} className="text-gray-300" /></div>
+                          }
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+
+                          {/* Rating + review count badge */}
+                          {rating && (
+                            <div className="absolute top-3 left-3 flex items-center gap-1 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-xl shadow-sm">
+                              <span className="text-yellow-400 text-[10px]">★</span>
+                              <span className="text-[11px] font-black text-[#222]">{rating}</span>
+                              {reviewCount > 0 && (
+                                <span className="text-[9px] font-bold text-gray-400">({reviewCount})</span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Dynamic availability badge */}
+                          {availabilityBadge && (
+                            <div className="absolute top-3 right-3">
+                              <span className={`${availabilityBadge.bg} text-white px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm`}>
+                                {availabilityBadge.label}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Campaign badge — bottom right */}
+                          {campaignLabel && (
+                            <div className="absolute bottom-3 right-3">
+                              <span className="bg-amber-400 text-black px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
+                                {campaignLabel}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Bottom-left: Yeni İşletme or En Çok Tercih Edilen */}
+                          {(isNew || isMostPopular) && (
+                            <div className="absolute bottom-3 left-3">
+                              <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wide">
+                                {isNew ? 'Yeni İşletme' : 'En Çok Tercih Edilen'}
+                              </span>
+                            </div>
                           )}
                         </div>
-                      )}
 
-                      {/* Today available badge */}
-                      {todayOpen && (
-                        <div className="absolute top-3 right-3">
-                          <span className="bg-[#00A3AD] text-white px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
-                            Bugün uygun
-                          </span>
+                        {/* Card info */}
+                        <div className="px-0.5">
+                          <p className="font-black text-[13px] text-[#222] uppercase tracking-tight leading-tight truncate group-hover:text-[#00A3AD] transition-colors duration-200">
+                            {s.name}
+                          </p>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate">
+                              {s.district && s.city ? `${s.district}, ${s.city}` : s.city || s.district}
+                            </p>
+                            {reviewCount > 0 && (
+                              <span className="text-[9px] text-gray-300 font-bold flex-shrink-0 ml-1">{reviewCount} yorum</span>
+                            )}
+                          </div>
+                          {minPrice && (
+                            <p className="text-[11px] font-black text-gray-500 mt-1.5">
+                              ₺{minPrice}<span className="font-medium text-gray-400">'den başlayan</span>
+                            </p>
+                          )}
+                          <button className="mt-3 w-full py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-[#00A3AD] hover:text-white hover:border-[#00A3AD] font-black text-[10px] uppercase tracking-widest text-gray-400 transition-all duration-200 shadow-sm">
+                            İncele
+                          </button>
                         </div>
-                      )}
-
-                      {/* Campaign badge */}
-                      {campaignLabel && (
-                        <div className="absolute bottom-3 right-3">
-                          <span className="bg-amber-400 text-black px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wide shadow-sm">
-                            {campaignLabel}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Same category tag */}
-                      {sameCategory && (
-                        <div className="absolute bottom-3 left-3">
-                          <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wide">
-                            {s.category}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Card info */}
-                    <div className="px-0.5">
-                      <p className="font-black text-[13px] text-[#222] uppercase tracking-tight leading-tight truncate group-hover:text-[#00A3AD] transition-colors duration-200">
-                        {s.name}
-                      </p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-0.5 truncate">
-                        {s.district && s.city ? `${s.district}, ${s.city}` : s.city || s.district}
-                      </p>
-                      {minPrice && (
-                        <p className="text-[11px] font-black text-gray-500 mt-1.5">
-                          ₺{minPrice}<span className="font-medium text-gray-400">'den başlayan</span>
-                        </p>
-                      )}
-                      <button className="mt-3 w-full py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-[#00A3AD] hover:text-white hover:border-[#00A3AD] font-black text-[10px] uppercase tracking-widest text-gray-400 transition-all duration-200 shadow-sm">
-                        İncele
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
 
       {/* Lightbox */}
