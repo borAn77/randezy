@@ -164,11 +164,11 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white font-sans">
       <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[#050505]">
+        <div className="absolute inset-0 bg-[#050505] overflow-hidden">
           {userId ? (
             <img
               src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
-              className="w-full h-full object-cover opacity-50 object-top scale-105"
+              className="w-full h-full object-cover opacity-50 object-top"
               alt="Hero Background"
             />
           ) : (
@@ -180,9 +180,9 @@ export default function Home() {
                 muted
                 loop
                 playsInline
-                className="absolute inset-0 w-full h-full object-cover scale-105"
+                className="absolute inset-0 w-full h-full object-cover"
                 style={{
-                  opacity: i === videoIdx ? 0.6 : 0,
+                  opacity: i === videoIdx ? 0.65 : 0,
                   transition: 'opacity 1.5s ease-in-out',
                   zIndex: i === videoIdx ? 1 : 0,
                 }}
