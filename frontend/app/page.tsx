@@ -29,7 +29,14 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [videoIdx, setVideoIdx] = useState(0);
   const shopsRef = useRef<HTMLDivElement>(null);
+
+  const heroVideos = [
+    '/videos/4177973-hd_1920_1080_30fps.mp4',
+    '/videos/8225735-hd_1920_1080_25fps.mp4',
+    '/videos/9335886-hd_1920_1080_25fps.mp4',
+  ];
 
   // Read URL params on mount
   useEffect(() => {
@@ -56,6 +63,12 @@ export default function Home() {
     const qs = params.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
   }, [searchQuery, selectedCategory, selectedCity, selectedDistrict]);
+
+  useEffect(() => {
+    if (userId) return;
+    const t = setInterval(() => setVideoIdx(i => (i + 1) % heroVideos.length), 7000);
+    return () => clearInterval(t);
+  }, [userId]);
 
   useEffect(() => {
     supabase
@@ -152,11 +165,30 @@ export default function Home() {
     <main className="min-h-screen bg-white font-sans">
       <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden">
         <div className="absolute inset-0 bg-[#050505]">
-          <img
-            src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
-            className="w-full h-full object-cover opacity-50 object-top scale-105"
-            alt="Hero Background"
-          />
+          {userId ? (
+            <img
+              src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
+              className="w-full h-full object-cover opacity-50 object-top scale-105"
+              alt="Hero Background"
+            />
+          ) : (
+            heroVideos.map((src, i) => (
+              <video
+                key={i}
+                src={src}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover scale-105"
+                style={{
+                  opacity: i === videoIdx ? 0.6 : 0,
+                  transition: 'opacity 1.5s ease-in-out',
+                  zIndex: i === videoIdx ? 1 : 0,
+                }}
+              />
+            ))
+          )}
         </div>
 
         <Navbar />
