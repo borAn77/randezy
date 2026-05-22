@@ -1,10 +1,10 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   Clock, ArrowLeft, X, Calendar as CalIcon,
   ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon, Share2, Heart,
-  Phone, Mail, AtSign, ChevronDown
+  Phone, Mail, AtSign, ChevronDown, Users, User, Search
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import AuthModal from "../../../components/layout/AuthModal";
@@ -66,6 +66,8 @@ export default function ShopDetail() {
   const [copied, setCopied] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceStaffFilter, setServiceStaffFilter] = useState<any>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -152,13 +154,13 @@ export default function ShopDetail() {
     return () => subscription.unsubscribe();
   }, [shopId]);
 
-  const handleBookingClick = async (service: any) => {
+  const handleBookingClick = async (service: any, preferredStaff?: any) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       setSelectedService(service);
       setSelectedDay(null);
       setSelectedTime("");
-      setSelectedStaff(null);
+      setSelectedStaff(preferredStaff ?? null);
       setIsBooking(true);
     } else {
       pendingService.current = service;
@@ -261,6 +263,39 @@ export default function ShopDetail() {
     }
     setSubmittingReview(false);
   };
+
+  const SERVICE_CATEGORIES = ['Saç', 'Sakal', 'Masaj', 'Tırnak', 'Kaş/Kirpik', 'Diğer'];
+
+  const filteredServices = useMemo(() => {
+    let result = services;
+    if (serviceStaffFilter) {
+      result = result.filter((s: any) =>
+        !s.staff_id || s.staff_id === serviceStaffFilter.id ||
+        (Array.isArray(s.staff_ids) && s.staff_ids.includes(serviceStaffFilter.id))
+      );
+    }
+    if (serviceSearch.trim()) {
+      const q = serviceSearch.toLowerCase();
+      result = result.filter((s: any) =>
+        s.name?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [services, serviceStaffFilter, serviceSearch]);
+
+  const groupedServices = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    filteredServices.forEach((s: any) => {
+      const cat = s.category || 'Diğer';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    });
+    // Sort groups by predefined category order, unknowns at end
+    const sorted: Record<string, any[]> = {};
+    SERVICE_CATEGORIES.forEach(c => { if (groups[c]) sorted[c] = groups[c]; });
+    Object.keys(groups).forEach(c => { if (!sorted[c]) sorted[c] = groups[c]; });
+    return sorted;
+  }, [filteredServices]);
 
   const renderDays = () => {
     const year = currentDate.getFullYear();
@@ -413,27 +448,137 @@ export default function ShopDetail() {
             )}
 
             {/* Services */}
-            <h2 className="text-xl md:text-2xl font-black mb-6 md:mb-10 uppercase tracking-tighter border-b-4 border-[#00A3AD] inline-block text-black">Hizmetlerimiz</h2>
-            <div className="space-y-3 md:space-y-4 mt-4 md:mt-6">
-              {services.length === 0 && (
-                <p className="text-gray-300 font-bold text-sm uppercase tracking-widest italic py-10 text-center">Henüz hizmet eklenmemiş.</p>
-              )}
-              {services.map((service) => (
-                <div key={service.id} className="bg-gray-50/50 hover:bg-white hover:shadow-xl p-4 md:p-8 rounded-[1.5rem] md:rounded-[2rem] flex justify-between items-center transition-all group border border-transparent hover:border-gray-100 gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-black text-sm md:text-xl mb-1 group-hover:text-[#00A3AD] transition-colors text-black uppercase leading-tight">{service.name}</h3>
-                    <p className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center gap-1 md:gap-2">
-                      <Clock size={10} /> {service.duration} dk
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 md:gap-8 flex-shrink-0">
-                    <span className="font-black text-base md:text-2xl tracking-tighter text-black">{service.price} ₺</span>
-                    <button onClick={() => handleBookingClick(service)} className="bg-[#222] text-white px-3 md:px-10 py-2.5 md:py-4 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase shadow-lg hover:bg-[#00A3AD] hover:scale-105 transition-all whitespace-nowrap">
-                      Randevu Al
-                    </button>
-                  </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-black mb-6 md:mb-8 uppercase tracking-tighter border-b-4 border-[#00A3AD] inline-block text-black">Hizmetlerimiz</h2>
+
+              {/* Staff filter chips */}
+              {staff.length > 0 && (
+                <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 mb-5 mt-4 md:mt-6">
+                  <button
+                    onClick={() => setServiceStaffFilter(null)}
+                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-2xl border-2 font-black text-[10px] uppercase tracking-widest transition-all
+                      ${serviceStaffFilter === null
+                        ? 'border-[#222] bg-[#222] text-white'
+                        : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-300 hover:text-gray-600'}`}
+                  >
+                    <Users size={11} /> Tümü
+                  </button>
+                  {staff.map((s: any) => {
+                    const isActive = serviceStaffFilter?.id === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => setServiceStaffFilter(isActive ? null : s)}
+                        className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-2xl border-2 font-black text-[10px] uppercase tracking-widest transition-all
+                          ${isActive
+                            ? 'border-[#00A3AD] bg-[#E6F6F7] text-[#00A3AD]'
+                            : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-300 hover:text-gray-600'}`}
+                      >
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center flex-shrink-0">
+                          {s.avatar_url
+                            ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} />
+                            : <span className="text-[#00A3AD] font-black text-[9px]">{s.first_name?.charAt(0)}</span>
+                          }
+                        </div>
+                        {s.first_name}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
+
+              {/* Selected staff profile card */}
+              {serviceStaffFilter && (
+                <div className="mb-5 p-4 bg-gradient-to-r from-[#E6F6F7] to-white rounded-2xl border border-[#00A3AD]/20 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow flex-shrink-0">
+                    {serviceStaffFilter.avatar_url
+                      ? <img src={serviceStaffFilter.avatar_url} className="w-full h-full object-cover" alt={serviceStaffFilter.first_name} />
+                      : <span className="text-[#00A3AD] font-black text-base">{serviceStaffFilter.first_name?.charAt(0)}{serviceStaffFilter.last_name?.charAt(0)}</span>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-sm uppercase tracking-tight text-[#222] leading-tight">{serviceStaffFilter.first_name} {serviceStaffFilter.last_name}</p>
+                    {serviceStaffFilter.role && <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mt-0.5">{serviceStaffFilter.role}</p>}
+                    {serviceStaffFilter.specialty && <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{serviceStaffFilter.specialty}</p>}
+                  </div>
+                  <button onClick={() => setServiceStaffFilter(null)} className="flex-shrink-0 p-1.5 hover:bg-white rounded-xl transition-colors">
+                    <X size={13} className="text-gray-300 hover:text-gray-500 transition-colors" />
+                  </button>
+                </div>
+              )}
+
+              {/* Service search */}
+              <div className="relative mb-5">
+                <Search size={13} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                <input
+                  type="text"
+                  value={serviceSearch}
+                  onChange={e => setServiceSearch(e.target.value)}
+                  placeholder="Hizmet ara..."
+                  className="w-full pl-10 pr-10 py-3.5 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-bold text-[#222] placeholder:text-gray-300 outline-none focus:border-[#00A3AD] focus:bg-white transition-all"
+                />
+                {serviceSearch && (
+                  <button onClick={() => setServiceSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Service list */}
+              {filteredServices.length === 0 ? (
+                <p className="text-gray-300 font-bold text-sm uppercase tracking-widest italic py-10 text-center">
+                  {serviceSearch ? 'Hizmet bulunamadı.' : 'Henüz hizmet eklenmemiş.'}
+                </p>
+              ) : (
+                Object.entries(groupedServices).map(([category, catServices]) => (
+                  <div key={category} className="mb-6 md:mb-8">
+                    {Object.keys(groupedServices).length > 1 && (
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="h-px flex-1 bg-gray-100" />
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex-shrink-0">{category}</span>
+                        <div className="h-px flex-1 bg-gray-100" />
+                      </div>
+                    )}
+                    <div className="space-y-3">
+                      {(catServices as any[]).map((service: any) => (
+                        <div key={service.id} className="group border border-gray-100 hover:border-[#00A3AD]/25 hover:shadow-md p-5 md:p-6 rounded-2xl transition-all bg-white">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-black text-sm md:text-base uppercase tracking-tight text-[#222] group-hover:text-[#00A3AD] transition-colors leading-tight mb-1.5">{service.name}</h3>
+                              <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+                                <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                  <Clock size={9} /> {service.duration} dk
+                                </span>
+                                {serviceStaffFilter ? (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-[#00A3AD] uppercase tracking-widest">
+                                    <User size={9} /> {serviceStaffFilter.first_name}
+                                  </span>
+                                ) : staff.length > 0 && (
+                                  <span className="flex items-center gap-1 text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                                    <Users size={9} /> Tüm Personel
+                                  </span>
+                                )}
+                              </div>
+                              {service.description && (
+                                <p className="text-[12px] text-gray-400 font-medium mt-2 leading-relaxed">{service.description}</p>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-2.5 flex-shrink-0">
+                              <span className="font-black text-xl md:text-2xl tracking-tighter text-[#222]">{service.price} ₺</span>
+                              <button
+                                onClick={() => handleBookingClick(service, serviceStaffFilter || undefined)}
+                                className="bg-[#222] text-white px-5 md:px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-[#00A3AD] hover:scale-105 transition-all whitespace-nowrap"
+                              >
+                                Randevu Al
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Reviews */}
