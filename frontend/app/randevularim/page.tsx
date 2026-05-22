@@ -3,8 +3,35 @@
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../../components/layout/Navbar";
-import { api, Appointment, AppointmentStatus } from "../../lib/api";
 import { supabase } from "../../lib/supabase";
+
+// ── Supabase row type ─────────────────────────────────────────────────────────
+
+type AptRow = {
+  id: string;
+  shop_id: string;
+  appointment_date: string;   // "2026-05-25"
+  appointment_time: string;   // "14:30:00"
+  service_name: string;
+  status: string;             // 'Beklemede' | 'Onaylandı' | 'İptal Edildi' | 'Tamamlandı'
+  price: number;
+  cancel_reason?: string | null;
+  staff_name?: string | null;
+  notes?: string | null;
+  shops: { name: string; city: string; district: string } | null;
+};
+
+type TabKey = 'upcoming' | 'past' | 'cancelled';
+
+function aptDateTime(apt: AptRow): Date {
+  return new Date(`${apt.appointment_date}T${apt.appointment_time}`);
+}
+
+function classifyApt(apt: AptRow): TabKey {
+  if (apt.status === 'İptal Edildi') return 'cancelled';
+  if (apt.status === 'Tamamlandı') return 'past';
+  return aptDateTime(apt).getTime() > Date.now() ? 'upcoming' : 'past';
+}
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
 
@@ -18,43 +45,35 @@ const PALETTE_HUES = [30, 65, 155, 200, 230, 265, 295, 340];
 const PATTERN_KEYS = ['lines', 'crosshatch', 'dots', 'wave'] as const;
 type PatternKey = typeof PATTERN_KEYS[number];
 
-function bizHue(id: string): number { return PALETTE_HUES[strHash(id) % PALETTE_HUES.length]; }
+function bizHue(id: string) { return PALETTE_HUES[strHash(id) % PALETTE_HUES.length]; }
 function bizPat(id: string): PatternKey { return PATTERN_KEYS[(strHash(id) >> 4) % PATTERN_KEYS.length]; }
 
 // ── SVG thumbnail ──────────────────────────────────────────────────────────────
 
-function BusinessThumb({ businessId, size = 60, radius = 14 }: { businessId: string; size?: number; radius?: number }) {
-  const h = bizHue(businessId);
-  const pat = bizPat(businessId);
-
-  const lines = Array.from({ length: 12 }, (_, i) => (
-    <line key={i} x1={i * 8} y1="0" x2={i * 8 - 30} y2="80" stroke={`oklch(0.78 0.08 ${h})`} strokeWidth="2.4" />
-  ));
-  const xhatch = [
-    ...Array.from({ length: 10 }, (_, i) => <line key={i} x1={i * 9} y1="0" x2={i * 9 - 30} y2="80" stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" />),
-    ...Array.from({ length: 10 }, (_, i) => <line key={`b${i}`} x1="0" y1={i * 9} x2="80" y2={i * 9 - 30} stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" opacity="0.5" />),
-  ];
-  const dots = Array.from({ length: 8 }, (_, r) =>
-    Array.from({ length: 8 }, (_, c) => (
-      <circle key={`${r}-${c}`} cx={c * 10 + 5} cy={r * 10 + 5} r={r % 2 === 0 ? 1.8 : 1.4} fill={`oklch(0.65 0.10 ${h})`} />
-    ))
-  );
-
+function BusinessThumb({ shopId, size = 60, radius = 14 }: { shopId: string; size?: number; radius?: number }) {
+  const h = bizHue(shopId);
+  const pat = bizPat(shopId);
   return (
     <div style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06)' }}>
       {pat === 'lines' && (
         <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.88 0.06 ${h})`} />{lines}
+          <rect width="80" height="80" fill={`oklch(0.88 0.06 ${h})`} />
+          {Array.from({ length: 12 }, (_, i) => <line key={i} x1={i * 8} y1="0" x2={i * 8 - 30} y2="80" stroke={`oklch(0.78 0.08 ${h})`} strokeWidth="2.4" />)}
         </svg>
       )}
       {pat === 'crosshatch' && (
         <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.86 0.05 ${h})`} />{xhatch}
+          <rect width="80" height="80" fill={`oklch(0.86 0.05 ${h})`} />
+          {Array.from({ length: 10 }, (_, i) => <line key={i} x1={i * 9} y1="0" x2={i * 9 - 30} y2="80" stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" />)}
+          {Array.from({ length: 10 }, (_, i) => <line key={`b${i}`} x1="0" y1={i * 9} x2="80" y2={i * 9 - 30} stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" opacity="0.5" />)}
         </svg>
       )}
       {pat === 'dots' && (
         <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.88 0.045 ${h})`} />{dots}
+          <rect width="80" height="80" fill={`oklch(0.88 0.045 ${h})`} />
+          {Array.from({ length: 8 }, (_, r) => Array.from({ length: 8 }, (_, c) => (
+            <circle key={`${r}-${c}`} cx={c * 10 + 5} cy={r * 10 + 5} r={r % 2 === 0 ? 1.8 : 1.4} fill={`oklch(0.65 0.10 ${h})`} />
+          )))}
         </svg>
       )}
       {pat === 'wave' && (
@@ -70,21 +89,20 @@ function BusinessThumb({ businessId, size = 60, radius = 14 }: { businessId: str
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 
-const STATUS_CFG: Record<AppointmentStatus, { label: string; bg: string; fg: string }> = {
-  confirmed:  { label: 'Onaylandı',        bg: 'oklch(0.95 0.06 155)', fg: 'oklch(0.34 0.10 155)' },
-  pending:    { label: 'Onay bekleniyor',  bg: 'oklch(0.95 0.06 75)',  fg: 'oklch(0.38 0.13 60)'  },
-  completed:  { label: 'Tamamlandı',       bg: 'oklch(0.95 0.04 240)', fg: 'oklch(0.38 0.10 240)' },
-  cancelled:  { label: 'İptal edildi',     bg: 'oklch(0.94 0.005 60)', fg: 'oklch(0.50 0.005 60)' },
-  no_show:    { label: 'Gelmedi',          bg: 'oklch(0.95 0.04 30)',  fg: 'oklch(0.45 0.12 30)'  },
+const STATUS_CFG: Record<string, { label: string; bg: string; fg: string }> = {
+  'Onaylandı':   { label: 'Onaylandı',       bg: 'oklch(0.95 0.06 155)', fg: 'oklch(0.34 0.10 155)' },
+  'Beklemede':   { label: 'Onay bekleniyor', bg: 'oklch(0.95 0.06 75)',  fg: 'oklch(0.38 0.13 60)'  },
+  'Tamamlandı':  { label: 'Tamamlandı',      bg: 'oklch(0.95 0.04 240)', fg: 'oklch(0.38 0.10 240)' },
+  'İptal Edildi':{ label: 'İptal edildi',    bg: 'oklch(0.94 0.005 60)', fg: 'oklch(0.50 0.005 60)' },
 };
 
-function StatusPill({ status }: { status: AppointmentStatus }) {
-  const s = STATUS_CFG[status] ?? STATUS_CFG.cancelled;
+function StatusPill({ status }: { status: string }) {
+  const s = STATUS_CFG[status] ?? STATUS_CFG['Beklemede'];
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
       fontSize: 11.5, fontWeight: 600, padding: '3px 10px',
-      borderRadius: 999, background: s.bg, color: s.fg, letterSpacing: 0.1, whiteSpace: 'nowrap',
+      borderRadius: 999, background: s.bg, color: s.fg, whiteSpace: 'nowrap',
     }}>
       <span style={{ width: 6, height: 6, borderRadius: 999, background: 'currentColor' }} />
       {s.label}
@@ -92,18 +110,18 @@ function StatusPill({ status }: { status: AppointmentStatus }) {
   );
 }
 
-// ── Date / time helpers ───────────────────────────────────────────────────────
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 const MONTHS_LONG  = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const DAYS_TR      = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+function fmtTimeParts(timeStr: string): string {
+  return timeStr?.slice(0, 5) ?? '—';
 }
 
-function computeCountdown(startIso: string): { main: string; sub: string } {
-  let diff = (new Date(startIso).getTime() - Date.now()) / 1000;
+function computeCountdown(apt: AptRow): { main: string; sub: string } {
+  let diff = (aptDateTime(apt).getTime() - Date.now()) / 1000;
   if (diff < 0) return { main: '—', sub: 'geçti' };
   const days  = Math.floor(diff / 86400); diff -= days * 86400;
   const hours = Math.floor(diff / 3600);  diff -= hours * 3600;
@@ -125,16 +143,6 @@ function Stars({ value, size = 11 }: { value: number; size?: number }) {
       ))}
     </span>
   );
-}
-
-// ── Tab classification ────────────────────────────────────────────────────────
-
-type TabKey = 'upcoming' | 'past' | 'cancelled';
-
-function classify(apt: Appointment): TabKey {
-  if (apt.status === 'cancelled') return 'cancelled';
-  if (apt.status === 'completed' || apt.status === 'no_show') return 'past';
-  return new Date(apt.start_time).getTime() > Date.now() ? 'upcoming' : 'past';
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -169,45 +177,44 @@ const BRAND = '#00A3AD';
 
 export default function Randevularim() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AptRow[]>([]);
   const [loading, setLoading]           = useState(true);
   const [activeTab, setActiveTab]       = useState<TabKey>('upcoming');
-  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null);
-  const [rateTarget, setRateTarget]     = useState<Appointment | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<AptRow | null>(null);
+  const [rateTarget, setRateTarget]     = useState<AptRow | null>(null);
   const [localRatings, setLocalRatings] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.replace('/'); return; }
-    try {
-      const data = await api.myAppointments();
-      setAppointments(data);
-    } catch { setAppointments([]); }
+    const { data } = await supabase
+      .from('appointments')
+      .select('*, shops(name, city, district)')
+      .eq('user_id', user.id)
+      .order('appointment_date', { ascending: false });
+    setAppointments((data as AptRow[]) ?? []);
     setLoading(false);
   }, [router]);
 
   useEffect(() => { load(); }, [load]);
 
-  const upcoming  = appointments.filter(a => classify(a) === 'upcoming').sort((a, b) => +new Date(a.start_time) - +new Date(b.start_time));
-  const past      = appointments.filter(a => classify(a) === 'past').sort((a, b) => +new Date(b.start_time) - +new Date(a.start_time));
-  const cancelled = appointments.filter(a => classify(a) === 'cancelled').sort((a, b) => +new Date(b.start_time) - +new Date(a.start_time));
+  const upcoming  = appointments.filter(a => classifyApt(a) === 'upcoming').sort((a, b) => +aptDateTime(a) - +aptDateTime(b));
+  const past      = appointments.filter(a => classifyApt(a) === 'past').sort((a, b) => +aptDateTime(b) - +aptDateTime(a));
+  const cancelled = appointments.filter(a => classifyApt(a) === 'cancelled').sort((a, b) => +aptDateTime(b) - +aptDateTime(a));
 
   const nextApt = upcoming[0] ?? null;
 
-  const completed = past.filter(a => a.status === 'completed');
-  const totalSpent = completed.reduce((s, a) => s + (a.service?.price ?? 0), 0);
-  const bizCounts: Record<string, number> = {};
-  completed.forEach(a => { bizCounts[a.business_id] = (bizCounts[a.business_id] ?? 0) + 1; });
-  const favId   = Object.keys(bizCounts).sort((a, b) => bizCounts[b] - bizCounts[a])[0];
-  const favName = completed.find(a => a.business_id === favId)?.business?.name;
+  const completed   = past.filter(a => a.status === 'Tamamlandı');
+  const totalSpent  = completed.reduce((s, a) => s + (a.price ?? 0), 0);
+  const shopCounts: Record<string, number> = {};
+  completed.forEach(a => { shopCounts[a.shop_id] = (shopCounts[a.shop_id] ?? 0) + 1; });
+  const favId   = Object.keys(shopCounts).sort((a, b) => shopCounts[b] - shopCounts[a])[0];
+  const favName = completed.find(a => a.shop_id === favId)?.shops?.name;
 
   const handleCancel = async (id: string) => {
-    try {
-      await api.cancelAppointment(id);
-      setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'cancelled' as AppointmentStatus } : a));
-    } catch (e) {
-      alert('İptal başarısız: ' + (e instanceof Error ? e.message : 'Hata'));
-    }
+    const { error } = await supabase.from('appointments').update({ status: 'İptal Edildi' }).eq('id', id);
+    if (error) { alert('İptal başarısız: ' + error.message); return; }
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'İptal Edildi' } : a));
     setCancelTarget(null);
   };
 
@@ -217,9 +224,9 @@ export default function Randevularim() {
   };
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: 'upcoming',  label: 'Yaklaşan',     count: upcoming.length  },
-    { key: 'past',      label: 'Geçmiş',        count: past.length      },
-    { key: 'cancelled', label: 'İptal Edilen',  count: cancelled.length },
+    { key: 'upcoming',  label: 'Yaklaşan',    count: upcoming.length  },
+    { key: 'past',      label: 'Geçmiş',       count: past.length      },
+    { key: 'cancelled', label: 'İptal Edilen', count: cancelled.length },
   ];
 
   const listMap = { upcoming, past, cancelled };
@@ -243,11 +250,8 @@ export default function Randevularim() {
 
             {/* ── Left column ── */}
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22 }}>
-
-              {/* Hero */}
               <HeroCard apt={nextApt} onCancel={() => nextApt && setCancelTarget(nextApt)} />
 
-              {/* Tabs + list */}
               <div>
                 <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 14, gap: 2 }}>
                   {tabs.map(t => (
@@ -257,7 +261,7 @@ export default function Randevularim() {
                       fontSize: 13.5, fontWeight: activeTab === t.key ? 700 : 500,
                       color: activeTab === t.key ? '#0f172a' : '#64748b',
                       borderBottom: `2px solid ${activeTab === t.key ? BRAND : 'transparent'}`,
-                      display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 6,
                     }}>
                       {t.label}
                       {t.count > 0 && (
@@ -265,7 +269,6 @@ export default function Randevularim() {
                           fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
                           background: activeTab === t.key ? BRAND : '#e2e8f0',
                           color: activeTab === t.key ? '#fff' : '#64748b',
-                          transition: 'background 0.15s',
                         }}>{t.count}</span>
                       )}
                     </button>
@@ -273,30 +276,26 @@ export default function Randevularim() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {listMap[activeTab].length === 0
-                    ? (
-                      <div style={{
-                        textAlign: 'center', padding: '44px 24px', background: '#fff',
-                        borderRadius: 16, border: '1.5px dashed #e2e8f0',
-                        fontSize: 14, color: '#94a3b8', fontWeight: 600,
-                      }}>
-                        {activeTab === 'upcoming'  && 'Yaklaşan randevun yok'}
-                        {activeTab === 'past'      && 'Tamamlanmış randevun yok'}
-                        {activeTab === 'cancelled' && 'İptal edilmiş randevun yok'}
-                      </div>
-                    )
-                    : listMap[activeTab].map(apt => (
-                      <AptCard
-                        key={apt.id}
-                        apt={apt}
-                        kind={activeTab}
-                        localRating={localRatings[apt.id]}
-                        onCancel={() => setCancelTarget(apt)}
-                        onRate={() => setRateTarget(apt)}
-                        onRebook={() => { if (apt.business?.slug) router.push(`/b/${apt.business.slug}`); }}
-                      />
-                    ))
-                  }
+                  {listMap[activeTab].length === 0 ? (
+                    <div style={{
+                      textAlign: 'center', padding: '44px 24px', background: '#fff',
+                      borderRadius: 16, border: '1.5px dashed #e2e8f0',
+                      fontSize: 14, color: '#94a3b8', fontWeight: 600,
+                    }}>
+                      {activeTab === 'upcoming'  && 'Yaklaşan randevun yok'}
+                      {activeTab === 'past'      && 'Tamamlanmış randevun yok'}
+                      {activeTab === 'cancelled' && 'İptal edilmiş randevun yok'}
+                    </div>
+                  ) : listMap[activeTab].map(apt => (
+                    <AptCard
+                      key={apt.id}
+                      apt={apt}
+                      kind={activeTab}
+                      localRating={localRatings[apt.id]}
+                      onCancel={() => setCancelTarget(apt)}
+                      onRate={() => setRateTarget(apt)}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -309,14 +308,13 @@ export default function Randevularim() {
                 totalSpent={totalSpent}
                 favId={favId}
                 favName={favName}
-                favVisits={bizCounts[favId]}
+                favVisits={shopCounts[favId]}
               />
             </div>
           </div>
         )}
       </div>
 
-      {/* Modals */}
       {cancelTarget && (
         <CancelModal apt={cancelTarget} onClose={() => setCancelTarget(null)} onConfirm={handleCancel} />
       )}
@@ -329,13 +327,10 @@ export default function Randevularim() {
 
 // ── Hero card ─────────────────────────────────────────────────────────────────
 
-function HeroCard({ apt, onCancel }: { apt: Appointment | null; onCancel: () => void }) {
+function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void }) {
   if (!apt) {
     return (
-      <div style={{
-        background: '#fff', border: '1.5px dashed #e2e8f0', borderRadius: 20,
-        padding: '36px 28px', textAlign: 'center',
-      }}>
+      <div style={{ background: '#fff', border: '1.5px dashed #e2e8f0', borderRadius: 20, padding: '36px 28px', textAlign: 'center' }}>
         <div style={{ fontSize: 12, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 }}>Sıradaki randevun</div>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>Planlanmış randevun yok</div>
         <div style={{ fontSize: 13.5, color: '#64748b', marginBottom: 22 }}>Yakındaki popüler salonlardan birini keşfet.</div>
@@ -348,10 +343,9 @@ function HeroCard({ apt, onCancel }: { apt: Appointment | null; onCancel: () => 
     );
   }
 
-  const h  = bizHue(apt.business_id);
-  const cd = computeCountdown(apt.start_time);
-  const s  = new Date(apt.start_time);
-  const e  = new Date(apt.end_time);
+  const h  = bizHue(apt.shop_id);
+  const cd = computeCountdown(apt);
+  const d  = aptDateTime(apt);
 
   return (
     <div style={{
@@ -373,29 +367,25 @@ function HeroCard({ apt, onCancel }: { apt: Appointment | null; onCancel: () => 
         </div>
 
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          <BusinessThumb businessId={apt.business_id} size={96} radius={18} />
+          <BusinessThumb shopId={apt.shop_id} size={96} radius={18} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            {apt.business?.category && (
-              <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>
-                {apt.business.category}
-              </div>
-            )}
             <h2 style={{ margin: '0 0 3px', fontSize: 22, fontWeight: 700, color: '#0f172a', letterSpacing: -0.4, lineHeight: 1.2 }}>
-              {apt.business?.name ?? 'İşletme'}
+              {apt.shops?.name ?? 'İşletme'}
             </h2>
-            {apt.business?.city && (
-              <div style={{ fontSize: 13, color: '#64748b' }}>{apt.business.city}</div>
+            {(apt.shops?.district || apt.shops?.city) && (
+              <div style={{ fontSize: 13, color: '#64748b' }}>
+                {[apt.shops?.district, apt.shops?.city].filter(Boolean).join(', ')}
+              </div>
             )}
 
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e8edf2', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <InfoCol label="Hizmet"  value={apt.service?.name ?? '—'}                                              sub={apt.service?.duration_minutes != null ? `${apt.service.duration_minutes} dk` : '—'} />
-              <InfoCol label="Tarih"   value={`${s.getDate()} ${MONTHS_LONG[s.getMonth()]} ${DAYS_TR[s.getDay()]}`} sub={`${fmtTime(apt.start_time)} – ${fmtTime(apt.end_time)}`} />
-              <InfoCol label="Ücret"   value={apt.service?.price != null ? `${apt.service.price}₺` : '—'}           sub="Yerinde ödeme" mono />
+              <InfoCol label="Hizmet" value={apt.service_name} sub={apt.staff_name ?? '—'} />
+              <InfoCol label="Tarih"  value={`${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${DAYS_TR[d.getDay()]}`} sub={fmtTimeParts(apt.appointment_time)} />
+              <InfoCol label="Ücret"  value={`${apt.price}₺`} sub="Yerinde ödeme" mono />
             </div>
           </div>
 
-          {/* Countdown */}
           <div style={{
             flexShrink: 0, width: 108, textAlign: 'center',
             background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 8px',
@@ -409,7 +399,6 @@ function HeroCard({ apt, onCancel }: { apt: Appointment | null; onCancel: () => 
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-          <OutlineBtn><IcoMap /> Yol tarifi</OutlineBtn>
           <OutlineBtn><IcoCal /> Takvime ekle</OutlineBtn>
           <OutlineBtn><IcoMsg /> Mesaj gönder</OutlineBtn>
           <div style={{ flex: 1 }} />
@@ -450,9 +439,7 @@ function OutlineBtn({ children, onClick }: { children: ReactNode; onClick?: () =
 
 // ── Stats card ─────────────────────────────────────────────────────────────────
 
-function StatsCard({
-  completedCount, upcomingCount, totalSpent, favId, favName, favVisits
-}: {
+function StatsCard({ completedCount, upcomingCount, totalSpent, favId, favName, favVisits }: {
   completedCount: number; upcomingCount: number; totalSpent: number;
   favId?: string; favName?: string; favVisits?: number;
 }) {
@@ -464,15 +451,15 @@ function StatsCard({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <StatTile label="Tamamlanan"   value={completedCount}                                         sub="randevu" />
-        <StatTile label="Yaklaşan"     value={upcomingCount}                                          sub="randevu" />
-        <StatTile label="Harcama"      value={totalSpent > 0 ? `${(totalSpent / 1000).toFixed(1)}K` : '—'} sub="TL" mono />
-        <StatTile label="Puan ort."    value="—"                                                      sub="henüz yok" />
+        <StatTile label="Tamamlanan" value={completedCount}                                                   sub="randevu" />
+        <StatTile label="Yaklaşan"   value={upcomingCount}                                                    sub="randevu" />
+        <StatTile label="Harcama"    value={totalSpent > 0 ? `${(totalSpent / 1000).toFixed(1)}K` : '—'}     sub="TL" mono />
+        <StatTile label="Puan ort."  value="—"                                                                sub="henüz yok" />
       </div>
 
       {favId && favName && (
         <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <BusinessThumb businessId={favId} size={42} radius={10} />
+          <BusinessThumb shopId={favId} size={42} radius={10} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Favorin</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{favName}</div>
@@ -496,11 +483,11 @@ function StatTile({ label, value, sub, mono }: { label: string; value: string | 
 
 // ── Appointment card ──────────────────────────────────────────────────────────
 
-function AptCard({ apt, kind, localRating, onCancel, onRate, onRebook }: {
-  apt: Appointment; kind: TabKey; localRating?: number;
-  onCancel: () => void; onRate: () => void; onRebook: () => void;
+function AptCard({ apt, kind, localRating, onCancel, onRate }: {
+  apt: AptRow; kind: TabKey; localRating?: number;
+  onCancel: () => void; onRate: () => void;
 }) {
-  const s   = new Date(apt.start_time);
+  const d     = aptDateTime(apt);
   const rated = !!localRating;
 
   return (
@@ -520,17 +507,17 @@ function AptCard({ apt, kind, localRating, onCancel, onRate, onRebook }: {
         display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1,
       }}>
         <div style={{ fontSize: 11, color: BRAND, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 }}>
-          {MONTHS_SHORT[s.getMonth()]}
+          {MONTHS_SHORT[d.getMonth()]}
         </div>
         <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1, letterSpacing: -1, fontFamily: 'monospace' }}>
-          {s.getDate()}
+          {d.getDate()}
         </div>
         <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {DAYS_TR[s.getDay()]}
+          {DAYS_TR[d.getDay()]}
         </div>
       </div>
 
-      <BusinessThumb businessId={apt.business_id} size={60} radius={12} />
+      <BusinessThumb shopId={apt.shop_id} size={60} radius={12} />
 
       {/* Main info */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -540,22 +527,18 @@ function AptCard({ apt, kind, localRating, onCancel, onRate, onRebook }: {
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             textDecoration: kind === 'cancelled' ? 'line-through' : 'none',
           }}>
-            {apt.business?.name ?? 'İşletme'}
+            {apt.shops?.name ?? 'İşletme'}
           </span>
           <StatusPill status={apt.status} />
         </div>
 
-        <div style={{ fontSize: 13, color: '#64748b' }}>
-          {apt.service?.name ?? '—'}
-        </div>
+        <div style={{ fontSize: 13, color: '#64748b' }}>{apt.service_name}</div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'monospace' }}>
-            {fmtTime(apt.start_time)} – {fmtTime(apt.end_time)}
-          </span>
-          {apt.business?.city && (
+          <span style={{ fontFamily: 'monospace' }}>{fmtTimeParts(apt.appointment_time)}</span>
+          {(apt.shops?.district || apt.shops?.city) && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <IcoMap s={11} /> {apt.business.city}
+              <IcoMap s={11} /> {apt.shops?.district || apt.shops?.city}
             </span>
           )}
           {kind === 'past' && rated && (
@@ -564,13 +547,16 @@ function AptCard({ apt, kind, localRating, onCancel, onRate, onRebook }: {
               <span style={{ fontSize: 11 }}>· değerlendirildi</span>
             </span>
           )}
+          {kind === 'cancelled' && apt.cancel_reason && (
+            <span style={{ color: '#94a3b8' }}>{apt.cancel_reason}</span>
+          )}
         </div>
       </div>
 
       {/* Price */}
       <div style={{ flexShrink: 0, textAlign: 'right' }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', letterSpacing: -0.3 }}>
-          {apt.service?.price != null ? `${apt.service.price}₺` : '—'}
+          {apt.price != null ? `${apt.price}₺` : '—'}
         </div>
       </div>
 
@@ -579,14 +565,11 @@ function AptCard({ apt, kind, localRating, onCancel, onRate, onRebook }: {
         {kind === 'upcoming' && (
           <ActionBtn danger onClick={onCancel}>İptal</ActionBtn>
         )}
-        {kind === 'past' && (
-          <>
-            {!rated && <ActionBtn primary onClick={onRate}>Değerlendir</ActionBtn>}
-            <ActionBtn onClick={onRebook}>Tekrar al</ActionBtn>
-          </>
+        {kind === 'past' && !rated && (
+          <ActionBtn primary onClick={onRate}>Değerlendir</ActionBtn>
         )}
         {kind === 'cancelled' && (
-          <ActionBtn primary onClick={onRebook}>Tekrar randevu</ActionBtn>
+          <ActionBtn primary onClick={() => {}}>Tekrar randevu</ActionBtn>
         )}
       </div>
     </div>
@@ -642,16 +625,16 @@ function ModalHeader({ title, subtitle, onClose }: { title: string; subtitle?: s
   );
 }
 
-function CancelModal({ apt, onClose, onConfirm }: { apt: Appointment; onClose: () => void; onConfirm: (id: string) => void }) {
+function CancelModal({ apt, onClose, onConfirm }: { apt: AptRow; onClose: () => void; onConfirm: (id: string) => void }) {
   const [reason, setReason] = useState('');
-  const start = new Date(apt.start_time);
+  const d = aptDateTime(apt);
   return (
     <ModalOverlay onClose={onClose}>
       <ModalHeader title="Randevuyu iptal et" subtitle="İptal edildiğinde işletme bilgilendirilir." onClose={onClose} />
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 14, marginBottom: 18 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{apt.business?.name ?? 'İşletme'}</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{apt.shops?.name ?? 'İşletme'}</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-          {apt.service?.name ?? '—'} · {start.getDate()} {MONTHS_LONG[start.getMonth()]} · {fmtTime(apt.start_time)}
+          {apt.service_name} · {d.getDate()} {MONTHS_LONG[d.getMonth()]} · {fmtTimeParts(apt.appointment_time)}
         </div>
       </div>
       <label style={{ fontSize: 12, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600 }}>İptal sebebi (opsiyonel)</label>
@@ -677,7 +660,7 @@ function CancelModal({ apt, onClose, onConfirm }: { apt: Appointment; onClose: (
 }
 
 function RateModal({ apt, onClose, onSubmit }: {
-  apt: Appointment; onClose: () => void; onSubmit: (id: string, rating: number, review: string) => void;
+  apt: AptRow; onClose: () => void; onSubmit: (id: string, rating: number, review: string) => void;
 }) {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
@@ -687,10 +670,10 @@ function RateModal({ apt, onClose, onSubmit }: {
       <ModalHeader title="Deneyimini puanla" subtitle="Geri bildirimin başka müşterilere yardımcı olur." onClose={onClose} />
 
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <BusinessThumb businessId={apt.business_id} size={44} radius={10} />
+        <BusinessThumb shopId={apt.shop_id} size={44} radius={10} />
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{apt.business?.name ?? 'İşletme'}</div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>{apt.service?.name ?? '—'}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{apt.shops?.name ?? 'İşletme'}</div>
+          <div style={{ fontSize: 12, color: '#64748b' }}>{apt.service_name}</div>
         </div>
       </div>
 
