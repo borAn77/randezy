@@ -6,6 +6,12 @@ import Navbar from "../components/layout/Navbar";
 import { supabase } from "../lib/supabase";
 import AuthModal from "../components/layout/AuthModal";
 
+const HERO_VIDEOS = [
+  '/videos/4177973-hd_1920_1080_30fps.mp4',
+  '/videos/8225735-hd_1920_1080_25fps.mp4',
+  '/videos/9335886-hd_1920_1080_25fps.mp4',
+];
+
 const CATEGORY_MAP: Record<string, string> = {
   "Kuaför": "KUAFÖR",
   "Berber": "BERBER",
@@ -31,12 +37,6 @@ export default function Home() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
   const shopsRef = useRef<HTMLDivElement>(null);
-
-  const heroVideos = [
-    '/videos/4177973-hd_1920_1080_30fps.mp4',
-    '/videos/8225735-hd_1920_1080_25fps.mp4',
-    '/videos/9335886-hd_1920_1080_25fps.mp4',
-  ];
 
   // Read URL params on mount
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function Home() {
 
   useEffect(() => {
     if (userId) return;
-    const t = setInterval(() => setVideoIdx(i => (i + 1) % heroVideos.length), 7000);
+    const t = setInterval(() => setVideoIdx(i => (i + 1) % HERO_VIDEOS.length), 7000);
     return () => clearInterval(t);
   }, [userId]);
 
@@ -171,12 +171,14 @@ export default function Home() {
               className="w-full h-full object-cover opacity-50 object-top"
               alt="Hero Background"
             />
-          ) : (
-            heroVideos.map((src, i) => (
+          ) : (() => {
+            const nextIdx = (videoIdx + 1) % HERO_VIDEOS.length;
+            return HERO_VIDEOS.map((src, i) => (
               <video
                 key={i}
                 src={src}
-                autoPlay
+                autoPlay={i === videoIdx}
+                preload={i === videoIdx || i === nextIdx ? "auto" : "none"}
                 muted
                 loop
                 playsInline
@@ -186,8 +188,8 @@ export default function Home() {
                   transition: 'opacity 1.5s ease-in-out',
                 }}
               />
-            ))
-          )}
+            ));
+          })()}
         </div>
 
         <Navbar />
