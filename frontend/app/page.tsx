@@ -184,7 +184,6 @@ export default function Home() {
                 style={{
                   opacity: i === videoIdx ? 0.65 : 0,
                   transition: 'opacity 1.5s ease-in-out',
-                  zIndex: i === videoIdx ? 1 : 0,
                 }}
               />
             ))
@@ -302,7 +301,7 @@ export default function Home() {
         </div>
 
         {/* Bottom bar */}
-        <div className="absolute bottom-0 left-0 w-full bg-white px-5 md:px-20 py-4 md:py-8 flex justify-between items-center border-t border-gray-100">
+        <div className="absolute bottom-0 left-0 w-full bg-white px-5 md:px-20 py-4 md:py-8 flex justify-between items-center border-t border-gray-100 z-20">
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg md:text-2xl font-black text-[#222] tracking-tighter leading-none">Öne Çıkanlar</h3>
