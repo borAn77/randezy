@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,15 @@ from app.models import Appointment, AppointmentStatus, Business, Service, Staff,
 from app.schemas import AppointmentCreate, AppointmentDetail, AppointmentOut
 
 router = APIRouter(tags=["appointments"])
+
+
+class ConfirmEmailPayload(BaseModel):
+    customer_email: str
+    customer_name: str | None = None
+    business_name: str
+    service_name: str
+    start_time: datetime
+    staff_name: str | None = None
 
 
 @router.post("/appointments", response_model=AppointmentOut, status_code=201)
@@ -114,46 +124,22 @@ def get_my_appointments(
     return appointments
 
 
-@router.patch("/appointments/{appointment_id}/confirm", response_model=AppointmentOut)
-def confirm_appointment(
-    appointment_id: uuid.UUID,
+@router.post("/appointments/send-confirmed-email")
+def send_confirmed_email(
+    payload: ConfirmEmailPayload,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    appointment = db.get(Appointment, appointment_id)
-    if not appointment:
-        raise HTTPException(404, "Randevu bulunamadı")
-    if appointment.status == AppointmentStatus.cancelled:
-        raise HTTPException(400, "İptal edilmiş randevu onaylanamaz")
-
-    business = db.get(Business, appointment.business_id)
-    service = db.get(Service, appointment.service_id)
-    customer = db.execute(
-        select(User).where(User.supabase_id == appointment.customer_id)
-    ).scalar_one_or_none()
-
-    appointment.status = AppointmentStatus.confirmed
-    db.commit()
-    db.refresh(appointment)
-
-    if customer and customer.email:
-        staff_name: str | None = None
-        if appointment.staff_id:
-            staff = db.get(Staff, appointment.staff_id)
-            if staff:
-                staff_name = staff.name
-        background_tasks.add_task(
-            email_service.send_appointment_confirmed,
-            customer_email=customer.email,
-            customer_name=customer.full_name,
-            business_name=business.name if business else "",
-            service_name=service.name if service else "",
-            start_time=appointment.start_time,
-            staff_name=staff_name,
-        )
-
-    return appointment
+    background_tasks.add_task(
+        email_service.send_appointment_confirmed,
+        customer_email=payload.customer_email,
+        customer_name=payload.customer_name,
+        business_name=payload.business_name,
+        service_name=payload.service_name,
+        start_time=payload.start_time,
+        staff_name=payload.staff_name,
+    )
+    return {"status": "ok"}
 
 
 @router.patch("/appointments/{appointment_id}/cancel", response_model=AppointmentOut)
