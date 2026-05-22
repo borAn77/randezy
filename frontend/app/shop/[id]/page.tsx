@@ -497,7 +497,7 @@ export default function ShopDetail() {
                   <div>
                     <h1 className="text-xl sm:text-2xl md:text-4xl font-black tracking-tighter uppercase mb-1 md:mb-2 text-black">{shop.name}</h1>
                     <p className="text-gray-500 font-bold text-[10px] md:text-xs uppercase tracking-[0.15em] md:tracking-[0.2em]">
-                      {shop.district}, {shop.city}
+                      {[shop.neighborhood, shop.district, shop.city].filter(Boolean).join(', ') || [shop.district, shop.city].filter(Boolean).join(', ')}
                       {avgRating && <span className="ml-2">— ⭐ {avgRating} ({reviews.length} yorum)</span>}
                       {!avgRating && shop.score && <span className="ml-2">— ⭐ {shop.score}</span>}
                     </p>
@@ -735,169 +735,204 @@ export default function ShopDetail() {
           {/* Sidebar — desktop only */}
           <div className="hidden lg:block text-black">
             <div className="sticky top-6">
-
-              {/* Map card — prominent anchor */}
               {(() => {
-                const mapQuery = [shop.address, shop.district, shop.city].filter(Boolean).join(', ');
-                const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(mapQuery)}`;
+                // Full address from all fields
+                const streetPart = shop.street
+                  ? `${shop.street}${shop.building_no ? ' No:' + shop.building_no : ''}`
+                  : null;
+                const addressLine1 = [streetPart, shop.neighborhood].filter(Boolean).join(', ');
+                const addressLine2 = [shop.district, shop.city, shop.postal_code].filter(Boolean).join(' / ');
+                const mapQuery = [streetPart, shop.neighborhood, shop.district, shop.city].filter(Boolean).join(', ')
+                  || [shop.district, shop.city].filter(Boolean).join(', ');
+                const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
+
+                // Real open/closed status right now
+                const todayIdx = new Date().getDay();
+                const todayHours = shopHours.find((h: any) => h.day_of_week === todayIdx);
+                const isOpenNow = (() => {
+                  if (!todayHours || todayHours.is_closed) return false;
+                  const now = new Date();
+                  const [oH, oM] = todayHours.open_time.split(':').map(Number);
+                  const [cH, cM] = todayHours.close_time.split(':').map(Number);
+                  const nowMin = now.getHours() * 60 + now.getMinutes();
+                  return nowMin >= oH * 60 + oM && nowMin < cH * 60 + cM;
+                })();
+
                 return (
-                  <div className="rounded-[2rem] overflow-hidden border border-gray-100 shadow-lg">
-                    <div className="h-[190px] w-full bg-gray-100 relative">
-                      <iframe
-                        title="Konum"
-                        className="w-full h-full border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&z=15`}
-                      />
-                    </div>
-                    <div className="px-5 py-4 bg-white">
-                      <p className="font-black text-sm text-[#222] uppercase tracking-tight leading-tight">{shop.name}</p>
-                      <p className="text-[11px] text-gray-400 font-bold mt-1 leading-snug">
-                        {[shop.address, shop.district, shop.city].filter(Boolean).join(', ')}
-                      </p>
-                      <a
-                        href={mapsLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline"
-                      >
-                        <MapPin size={9} /> Yol Tarifi Al
-                      </a>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Unified info panel */}
-              <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mt-3">
-
-                {/* About */}
-                {shop.description && (
-                  <div className="px-5 py-5">
-                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-2.5">Hakkımızda</p>
-                    <p className="text-[12.5px] text-gray-600 font-medium leading-relaxed">{shop.description}</p>
-                  </div>
-                )}
-
-                {/* Working hours */}
-                {shopHours.length > 0 && (() => {
-                  const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
-                  const todayIdx = new Date().getDay();
-                  const todayHours = shopHours.find((h: any) => h.day_of_week === todayIdx);
-                  const sorted = [...shopHours].sort((a: any, b: any) => a.day_of_week - b.day_of_week);
-                  return (
-                    <div className="px-5 py-5 border-t border-gray-50">
-                      <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışma Saatleri</p>
-                      <div className="flex items-center justify-between py-2.5 px-3 bg-gray-50 rounded-xl mb-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${todayHours?.is_closed ? 'bg-red-400' : 'bg-green-400'}`} />
-                          <span className="text-[11px] font-black uppercase text-[#222]">Bugün</span>
-                        </div>
-                        {todayHours?.is_closed
-                          ? <span className="text-[11px] font-black text-red-400">Kapalı</span>
-                          : <span className="text-[11px] font-black text-[#00A3AD]">
-                              {todayHours?.open_time?.slice(0,5)} – {todayHours?.close_time?.slice(0,5)}
-                            </span>
-                        }
+                  <>
+                    {/* Map card — prominent anchor */}
+                    <div className="rounded-[2rem] overflow-hidden border border-gray-100 shadow-lg">
+                      <div className="h-[190px] w-full bg-gray-100 relative">
+                        <iframe
+                          title="Konum"
+                          className="w-full h-full border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&z=16`}
+                        />
                       </div>
-                      {showAllHours && (
-                        <div className="space-y-2 mb-2.5">
-                          {sorted.map((h: any) => (
-                            <div key={h.day_of_week} className="flex justify-between items-center py-0.5">
-                              <span className={`text-[11px] uppercase ${h.day_of_week === todayIdx ? 'text-[#222] font-black' : 'text-gray-400 font-bold'}`}>
-                                {dayNames[h.day_of_week]}
-                              </span>
-                              {h.is_closed
-                                ? <span className="text-[11px] font-bold text-red-300">Kapalı</span>
-                                : <span className="text-[11px] font-bold text-gray-500">{h.open_time?.slice(0,5)} – {h.close_time?.slice(0,5)}</span>
-                              }
-                            </div>
-                          ))}
+                      <div className="px-5 py-4 bg-white">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="font-black text-sm text-[#222] uppercase tracking-tight leading-tight">{shop.name}</p>
+                          <span className={`flex-shrink-0 flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${isOpenNow ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isOpenNow ? 'bg-green-500' : 'bg-gray-400'}`} />
+                            {isOpenNow ? 'Açık' : 'Kapalı'}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5 mb-3">
+                          {addressLine1 && (
+                            <p className="text-[11px] text-gray-600 font-bold leading-snug">{addressLine1}</p>
+                          )}
+                          {addressLine2 && (
+                            <p className="text-[11px] text-gray-400 font-bold leading-snug">{addressLine2}</p>
+                          )}
+                          {!addressLine1 && !addressLine2 && (
+                            <p className="text-[11px] text-gray-400 font-bold leading-snug">
+                              {[shop.district, shop.city].filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <a
+                          href={directionsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline"
+                        >
+                          <MapPin size={9} /> Yol Tarifi Al
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Unified info panel */}
+                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mt-3">
+
+                      {/* About */}
+                      {shop.description && (
+                        <div className="px-5 py-5">
+                          <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-2.5">Hakkımızda</p>
+                          <p className="text-[12.5px] text-gray-600 font-medium leading-relaxed">{shop.description}</p>
                         </div>
                       )}
-                      <button
-                        onClick={() => setShowAllHours(p => !p)}
-                        className="flex items-center gap-1 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline mt-1"
-                      >
-                        <ChevronDown size={10} className={`transition-transform ${showAllHours ? 'rotate-180' : ''}`} />
-                        {showAllHours ? 'Daha Az' : 'Tüm Hafta'}
-                      </button>
-                    </div>
-                  );
-                })()}
 
-                {/* Staff */}
-                {staff.length > 0 && (
-                  <div className="px-5 py-5 border-t border-gray-50">
-                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışanlar</p>
-                    <div className="flex flex-wrap gap-2.5">
-                      {staff.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedStaff(selectedStaff?.id === s.id ? null : s)}
-                          className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all ${selectedStaff?.id === s.id ? 'ring-2 ring-[#00A3AD] bg-[#E6F6F7]' : 'hover:bg-gray-50'}`}
-                        >
-                          <div className="w-11 h-11 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow-sm">
-                            {s.avatar_url
-                              ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} />
-                              : <span className="text-[#00A3AD] font-black text-sm">{s.first_name?.charAt(0)}{s.last_name?.charAt(0)}</span>
-                            }
+                      {/* Working hours */}
+                      {shopHours.length > 0 && (() => {
+                        const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+                        const sorted = [...shopHours].sort((a: any, b: any) => a.day_of_week - b.day_of_week);
+                        return (
+                          <div className="px-5 py-5 border-t border-gray-50">
+                            <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışma Saatleri</p>
+                            <div className="flex items-center justify-between py-2.5 px-3 bg-gray-50 rounded-xl mb-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full ${todayHours?.is_closed ? 'bg-red-400' : 'bg-green-400'}`} />
+                                <span className="text-[11px] font-black uppercase text-[#222]">Bugün</span>
+                              </div>
+                              {todayHours?.is_closed
+                                ? <span className="text-[11px] font-black text-red-400">Kapalı</span>
+                                : <span className="text-[11px] font-black text-[#00A3AD]">
+                                    {todayHours?.open_time?.slice(0,5)} – {todayHours?.close_time?.slice(0,5)}
+                                  </span>
+                              }
+                            </div>
+                            {showAllHours && (
+                              <div className="space-y-2 mb-2.5">
+                                {sorted.map((h: any) => (
+                                  <div key={h.day_of_week} className="flex justify-between items-center py-0.5">
+                                    <span className={`text-[11px] uppercase ${h.day_of_week === todayIdx ? 'text-[#222] font-black' : 'text-gray-400 font-bold'}`}>
+                                      {dayNames[h.day_of_week]}
+                                    </span>
+                                    {h.is_closed
+                                      ? <span className="text-[11px] font-bold text-red-300">Kapalı</span>
+                                      : <span className="text-[11px] font-bold text-gray-500">{h.open_time?.slice(0,5)} – {h.close_time?.slice(0,5)}</span>
+                                    }
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <button
+                              onClick={() => setShowAllHours(p => !p)}
+                              className="flex items-center gap-1 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline mt-1"
+                            >
+                              <ChevronDown size={10} className={`transition-transform ${showAllHours ? 'rotate-180' : ''}`} />
+                              {showAllHours ? 'Daha Az' : 'Tüm Hafta'}
+                            </button>
                           </div>
-                          <span className="text-[9px] font-black uppercase text-gray-500 tracking-wide max-w-[52px] truncate text-center">{s.first_name}</span>
-                          {s.role && <span className="text-[8px] font-bold text-gray-300 uppercase tracking-wide max-w-[52px] truncate text-center">{s.role}</span>}
-                        </button>
-                      ))}
+                        );
+                      })()}
+
+                      {/* Staff */}
+                      {staff.length > 0 && (
+                        <div className="px-5 py-5 border-t border-gray-50">
+                          <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışanlar</p>
+                          <div className="flex flex-wrap gap-2.5">
+                            {staff.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => setSelectedStaff(selectedStaff?.id === s.id ? null : s)}
+                                className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all ${selectedStaff?.id === s.id ? 'ring-2 ring-[#00A3AD] bg-[#E6F6F7]' : 'hover:bg-gray-50'}`}
+                              >
+                                <div className="w-11 h-11 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow-sm">
+                                  {s.avatar_url
+                                    ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} />
+                                    : <span className="text-[#00A3AD] font-black text-sm">{s.first_name?.charAt(0)}{s.last_name?.charAt(0)}</span>
+                                  }
+                                </div>
+                                <span className="text-[9px] font-black uppercase text-gray-500 tracking-wide max-w-[52px] truncate text-center">{s.first_name}</span>
+                                {s.role && <span className="text-[8px] font-bold text-gray-300 uppercase tracking-wide max-w-[52px] truncate text-center">{s.role}</span>}
+                              </button>
+                            ))}
+                          </div>
+                          {selectedStaff && (
+                            <p className="mt-2.5 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest">
+                              {selectedStaff.first_name} seçildi — randevuda uygulanır
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Contact & trust signals */}
+                      {(shop.shop_phone || shop.email || shop.instagram) && (
+                        <div className="px-5 py-5 border-t border-gray-50 space-y-2.5">
+                          <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em]">İletişim</p>
+                          {shop.shop_phone && (
+                            <a href={`tel:${shop.shop_phone}`} className="flex items-center gap-3 group">
+                              <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
+                                <Phone size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                              </div>
+                              <span className="text-[12.5px] font-black text-[#222] group-hover:text-[#00A3AD] transition-colors">{shop.shop_phone}</span>
+                            </a>
+                          )}
+                          {shop.email && (
+                            <a href={`mailto:${shop.email}`} className="flex items-center gap-3 group">
+                              <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
+                                <Mail size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                              </div>
+                              <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-[#00A3AD] transition-colors">{shop.email}</span>
+                            </a>
+                          )}
+                          {shop.instagram && (
+                            <a href={`https://instagram.com/${shop.instagram.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+                              <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-pink-500 transition-all flex-shrink-0">
+                                <AtSign size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                              </div>
+                              <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-pink-500 transition-colors">{shop.instagram}</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Cancellation policy */}
+                      <button
+                        onClick={() => setShowCancellationModal(true)}
+                        className="w-full flex items-center justify-between px-5 py-4 border-t border-gray-50 hover:bg-gray-50 transition-colors group"
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-[#00A3AD] transition-colors">İptal Politikası</span>
+                        <ChevronRight size={13} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
+                      </button>
+
                     </div>
-                    {selectedStaff && (
-                      <p className="mt-2.5 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest">
-                        {selectedStaff.first_name} seçildi — randevuda uygulanır
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Contact */}
-                {(shop.shop_phone || shop.email || shop.instagram) && (
-                  <div className="px-5 py-5 border-t border-gray-50 space-y-2.5">
-                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-1">İletişim</p>
-                    {shop.shop_phone && (
-                      <a href={`tel:${shop.shop_phone}`} className="flex items-center gap-3 group">
-                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
-                          <Phone size={12} className="text-gray-400 group-hover:text-white transition-colors" />
-                        </div>
-                        <span className="text-[12.5px] font-black text-[#222] group-hover:text-[#00A3AD] transition-colors">{shop.shop_phone}</span>
-                      </a>
-                    )}
-                    {shop.email && (
-                      <a href={`mailto:${shop.email}`} className="flex items-center gap-3 group">
-                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
-                          <Mail size={12} className="text-gray-400 group-hover:text-white transition-colors" />
-                        </div>
-                        <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-[#00A3AD] transition-colors">{shop.email}</span>
-                      </a>
-                    )}
-                    {shop.instagram && (
-                      <a href={`https://instagram.com/${shop.instagram.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
-                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-pink-500 transition-all flex-shrink-0">
-                          <AtSign size={12} className="text-gray-400 group-hover:text-white transition-colors" />
-                        </div>
-                        <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-pink-500 transition-colors">{shop.instagram}</span>
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {/* Cancellation policy */}
-                <button
-                  onClick={() => setShowCancellationModal(true)}
-                  className="w-full flex items-center justify-between px-5 py-4 border-t border-gray-50 hover:bg-gray-50 transition-colors group"
-                >
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-[#00A3AD] transition-colors">İptal Politikası</span>
-                  <ChevronRight size={13} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
-                </button>
-
-              </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
