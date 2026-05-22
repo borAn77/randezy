@@ -43,10 +43,20 @@ export default function HesabimPage() {
 
         const { data: favData } = await supabase
           .from('favorites')
-          .select('shop_id, shops(id, name, city, district, image_url, score, category)')
+          .select('shop_id')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
-        setFavorites((favData || []).map((f: any) => f.shops).filter(Boolean));
+        const shopIds = (favData || []).map((f: any) => f.shop_id).filter(Boolean);
+        if (shopIds.length > 0) {
+          const { data: shopData } = await supabase
+            .from('shops')
+            .select('id, name, city, district, image_url, score, category')
+            .in('id', shopIds);
+          const shopMap = Object.fromEntries((shopData || []).map((s: any) => [s.id, s]));
+          setFavorites(shopIds.map((id: any) => shopMap[id]).filter(Boolean));
+        } else {
+          setFavorites([]);
+        }
 
         if (prof?.role === 'business_owner') {
           const { data: shopRes } = await supabase
