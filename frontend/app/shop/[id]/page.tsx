@@ -81,6 +81,13 @@ export default function ShopDetail() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!isBooking) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsBooking(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isBooking]);
+
   const toggleFavorite = useCallback(async () => {
     if (!currentUserId) { setIsAuthOpen(true); return; }
     if (isFavorited) {
@@ -645,15 +652,15 @@ export default function ShopDetail() {
 
           {/* Sidebar — desktop only */}
           <div className="hidden lg:block text-black">
-            <div className="sticky top-12 space-y-4">
+            <div className="sticky top-6">
 
-              {/* Map card */}
+              {/* Map card — prominent anchor */}
               {(() => {
                 const mapQuery = [shop.address, shop.district, shop.city].filter(Boolean).join(', ');
                 const mapsLink = `https://www.google.com/maps/search/${encodeURIComponent(mapQuery)}`;
                 return (
-                  <div className="rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm">
-                    <div className="h-[170px] w-full bg-gray-100 relative">
+                  <div className="rounded-[2rem] overflow-hidden border border-gray-100 shadow-lg">
+                    <div className="h-[190px] w-full bg-gray-100 relative">
                       <iframe
                         title="Konum"
                         className="w-full h-full border-0"
@@ -662,16 +669,16 @@ export default function ShopDetail() {
                         src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&z=15`}
                       />
                     </div>
-                    <div className="p-4 bg-white">
+                    <div className="px-5 py-4 bg-white">
                       <p className="font-black text-sm text-[#222] uppercase tracking-tight leading-tight">{shop.name}</p>
-                      <p className="text-[11px] text-gray-400 font-bold mt-1">
+                      <p className="text-[11px] text-gray-400 font-bold mt-1 leading-snug">
                         {[shop.address, shop.district, shop.city].filter(Boolean).join(', ')}
                       </p>
                       <a
                         href={mapsLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-2 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline"
+                        className="inline-flex items-center gap-1.5 mt-3 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline"
                       >
                         <MapPin size={9} /> Yol Tarifi Al
                       </a>
@@ -680,131 +687,135 @@ export default function ShopDetail() {
                 );
               })()}
 
-              {/* About */}
-              {shop.description && (
-                <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm p-5">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.18em] mb-3">Hakkımızda</p>
-                  <p className="text-[13px] text-gray-600 font-medium leading-relaxed">{shop.description}</p>
-                </div>
-              )}
+              {/* Unified info panel */}
+              <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mt-3">
 
-              {/* Working hours */}
-              {shopHours.length > 0 && (() => {
-                const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
-                const todayIdx = new Date().getDay();
-                const todayHours = shopHours.find((h: any) => h.day_of_week === todayIdx);
-                const sorted = [...shopHours].sort((a: any, b: any) => a.day_of_week - b.day_of_week);
-                return (
-                  <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm p-5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.18em] mb-4">Çalışma Saatleri</p>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${todayHours?.is_closed ? 'bg-red-400' : 'bg-green-400'}`} />
-                        <span className="text-xs font-black uppercase text-[#222]">Bugün</span>
-                      </div>
-                      {todayHours?.is_closed
-                        ? <span className="text-xs font-black text-red-400">Kapalı</span>
-                        : <span className="text-xs font-black text-[#00A3AD]">
-                            {todayHours?.open_time?.slice(0,5)} – {todayHours?.close_time?.slice(0,5)}
-                          </span>
-                      }
-                    </div>
-                    {showAllHours && (
-                      <div className="space-y-2.5 mb-3">
-                        {sorted.map((h: any) => (
-                          <div key={h.day_of_week} className="flex justify-between items-center">
-                            <span className={`text-xs font-bold uppercase ${h.day_of_week === todayIdx ? 'text-[#222] font-black' : 'text-gray-400'}`}>
-                              {dayNames[h.day_of_week]}
+                {/* About */}
+                {shop.description && (
+                  <div className="px-5 py-5">
+                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-2.5">Hakkımızda</p>
+                    <p className="text-[12.5px] text-gray-600 font-medium leading-relaxed">{shop.description}</p>
+                  </div>
+                )}
+
+                {/* Working hours */}
+                {shopHours.length > 0 && (() => {
+                  const dayNames = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+                  const todayIdx = new Date().getDay();
+                  const todayHours = shopHours.find((h: any) => h.day_of_week === todayIdx);
+                  const sorted = [...shopHours].sort((a: any, b: any) => a.day_of_week - b.day_of_week);
+                  return (
+                    <div className="px-5 py-5 border-t border-gray-50">
+                      <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışma Saatleri</p>
+                      <div className="flex items-center justify-between py-2.5 px-3 bg-gray-50 rounded-xl mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full ${todayHours?.is_closed ? 'bg-red-400' : 'bg-green-400'}`} />
+                          <span className="text-[11px] font-black uppercase text-[#222]">Bugün</span>
+                        </div>
+                        {todayHours?.is_closed
+                          ? <span className="text-[11px] font-black text-red-400">Kapalı</span>
+                          : <span className="text-[11px] font-black text-[#00A3AD]">
+                              {todayHours?.open_time?.slice(0,5)} – {todayHours?.close_time?.slice(0,5)}
                             </span>
-                            {h.is_closed
-                              ? <span className="text-xs font-bold text-red-300">Kapalı</span>
-                              : <span className="text-xs font-bold text-gray-500">{h.open_time?.slice(0,5)} – {h.close_time?.slice(0,5)}</span>
+                        }
+                      </div>
+                      {showAllHours && (
+                        <div className="space-y-2 mb-2.5">
+                          {sorted.map((h: any) => (
+                            <div key={h.day_of_week} className="flex justify-between items-center py-0.5">
+                              <span className={`text-[11px] uppercase ${h.day_of_week === todayIdx ? 'text-[#222] font-black' : 'text-gray-400 font-bold'}`}>
+                                {dayNames[h.day_of_week]}
+                              </span>
+                              {h.is_closed
+                                ? <span className="text-[11px] font-bold text-red-300">Kapalı</span>
+                                : <span className="text-[11px] font-bold text-gray-500">{h.open_time?.slice(0,5)} – {h.close_time?.slice(0,5)}</span>
+                              }
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowAllHours(p => !p)}
+                        className="flex items-center gap-1 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline mt-1"
+                      >
+                        <ChevronDown size={10} className={`transition-transform ${showAllHours ? 'rotate-180' : ''}`} />
+                        {showAllHours ? 'Daha Az' : 'Tüm Hafta'}
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Staff */}
+                {staff.length > 0 && (
+                  <div className="px-5 py-5 border-t border-gray-50">
+                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-3">Çalışanlar</p>
+                    <div className="flex flex-wrap gap-2.5">
+                      {staff.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => setSelectedStaff(selectedStaff?.id === s.id ? null : s)}
+                          className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all ${selectedStaff?.id === s.id ? 'ring-2 ring-[#00A3AD] bg-[#E6F6F7]' : 'hover:bg-gray-50'}`}
+                        >
+                          <div className="w-11 h-11 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow-sm">
+                            {s.avatar_url
+                              ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} />
+                              : <span className="text-[#00A3AD] font-black text-sm">{s.first_name?.charAt(0)}{s.last_name?.charAt(0)}</span>
                             }
                           </div>
-                        ))}
-                      </div>
+                          <span className="text-[9px] font-black uppercase text-gray-500 tracking-wide max-w-[52px] truncate text-center">{s.first_name}</span>
+                          {s.role && <span className="text-[8px] font-bold text-gray-300 uppercase tracking-wide max-w-[52px] truncate text-center">{s.role}</span>}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedStaff && (
+                      <p className="mt-2.5 text-[9px] font-black text-[#00A3AD] uppercase tracking-widest">
+                        {selectedStaff.first_name} seçildi — randevuda uygulanır
+                      </p>
                     )}
-                    <button
-                      onClick={() => setShowAllHours(p => !p)}
-                      className="flex items-center gap-1 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest hover:underline"
-                    >
-                      <ChevronDown size={11} className={`transition-transform ${showAllHours ? 'rotate-180' : ''}`} />
-                      {showAllHours ? 'Daha Az Göster' : 'Tüm Haftayı Göster'}
-                    </button>
                   </div>
-                );
-              })()}
+                )}
 
-              {/* Staff */}
-              {staff.length > 0 && (
-                <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm p-5">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.18em] mb-4">Çalışanlar</p>
-                  <div className="flex flex-wrap gap-3">
-                    {staff.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => setSelectedStaff(selectedStaff?.id === s.id ? null : s)}
-                        className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all ${selectedStaff?.id === s.id ? 'ring-2 ring-[#00A3AD] bg-[#E6F6F7]' : 'hover:bg-gray-50'}`}
-                      >
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-[#E6F6F7] flex items-center justify-center border-2 border-white shadow-sm">
-                          {s.avatar_url
-                            ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} />
-                            : <span className="text-[#00A3AD] font-black text-sm">{s.first_name?.charAt(0)}{s.last_name?.charAt(0)}</span>
-                          }
+                {/* Contact */}
+                {(shop.shop_phone || shop.email || shop.instagram) && (
+                  <div className="px-5 py-5 border-t border-gray-50 space-y-2.5">
+                    <p className="text-[9px] font-black text-[#00A3AD] uppercase tracking-[0.18em] mb-1">İletişim</p>
+                    {shop.shop_phone && (
+                      <a href={`tel:${shop.shop_phone}`} className="flex items-center gap-3 group">
+                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
+                          <Phone size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                         </div>
-                        <span className="text-[9px] font-black uppercase text-gray-500 tracking-wide max-w-[56px] truncate text-center">{s.first_name}</span>
-                        {s.role && <span className="text-[8px] font-bold text-gray-300 uppercase tracking-wide max-w-[56px] truncate text-center">{s.role}</span>}
-                      </button>
-                    ))}
+                        <span className="text-[12.5px] font-black text-[#222] group-hover:text-[#00A3AD] transition-colors">{shop.shop_phone}</span>
+                      </a>
+                    )}
+                    {shop.email && (
+                      <a href={`mailto:${shop.email}`} className="flex items-center gap-3 group">
+                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
+                          <Mail size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                        </div>
+                        <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-[#00A3AD] transition-colors">{shop.email}</span>
+                      </a>
+                    )}
+                    {shop.instagram && (
+                      <a href={`https://instagram.com/${shop.instagram.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+                        <div className="w-7 h-7 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-pink-500 transition-all flex-shrink-0">
+                          <AtSign size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                        </div>
+                        <span className="text-[12.5px] font-bold text-gray-600 group-hover:text-pink-500 transition-colors">{shop.instagram}</span>
+                      </a>
+                    )}
                   </div>
-                  {selectedStaff && (
-                    <p className="mt-3 text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">
-                      {selectedStaff.first_name} seçildi — randevuda uygulanır
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Contact */}
-              {(shop.shop_phone || shop.email || shop.instagram) && (
-                <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-sm p-5 space-y-3">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.18em] mb-1">İletişim</p>
-                  {shop.shop_phone && (
-                    <a href={`tel:${shop.shop_phone}`} className="flex items-center gap-3 group">
-                      <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
-                        <Phone size={13} className="text-gray-400 group-hover:text-white transition-colors" />
-                      </div>
-                      <span className="text-sm font-black text-[#222] group-hover:text-[#00A3AD] transition-colors">{shop.shop_phone}</span>
-                    </a>
-                  )}
-                  {shop.email && (
-                    <a href={`mailto:${shop.email}`} className="flex items-center gap-3 group">
-                      <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-[#00A3AD] transition-colors flex-shrink-0">
-                        <Mail size={13} className="text-gray-400 group-hover:text-white transition-colors" />
-                      </div>
-                      <span className="text-sm font-bold text-gray-600 group-hover:text-[#00A3AD] transition-colors">{shop.email}</span>
-                    </a>
-                  )}
-                  {shop.instagram && (
-                    <a href={`https://instagram.com/${shop.instagram.replace('@','')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
-                      <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-purple-500 group-hover:to-pink-500 transition-all flex-shrink-0">
-                        <AtSign size={13} className="text-gray-400 group-hover:text-white transition-colors" />
-                      </div>
-                      <span className="text-sm font-bold text-gray-600 group-hover:text-pink-500 transition-colors">{shop.instagram}</span>
-                    </a>
-                  )}
-                </div>
-              )}
+                {/* Cancellation policy */}
+                <button
+                  onClick={() => setShowCancellationModal(true)}
+                  className="w-full flex items-center justify-between px-5 py-4 border-t border-gray-50 hover:bg-gray-50 transition-colors group"
+                >
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-[#00A3AD] transition-colors">İptal Politikası</span>
+                  <ChevronRight size={13} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
+                </button>
 
-              {/* Cancellation policy */}
-              <button
-                onClick={() => setShowCancellationModal(true)}
-                className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm hover:border-[#00A3AD] hover:shadow-md transition-all group"
-              >
-                <span className="text-[11px] font-black uppercase tracking-widest text-gray-500 group-hover:text-[#00A3AD] transition-colors">İptal Politikası</span>
-                <ChevronRight size={14} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
-              </button>
-
+              </div>
             </div>
           </div>
         </div>
@@ -884,8 +895,16 @@ export default function ShopDetail() {
 
       {/* Booking modal */}
       {isBooking && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-6 text-black">
-          <div className="bg-white w-full max-w-6xl rounded-t-[2.5rem] md:rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[92vh] md:h-[85vh]">
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-6 text-black" onClick={() => setIsBooking(false)}>
+          {/* Desktop close button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsBooking(false); }}
+            className="hidden md:flex absolute top-5 right-7 items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-gray-600 hover:text-[#222] shadow-lg hover:shadow-xl transition-all group z-10"
+          >
+            <X size={13} className="group-hover:rotate-90 transition-transform duration-300" />
+            Kapat
+          </button>
+          <div className="bg-white w-full max-w-6xl rounded-t-[2.5rem] md:rounded-[3.5rem] shadow-2xl overflow-hidden flex flex-col md:flex-row h-[92vh] md:h-[85vh]" onClick={e => e.stopPropagation()}>
 
             {/* Calendar panel */}
             <div className="flex-1 p-5 sm:p-8 md:p-16 overflow-y-auto">
