@@ -8,8 +8,10 @@ import AuthModal from "../components/layout/AuthModal";
 
 const HERO_VIDEOS = [
   '/videos/4177973-hd_1920_1080_30fps.mp4',
+  '/videos/5793310-uhd_3840_2160_25fps.mp4',
   '/videos/8225735-hd_1920_1080_25fps.mp4',
   '/videos/9335886-hd_1920_1080_25fps.mp4',
+  '/videos/9738019-uhd_3840_2160_24fps.mp4',
 ];
 
 const CATEGORY_MAP: Record<string, string> = {
