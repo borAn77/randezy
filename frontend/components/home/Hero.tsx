@@ -1,19 +1,65 @@
 "use client";
 
-import React from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import Categories from './Categories';
 
+const videos = [
+  '/videos/4177973-hd_1920_1080_30fps.mp4',
+  '/videos/8225735-hd_1920_1080_25fps.mp4',
+  '/videos/9335886-hd_1920_1080_25fps.mp4',
+];
+
 export default function Hero() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentIdx, setCurrentIdx] = useState(0);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    const timer = setInterval(() => {
+      setCurrentIdx(i => (i + 1) % videos.length);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, [isLoggedIn]);
+
   return (
     <section className="relative h-[88vh] min-h-[580px] w-full flex flex-col items-center justify-end overflow-hidden pb-4">
-      
-      {/* FOTOĞRAF AYARLARI: Tam istediğin o merkezi kadraj */}
-      <div 
-        className="absolute inset-0 bg-cover bg-[center_top] z-0 scale-110" 
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=2070')" }}
-      >
-        <div className="absolute inset-0 bg-black/45"></div>
-      </div>
+
+      {/* ARKA PLAN */}
+      {isLoggedIn ? (
+        <div
+          className="absolute inset-0 bg-cover bg-[center_top] z-0 scale-110"
+          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=2070')" }}
+        >
+          <div className="absolute inset-0 bg-black/45" />
+        </div>
+      ) : (
+        <div className="absolute inset-0 z-0">
+          {videos.map((src, i) => (
+            <video
+              key={i}
+              src={src}
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover scale-110"
+              style={{
+                opacity: i === currentIdx ? 1 : 0,
+                transition: 'opacity 1.5s ease-in-out',
+                zIndex: i === currentIdx ? 1 : 0,
+              }}
+            />
+          ))}
+          <div className="absolute inset-0 bg-black/45 z-10" />
+        </div>
+      )}
 
       <div className="relative z-10 w-full max-w-5xl px-6 flex flex-col items-center text-center">
         <h1 className="text-white text-4xl md:text-5xl font-black mb-3 leading-tight tracking-tighter drop-shadow-2xl">
@@ -22,14 +68,14 @@ export default function Hero() {
         <p className="text-white/90 text-sm md:text-base mb-8 font-semibold max-w-xl drop-shadow-md">
           Bölgendeki en iyi uzmanları keşfet ve anında randevunu al!
         </p>
-        
+
         {/* Arama Çubuğu */}
         <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl flex items-center p-1 mb-8 border border-white/20">
           <div className="flex-1 flex items-center px-4 py-2.5">
             <span className="text-lg mr-2">🔍</span>
-            <input 
-              type="text" 
-              placeholder="Hizmet veya işletme adı ara..." 
+            <input
+              type="text"
+              placeholder="Hizmet veya işletme adı ara..."
               className="w-full outline-none text-gray-800 font-bold text-sm placeholder:text-gray-400 bg-transparent"
             />
           </div>
@@ -41,7 +87,7 @@ export default function Hero() {
         <Categories />
       </div>
 
-      <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-black/20 to-transparent pointer-events-none z-10" />
     </section>
   );
 }
