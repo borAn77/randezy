@@ -37,9 +37,12 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [videoIdx, setVideoIdx] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [nextIdx, setNextIdx] = useState<number | null>(null);
+  const [fadingOutIdx, setFadingOutIdx] = useState<number | null>(null);
   const shopsRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const cycleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Read URL params on mount
   useEffect(() => {
@@ -67,24 +70,43 @@ export default function Home() {
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
   }, [searchQuery, selectedCategory, selectedCity, selectedDistrict]);
 
+  // Start first video on mount
   useEffect(() => {
     if (userId) return;
-    const t = setInterval(() => setVideoIdx(i => (i + 1) % HERO_VIDEOS.length), 7000);
-    return () => clearInterval(t);
+    const v = videoRefs.current[0];
+    if (v) { v.currentTime = 0; v.play().catch(() => {}); }
   }, [userId]);
 
+  // Two-layer crossfade cycle: display → fade-out/fade-in simultaneously → promote
   useEffect(() => {
     if (userId) return;
-    videoRefs.current.forEach((video, i) => {
-      if (!video) return;
-      if (i === videoIdx) {
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-        video.currentTime = 0;
+
+    cycleRef.current = setTimeout(() => {
+      const next = (activeIdx + 1) % HERO_VIDEOS.length;
+
+      // Pre-play next video silently before it becomes visible
+      const nextVideo = videoRefs.current[next];
+      if (nextVideo) {
+        nextVideo.currentTime = 0;
+        nextVideo.play().catch(() => {});
       }
-    });
-  }, [videoIdx, userId]);
+
+      // Both layers fade simultaneously: old fades out, new fades in
+      setFadingOutIdx(activeIdx);
+      setNextIdx(next);
+
+      cycleRef.current = setTimeout(() => {
+        // Retire old video
+        const oldVideo = videoRefs.current[activeIdx];
+        if (oldVideo) { oldVideo.pause(); oldVideo.currentTime = 0; }
+        setActiveIdx(next);
+        setFadingOutIdx(null);
+        setNextIdx(null);
+      }, 1400);
+    }, 5500);
+
+    return () => { if (cycleRef.current) clearTimeout(cycleRef.current); };
+  }, [activeIdx, userId]);
 
   useEffect(() => {
     supabase
@@ -188,22 +210,34 @@ export default function Home() {
               alt="Hero Background"
             />
           ) : (
-            HERO_VIDEOS.map((src, i) => (
-              <video
-                key={i}
-                ref={el => { videoRefs.current[i] = el; }}
-                src={src}
-                muted
-                loop
-                playsInline
-                preload="auto"
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{
-                  opacity: i === videoIdx ? 0.65 : 0,
-                  transition: 'opacity 1.5s ease-in-out',
-                }}
-              />
-            ))
+            HERO_VIDEOS.map((src, i) => {
+              const isFadingOut = i === fadingOutIdx;
+              const isNext = i === nextIdx;
+              const isActive = i === activeIdx;
+              // fadingOut: was 0.65, now fades to 0 (old layer exits)
+              // next/active: was 0, now fades to 0.65 (new layer enters)
+              const opacity = isFadingOut ? 0 : (isActive || isNext ? 0.65 : 0);
+              // Scale: entering video zooms in slightly, exiting zooms back out
+              const scale = isFadingOut ? 'scale(1.0)' : (isActive || isNext ? 'scale(1.04)' : 'scale(1.0)');
+              return (
+                <video
+                  key={i}
+                  ref={el => { videoRefs.current[i] = el; }}
+                  src={src}
+                  muted
+                  loop
+                  playsInline
+                  preload="auto"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{
+                    opacity,
+                    transform: scale,
+                    transition: 'opacity 1.4s ease-in-out, transform 1.4s ease-in-out',
+                    willChange: isActive || isNext || isFadingOut ? 'opacity, transform' : 'auto',
+                  }}
+                />
+              );
+            })
           )}
         </div>
 
