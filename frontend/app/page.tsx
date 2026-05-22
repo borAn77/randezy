@@ -39,6 +39,7 @@ export default function Home() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [videoIdx, setVideoIdx] = useState(0);
   const shopsRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   // Read URL params on mount
   useEffect(() => {
@@ -71,6 +72,19 @@ export default function Home() {
     const t = setInterval(() => setVideoIdx(i => (i + 1) % HERO_VIDEOS.length), 7000);
     return () => clearInterval(t);
   }, [userId]);
+
+  useEffect(() => {
+    if (userId) return;
+    videoRefs.current.forEach((video, i) => {
+      if (!video) return;
+      if (i === videoIdx) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [videoIdx, userId]);
 
   useEffect(() => {
     supabase
@@ -173,25 +187,24 @@ export default function Home() {
               className="w-full h-full object-cover opacity-50 object-top"
               alt="Hero Background"
             />
-          ) : (() => {
-            const nextIdx = (videoIdx + 1) % HERO_VIDEOS.length;
-            return HERO_VIDEOS.map((src, i) => (
+          ) : (
+            HERO_VIDEOS.map((src, i) => (
               <video
                 key={i}
+                ref={el => { videoRefs.current[i] = el; }}
                 src={src}
-                autoPlay={i === videoIdx}
-                preload={i === videoIdx || i === nextIdx ? "auto" : "none"}
                 muted
                 loop
                 playsInline
+                preload="auto"
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{
                   opacity: i === videoIdx ? 0.65 : 0,
                   transition: 'opacity 1.5s ease-in-out',
                 }}
               />
-            ));
-          })()}
+            ))
+          )}
         </div>
 
         <Navbar />
