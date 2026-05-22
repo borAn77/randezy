@@ -50,6 +50,37 @@ def send_appointment_created(
     })
 
 
+def send_appointment_confirmed(
+    customer_email: str,
+    customer_name: str | None,
+    business_name: str,
+    service_name: str,
+    start_time: datetime,
+    staff_name: str | None = None,
+) -> None:
+    date_str = start_time.strftime("%d.%m.%Y %H:%M")
+    staff_line = f"<p><b>Personel:</b> {staff_name}</p>" if staff_name else ""
+    _send({
+        "from": FROM_EMAIL,
+        "to": [customer_email],
+        "subject": f"Randevunuz Onaylandı – {business_name}",
+        "html": f"""
+<div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+  <h2 style="color:#16a34a">Randevunuz onaylandı!</h2>
+  <p>Merhaba {customer_name or 'Değerli Müşterimiz'},</p>
+  <p><b>{business_name}</b> işletmesi randevunuzu onayladı.</p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
+  <p><b>Hizmet:</b> {service_name}</p>
+  {staff_line}
+  <p><b>Tarih &amp; Saat:</b> {date_str}</p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">
+  <p>Randevunuzu yönetmek için <a href="https://randezy.com">randezy.com</a> adresini ziyaret edebilirsiniz.</p>
+  <p>İyi günler,<br><b>Randezy Ekibi</b></p>
+</div>
+""",
+    })
+
+
 def send_appointment_cancelled(
     customer_email: str,
     customer_name: str | None,

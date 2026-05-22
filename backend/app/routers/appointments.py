@@ -114,6 +114,48 @@ def get_my_appointments(
     return appointments
 
 
+@router.patch("/appointments/{appointment_id}/confirm", response_model=AppointmentOut)
+def confirm_appointment(
+    appointment_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    appointment = db.get(Appointment, appointment_id)
+    if not appointment:
+        raise HTTPException(404, "Randevu bulunamadı")
+    if appointment.status == AppointmentStatus.cancelled:
+        raise HTTPException(400, "İptal edilmiş randevu onaylanamaz")
+
+    business = db.get(Business, appointment.business_id)
+    service = db.get(Service, appointment.service_id)
+    customer = db.execute(
+        select(User).where(User.supabase_id == appointment.customer_id)
+    ).scalar_one_or_none()
+
+    appointment.status = AppointmentStatus.confirmed
+    db.commit()
+    db.refresh(appointment)
+
+    if customer and customer.email:
+        staff_name: str | None = None
+        if appointment.staff_id:
+            staff = db.get(Staff, appointment.staff_id)
+            if staff:
+                staff_name = staff.name
+        background_tasks.add_task(
+            email_service.send_appointment_confirmed,
+            customer_email=customer.email,
+            customer_name=customer.full_name,
+            business_name=business.name if business else "",
+            service_name=service.name if service else "",
+            start_time=appointment.start_time,
+            staff_name=staff_name,
+        )
+
+    return appointment
+
+
 @router.patch("/appointments/{appointment_id}/cancel", response_model=AppointmentOut)
 def cancel_appointment(
     appointment_id: uuid.UUID,
