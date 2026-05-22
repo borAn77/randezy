@@ -167,8 +167,8 @@ export default function HesabimPage() {
 
             {!isOwner && (
               <button
-                onClick={() => setActiveTab("randevularim")}
-                className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                onClick={() => router.push("/randevularim")}
+                className="w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 text-gray-500 hover:bg-gray-50"
               >
                 <div className="flex items-center gap-4">
                   <Calendar size={18} />
