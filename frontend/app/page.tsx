@@ -163,8 +163,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans">
-      <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[#050505] overflow-hidden">
+      <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
+        <div className="absolute inset-0 bg-[#050505]" style={{ height: '100vh', overflow: 'hidden' }}>
           {userId ? (
             <img
               src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
