@@ -578,50 +578,106 @@ export default function Dashboard() {
       ? calCurrentDayApts.filter((a: any) => !a.staff_id)
       : calCurrentDayApts.filter((a: any) => a.staff_id === colId);
 
-  if (loading) return <div className="h-screen bg-black flex items-center justify-center font-black text-[#00A3AD] animate-pulse uppercase tracking-[0.5em]">RANDEZY.PRO YÜKLENİYOR...</div>;
+  if (loading) return <div className="h-screen bg-[#0c0c0d] flex items-center justify-center text-[#14b8a6] font-semibold tracking-widest text-sm">Yükleniyor...</div>;
+
+  const NAV_GROUPS = [
+    {
+      label: 'Günlük Operasyon',
+      items: [
+        { id: 'overview', label: 'Ana Sayfa', icon: <LayoutDashboard size={16}/> },
+        { id: 'appointments', label: 'Takvim', icon: <Calendar size={16}/>, badge: pendingCount > 0 ? pendingCount : null },
+        { id: 'customers', label: 'Müşteriler', icon: <Users size={16}/> },
+        { id: 'reviews', label: 'Yorumlar', icon: <MessageSquare size={16}/> },
+      ],
+    },
+    {
+      label: 'İşletme Yönetimi',
+      items: [
+        { id: 'services', label: 'Hizmetler', icon: <Package size={16}/> },
+        { id: 'staff', label: 'Personel', icon: <Users size={16}/> },
+        { id: 'hours', label: 'Çalışma Saatleri', icon: <Clock size={16}/> },
+      ],
+    },
+    {
+      label: 'Büyüme',
+      items: [
+        { id: 'finance', label: 'Finans', icon: <TrendingUp size={16}/> },
+        { id: 'statistics', label: 'İstatistikler', icon: <ArrowUpRight size={16}/> },
+        { id: 'campaigns', label: 'Kampanyalar', icon: <Tag size={16}/> },
+      ],
+    },
+    {
+      label: 'Profil & Ayar',
+      items: [
+        { id: 'branding', label: 'Görsel Kimlik', icon: <Camera size={16}/> },
+        { id: 'settings', label: 'İşletme Bilgileri', icon: <Settings size={16}/> },
+      ],
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans text-black">
+    <div className="min-h-screen bg-[#f7f5f0] flex font-sans text-[#0c0c0d]">
       {/* SIDEBAR */}
-      <aside className="w-72 bg-black fixed h-full flex flex-col p-8 z-50 shadow-2xl">
-        <div className="mb-12"><h2 className="text-2xl font-black text-white tracking-tighter italic">RANDEZY<span className="text-[#00A3AD]">.PRO</span></h2><div className="h-[2px] w-8 bg-[#00A3AD] mt-1"></div></div>
-        <nav className="flex-1 space-y-2">
-          {[
-            { id: "overview", label: "Dashboard", icon: <LayoutDashboard size={18}/> },
-            { id: "branding", label: "Görsel Kimlik", icon: <Camera size={18}/> },
-            { id: "appointments", label: "Randevular", icon: <Calendar size={18}/> },
-            { id: "reviews", label: "Yorumlar", icon: <MessageSquare size={18}/> },
-            { id: "services", label: "Hizmet Yönetimi", icon: <Package size={18}/> },
-            { id: "hours", label: "Çalışma Saatleri", icon: <Clock size={18}/> },
-            { id: "staff", label: "Personel", icon: <Users size={18}/> },
-            { id: "finance", label: "Finans", icon: <TrendingUp size={18}/> },
-            { id: "campaigns", label: "Kampanyalar", icon: <Tag size={18}/> },
-          ].map((item) => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-[#00A3AD] text-white shadow-lg shadow-[#00A3AD]/20" : "text-gray-500 hover:text-white hover:bg-white/5"}`}>
-              {item.icon} {item.label}
-            </button>
+      <aside className="w-64 bg-[#0c0c0d] fixed h-full flex flex-col z-50 overflow-y-auto">
+        <div className="px-6 py-6 border-b border-white/5">
+          <div className="text-[18px] font-bold text-white tracking-tight">RANDEZY<span className="text-[#14b8a6]">.PRO</span></div>
+          <div className="h-0.5 w-7 bg-[#14b8a6] mt-1.5"></div>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-5">
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={gi}>
+              <p className="text-[9px] font-semibold text-white/30 uppercase tracking-[0.15em] px-3 mb-1.5">{group.label}</p>
+              {group.items.map(item => (
+                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all mb-0.5 relative ${
+                    activeTab === item.id
+                      ? 'bg-[#14b8a6] text-[#04221d] font-semibold shadow-lg shadow-[#14b8a6]/20'
+                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                  }`}>
+                  <span className="opacity-80">{item.icon}</span>
+                  <span>{item.label}</span>
+                  {(item as any).badge && (
+                    <span className="ml-auto bg-[#14b8a6] text-[#04221d] text-[10px] font-bold px-2 py-0.5 rounded-full">{(item as any).badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
-        <div className="pt-6 border-t border-white/10">
-          <button onClick={() => setActiveTab("settings")} className={`w-full flex items-center gap-4 px-6 py-4 font-black text-[11px] uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'text-[#00A3AD]' : 'text-gray-500 hover:text-white'}`}>
-            <Settings size={18}/> Ayarlar
-          </button>
+
+        <div className="px-6 py-4 border-t border-white/5">
+          <div className="flex items-center gap-2 text-white/30 text-[11px]">
+            <div className="w-2 h-2 rounded-full bg-[#14b8a6]"></div>
+            {isPublished ? 'Yayında' : 'Taslak'}
+          </div>
         </div>
       </aside>
 
-      <main className="flex-1 ml-72 p-12 overflow-y-auto">
-        <header className="flex justify-between items-center mb-16">
-          <div className="relative w-96 opacity-50 pointer-events-none"><input type="text" placeholder="Arama yakında..." className="w-full pl-14 pr-6 py-4 bg-white rounded-2xl border border-gray-100 shadow-sm outline-none font-bold text-xs" /></div>
-          <div className="flex items-center gap-6 bg-white px-6 py-3 rounded-2xl border border-gray-100 shadow-sm">
-            <div className="text-right">
-              <p className="text-xs font-black uppercase text-black">{shop?.name || "Kurulum Bekliyor"}</p>
-              <p className="text-[9px] font-bold text-[#00A3AD] uppercase tracking-widest">Premium İşletme</p>
+      <main className="flex-1 ml-64 min-h-screen flex flex-col">
+        {/* TOPBAR */}
+        <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between px-8 py-3.5">
+          <div className="text-sm font-semibold text-[#0c0c0d]">{shop?.name || 'İşletme Paneli'}</div>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setActiveTab('appointments')} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+              <Plus size={14}/> Randevu Ekle
+            </button>
+            <div className="relative">
+              <button className="w-9 h-9 bg-white border border-[#ececea] rounded-xl flex items-center justify-center text-[#0c0c0d] hover:bg-[#f7f5f0] transition-all">
+                <Calendar size={16}/>
+              </button>
+              {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#14b8a6] text-[#04221d] text-[9px] font-bold rounded-full flex items-center justify-center">{pendingCount}</span>}
             </div>
-            <div className="w-10 h-10 bg-black rounded-xl overflow-hidden shadow-xl border-2 border-white">
-               {shop?.profiles?.avatar_url ? <img src={shop.profiles.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[#00A3AD] font-black">{shop?.name?.charAt(0) || "P"}</div>}
+            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-3 py-1.5 cursor-pointer hover:bg-[#f7f5f0] transition-all">
+              <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center">
+                {shop?.profiles?.avatar_url ? <img src={shop.profiles.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[#14b8a6] font-bold text-[11px]">{shop?.name?.charAt(0) || 'R'}</span>}
+              </div>
+              <span className="text-[12px] font-semibold text-[#0c0c0d]">{shop?.name || 'Hesabım'}</span>
             </div>
           </div>
         </header>
+
+        <div className="flex-1 overflow-y-auto p-8">
 
         {!shop && activeTab !== "settings" ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -2095,6 +2151,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        </div>
       </main>
 
       {/* KAMPANYA MODALI */}
