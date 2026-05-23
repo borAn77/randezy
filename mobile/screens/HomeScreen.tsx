@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, RefreshControl, ActivityIndicator, Linking,
+  TouchableOpacity, RefreshControl, ActivityIndicator, Linking, Share, Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { toDateStr } from '../utils/date';
 
@@ -74,7 +75,7 @@ function Avatar({ name, userId, size = 40 }: { name: string; userId: string; siz
   );
 }
 
-function HomeHeader({ ownerName, shopName }: { ownerName: string; shopName: string }) {
+function HomeHeader({ ownerName, shopName, onGoCalendar, onGoSettings }: { ownerName: string; shopName: string; onGoCalendar: () => void; onGoSettings: () => void }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Günaydın' : hour < 18 ? 'İyi günler' : 'İyi akşamlar';
   return (
@@ -90,8 +91,10 @@ function HomeHeader({ ownerName, shopName }: { ownerName: string; shopName: stri
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-        <TouchableOpacity style={styles.iconBtn}><Feather name="search" size={20} color={INK} /></TouchableOpacity>
-        <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onGoCalendar}>
+          <Feather name="search" size={20} color={INK} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={onGoSettings}>
           <Feather name="bell" size={20} color={INK} />
           <View style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: ROSE, borderWidth: 1.5, borderColor: CARD }} />
         </TouchableOpacity>
@@ -134,10 +137,18 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
   );
 }
 
-function NextUpCard({ apt }: { apt: AptDisplay }) {
+function NextUpCard({ apt, onComplete, onGoCalendar }: { apt: AptDisplay; onComplete: (id: string) => void; onGoCalendar: () => void }) {
   const isNow = apt.dispStatus === 'now';
   const name  = apt.profiles?.full_name || 'Misafir';
   const phone = apt.profiles?.phone;
+
+  const handleComplete = () => {
+    Alert.alert('Randevuyu tamamla', `${name} için randevuyu tamamlandı olarak işaretle?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Tamamla', style: 'default', onPress: () => onComplete(apt.id) },
+    ]);
+  };
+
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: CARD, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.07, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -160,12 +171,20 @@ function NextUpCard({ apt }: { apt: AptDisplay }) {
       </View>
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-        {phone && (
+        {phone ? (
           <TouchableOpacity style={[styles.softBtn, { width: 40 }]} onPress={() => Linking.openURL(`tel:${phone}`)}>
             <Feather name="phone" size={16} color={INK} />
           </TouchableOpacity>
-        )}
-        <TouchableOpacity style={[styles.softBtn, { flex: 1, backgroundColor: isNow ? OK : INK, borderWidth: 0, shadowColor: isNow ? OK : INK, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}>
+        ) : null}
+        {phone ? (
+          <TouchableOpacity style={[styles.softBtn, { width: 40 }]} onPress={() => Linking.openURL(`sms:${phone}`)}>
+            <Feather name="message-circle" size={16} color={INK} />
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={[styles.softBtn, { flex: 1, backgroundColor: isNow ? OK : INK, borderWidth: 0, shadowColor: isNow ? OK : INK, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}
+          onPress={isNow ? handleComplete : onGoCalendar}
+        >
           <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{isNow ? '✓ Tamamla' : 'Detay'}</Text>
         </TouchableOpacity>
       </View>
@@ -173,16 +192,21 @@ function NextUpCard({ apt }: { apt: AptDisplay }) {
   );
 }
 
-function QuickActions() {
+function QuickActions({ onGoFinans }: { onGoFinans: () => void }) {
+  const handleShare = async () => {
+    await Share.share({ message: 'Randezy ile kolayca randevu alın: https://randezy.com' });
+  };
+  const handleKampanya = () => Alert.alert('Kampanya', 'Kampanya özelliği yakında aktif olacak.');
+
   const items = [
-    { icon: 'star'       as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)' },
-    { icon: 'share-2'    as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)'  },
-    { icon: 'dollar-sign'as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)'   },
+    { icon: 'star'        as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)', onPress: handleKampanya },
+    { icon: 'share-2'     as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)', onPress: handleShare    },
+    { icon: 'dollar-sign' as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)',  onPress: onGoFinans     },
   ];
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 18, flexDirection: 'row', gap: 10 }}>
       {items.map((it, i) => (
-        <TouchableOpacity key={i} style={{ flex: 1, backgroundColor: CARD, borderRadius: 18, paddingVertical: 12, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 }}>
+        <TouchableOpacity key={i} onPress={it.onPress} style={{ flex: 1, backgroundColor: CARD, borderRadius: 18, paddingVertical: 12, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 }}>
           <View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: it.bg, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name={it.icon} size={18} color={it.color} />
           </View>
@@ -193,19 +217,19 @@ function QuickActions() {
   );
 }
 
-function SectionHeader({ title, subtle, action }: { title: string; subtle?: string; action?: string }) {
+function SectionHeader({ title, subtle, action, onAction }: { title: string; subtle?: string; action?: string; onAction?: () => void }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: 20, paddingBottom: 10 }}>
       <View>
         <Text style={{ fontSize: 16, fontWeight: '700', color: INK, letterSpacing: -0.3 }}>{title}</Text>
         {subtle && <Text style={{ fontSize: 12, color: MUTED, fontWeight: '500', marginTop: 2 }}>{subtle}</Text>}
       </View>
-      {action && <TouchableOpacity><Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 13 }}>{action}</Text></TouchableOpacity>}
+      {action && <TouchableOpacity onPress={onAction}><Text style={{ color: PRIMARY, fontWeight: '600', fontSize: 13 }}>{action}</Text></TouchableOpacity>}
     </View>
   );
 }
 
-function ScheduleTimeline({ items }: { items: AptDisplay[] }) {
+function ScheduleTimeline({ items, onPress }: { items: AptDisplay[]; onPress?: () => void }) {
   if (!items.length) return (
     <View style={{ marginHorizontal: 16, marginBottom: 18, backgroundColor: CARD, borderRadius: 22, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: HAIR }}>
       <Text style={{ fontSize: 32, marginBottom: 8 }}>🎉</Text>
@@ -220,7 +244,7 @@ function ScheduleTimeline({ items }: { items: AptDisplay[] }) {
         const dim  = a.dispStatus === 'done';
         const name = a.profiles?.full_name || 'Misafir';
         return (
-          <View key={a.id} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
+          <TouchableOpacity key={a.id} onPress={onPress} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
             <View style={{ width: 46, alignItems: 'flex-start', paddingTop: 4 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: INK, letterSpacing: -0.2 }}>{a.appointment_time.slice(0, 5)}</Text>
               <Text style={{ fontSize: 11, color: MUTED, fontWeight: '500', marginTop: 1 }}>{a.duration_minutes || 30}dk</Text>
@@ -239,7 +263,7 @@ function ScheduleTimeline({ items }: { items: AptDisplay[] }) {
                 </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -316,6 +340,7 @@ function PromoCard() {
 
 // ─── main screen ─────────────────────────────────────────────
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
   const [ownerName, setOwnerName]   = useState('');
   const [shopName, setShopName]     = useState('');
   const [shopScore, setShopScore]   = useState<number | null>(null);
@@ -324,6 +349,19 @@ export default function HomeScreen() {
   const [revenue, setRevenue]       = useState(0);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const goCalendar  = () => navigation.navigate('Takvim');
+  const goSettings  = () => navigation.navigate('Profil');
+  const goFinans    = () => navigation.navigate('Isletme');
+
+  const handleComplete = useCallback(async (aptId: string) => {
+    await supabase.from('appointments').update({ status: 'Tamamlandı' }).eq('id', aptId);
+    setTodayApts(prev => prev.map(a => a.id === aptId ? { ...a, status: 'Tamamlandı', dispStatus: 'done' } : a));
+    setRevenue(prev => {
+      const apt = todayApts.find(a => a.id === aptId);
+      return prev + (apt?.price ?? 0);
+    });
+  }, [todayApts]);
 
   const load = useCallback(async () => {
     try {
@@ -402,21 +440,22 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
       >
-        <HomeHeader ownerName={ownerName} shopName={shopName} />
+        <HomeHeader ownerName={ownerName} shopName={shopName} onGoCalendar={goCalendar} onGoSettings={goSettings} />
         <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} />
-        {nextUp && <NextUpCard apt={nextUp} />}
-        <QuickActions />
+        {nextUp && <NextUpCard apt={nextUp} onComplete={handleComplete} onGoCalendar={goCalendar} />}
+        <QuickActions onGoFinans={goFinans} />
 
         <SectionHeader
           title="Bugünün programı"
           subtle={`${todayApts.length} randevu · ${Math.max(0, todayApts.length - doneCount)} sırada`}
           action="Tümü"
+          onAction={goCalendar}
         />
-        <ScheduleTimeline items={todayApts} />
+        <ScheduleTimeline items={todayApts} onPress={goCalendar} />
 
         {hasEmpty && <PromoCard />}
 
-        <SectionHeader title="Performans" subtle="Bu haftaki dağılım" action="Detay" />
+        <SectionHeader title="Performans" subtle="Bu haftaki dağılım" action="Detay" onAction={goCalendar} />
         {weekData.length > 0 && <WeekChart data={weekData} />}
         <InsightsRow score={shopScore} />
       </ScrollView>
