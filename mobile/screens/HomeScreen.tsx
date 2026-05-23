@@ -275,22 +275,25 @@ function WeekChart({ data }: { data: { d: string; v: number; today: boolean }[] 
     <View style={{ marginHorizontal: 16, marginBottom: 18, backgroundColor: CARD, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 }}>
       <Text style={{ fontSize: 12, color: MUTED, fontWeight: '600', letterSpacing: 0.2, marginBottom: 4 }}>BU HAFTA</Text>
       <Text style={{ fontSize: 16, fontWeight: '700', color: INK, marginBottom: 16 }}>Randevu dağılımı</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 90 }}>
-        {data.map((w, i) => (
-          <View key={i} style={{ flex: 1, alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
-            <View style={{ height: 70, width: '100%', justifyContent: 'flex-end', position: 'relative' }}>
-              {w.today && (
-                <View style={{ position: 'absolute', top: -20, left: 0, right: 0, alignItems: 'center' }}>
-                  <View style={{ backgroundColor: INK, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>Bugün</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+        {data.map((w, i) => {
+          const barH = Math.max(4, Math.round(w.v * 64));
+          return (
+            <View key={i} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+              <View style={{ height: 84, justifyContent: 'flex-end', alignItems: 'center', width: '100%' }}>
+                {w.today && (
+                  <View style={{ position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' }}>
+                    <View style={{ backgroundColor: INK, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
+                      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>Bugün</Text>
+                    </View>
                   </View>
-                </View>
-              )}
-              <View style={{ width: '100%', height: `${Math.max(5, w.v * 100)}%`, backgroundColor: w.today ? PRIMARY : 'rgba(91,91,247,0.18)', borderRadius: 6 }} />
+                )}
+                <View style={{ width: '100%', height: barH, backgroundColor: w.today ? PRIMARY : 'rgba(91,91,247,0.18)', borderRadius: 6 }} />
+              </View>
+              <Text style={{ fontSize: 11, color: w.today ? INK : MUTED, fontWeight: w.today ? '700' : '500' }}>{w.d}</Text>
             </View>
-            <Text style={{ fontSize: 11, color: w.today ? INK : MUTED, fontWeight: w.today ? '700' : '500' }}>{w.d}</Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
     </View>
   );
