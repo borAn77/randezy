@@ -13,10 +13,6 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: NextRequest) {
   console.log("[notify] resend configured:", !!resend);
-  if (!resend) {
-    return NextResponse.json({ ok: false, reason: "RESEND_API_KEY not configured" });
-  }
-
   const body = await req.json();
   const { type } = body;
   console.log("[notify] type:", type, "| body keys:", Object.keys(body).join(","));
@@ -49,24 +45,33 @@ async function sendExpoPush(token: string, title: string, body: string, data?: o
 }
 
 async function handleNewAppointment(body: {
-  shopId: number;
-  ownerId: string;
+  shopId: string;
+  ownerId?: string;
   customerName: string;
   serviceName: string;
   appointmentDate: string;
   appointmentTime: string;
   price: number;
 }) {
+  // resolve owner_id: prefer client-passed, fallback to shops table
+  let ownerId = body.ownerId;
+  if (!ownerId) {
+    const { data: shop } = await supabaseAdmin.from("shops").select("owner_id").eq("id", body.shopId).single();
+    ownerId = shop?.owner_id;
+    console.log("[notify] resolved owner_id from shops:", ownerId ?? "null");
+  }
+  if (!ownerId) { console.log("[notify] no owner_id, aborting"); return; }
+
   const { data: ownerProfile } = await supabaseAdmin
     .from("profiles")
     .select("email, full_name, expo_push_token")
-    .eq("id", body.ownerId)
+    .eq("id", ownerId)
     .single();
 
   let ownerEmail = ownerProfile?.email;
-  console.log("[notify] ownerProfile email:", ownerEmail ?? "null");
+  console.log("[notify] ownerProfile email:", ownerEmail ?? "null", "| push token:", ownerProfile?.expo_push_token ? "yes" : "no");
   if (!ownerEmail) {
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(body.ownerId);
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(ownerId);
     ownerEmail = authUser?.user?.email;
     console.log("[notify] auth fallback email:", ownerEmail ?? "null");
   }
@@ -84,9 +89,9 @@ async function handleNewAppointment(body: {
     );
   }
 
-  if (!ownerEmail) return;
+  if (!ownerEmail || !resend) return;
 
-  await resend!.emails.send({
+  await resend.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to: ownerEmail,
     subject: `Yeni Randevu — ${body.serviceName}`,
