@@ -17,14 +17,14 @@ const cities = [
 ].sort();
 
 const categories = [
-  { id: "KUAFÖR", label: "Kuaför", emoji: "✂️" },
-  { id: "BERBER", label: "Berber", emoji: "💈" },
-  { id: "GÜZELLİK MERKEZİ", label: "Güzellik Merkezi", emoji: "💅" },
-  { id: "TIRNAK", label: "Tırnak", emoji: "💅" },
-  { id: "KAŞ VE KİRPİK", label: "Kaş & Kirpik", emoji: "👁️" },
-  { id: "MASAJ", label: "Masaj", emoji: "🤲" },
-  { id: "FİZYOTERAPİ", label: "Fizyoterapi", emoji: "🏥" },
-  { id: "DÖVME", label: "Dövme", emoji: "🎨" },
+  { id: "KUAFÖR", label: "Kuaför" },
+  { id: "BERBER", label: "Berber" },
+  { id: "GÜZELLİK MERKEZİ", label: "Güzellik Merkezi" },
+  { id: "TIRNAK", label: "Tırnak" },
+  { id: "KAŞ VE KİRPİK", label: "Kaş & Kirpik" },
+  { id: "MASAJ", label: "Masaj" },
+  { id: "FİZYOTERAPİ", label: "Fizyoterapi" },
+  { id: "DÖVME", label: "Dövme" },
 ];
 
 export default function IsletmeEkle() {
@@ -122,15 +122,14 @@ export default function IsletmeEkle() {
                 <button
                   key={cat.id}
                   onClick={() => set('category', cat.id)}
-                  className={`py-4 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all duration-200 flex flex-col items-center gap-1.5
+                  className={`py-4 px-3 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all duration-200 flex items-center justify-center gap-1.5
                     ${form.category === cat.id
                       ? 'border-[#00A3AD] bg-[#E6F6F7] text-[#00A3AD]'
                       : 'border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50'
                     }`}
                 >
-                  <span className="text-xl">{cat.emoji}</span>
+                  {form.category === cat.id && <CheckCircle2 size={12} className="text-[#00A3AD] flex-shrink-0" />}
                   {cat.label}
-                  {form.category === cat.id && <CheckCircle2 size={12} className="text-[#00A3AD]" />}
                 </button>
               ))}
             </div>
