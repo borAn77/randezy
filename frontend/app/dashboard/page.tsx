@@ -514,6 +514,28 @@ export default function Dashboard() {
   if (satTotal > 0 && satTotal === Math.max(...allDayTotals)) smartSuggestions.push('Cumartesi günleri kapasite tamamen doluyor. Rezervasyon önceliği veya fiyat optimizasyonu uygulanabilir.');
   if (monthlyRevenue > prevMonthRevenue && prevMonthRevenue > 0) smartSuggestions.push(`Bu ay geçen aya göre %${((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)} daha fazla ciro elde edildi.`);
 
+  // Profile completion system
+  const profileSteps = [
+    { label: 'Kapak fotoğrafı ekle', desc: 'Müşteriler işletmeni ilk bunu görür', done: !!shop?.image_url, weight: 20, tab: 'branding', icon: '📸' },
+    { label: 'İlk hizmetini oluştur', desc: 'Randevu alabilmek için en az 1 hizmet gerekli', done: services.length > 0, weight: 20, tab: 'services', icon: '✂️' },
+    { label: 'Çalışma saatlerini ayarla', desc: 'Müşteriler müsait zamanını görsün', done: shopHours.some(h => !h.is_closed), weight: 20, tab: 'hours', icon: '🕐' },
+    { label: 'Kapak fotoğrafı yükle', desc: 'Profesyonel görünüm için zorunlu', done: !!shop?.image_url, weight: 0, tab: 'branding', icon: '🖼️' },
+    { label: 'Kendini / çalışanını ekle', desc: 'Müşteriler çalışan seçerek rezervasyon yapsın', done: staff.length > 0, weight: 10, tab: 'staff', icon: '👤' },
+    { label: 'İşletme açıklaması ekle', desc: 'Güven oluşturur, daha fazla tıklanma sağlar', done: !!shop?.description, weight: 10, tab: 'settings', icon: '📝' },
+    { label: 'Galeri fotoğrafı yükle', desc: 'Yaptığın işleri sergile', done: (shop?.gallery_urls?.length || 0) > 0, weight: 10, tab: 'branding', icon: '🎨' },
+    { label: 'Instagram hesabını bağla', desc: 'Sosyal kanıt ve takipçi dönüşümü', done: !!shop?.instagram, weight: 10, tab: 'settings', icon: '📱' },
+  ].filter((s, i, arr) => !(i === 3)); // kapak fotoğrafı zaten üstte var, tekrarlananı kaldır
+
+  const profilePct = Math.min(100, profileSteps.reduce((sum, s) => sum + (s.done ? s.weight : 0), 0));
+  const canPublish = !!(shop?.image_url && services.length > 0 && shopHours.some(h => !h.is_closed));
+  const isPublished = !!shop?.is_active;
+
+  const handlePublish = async () => {
+    if (!shop?.id || !canPublish) return;
+    await supabase.from('shops').update({ is_active: true }).eq('id', shop.id);
+    fetchInitialData();
+  };
+
   // Calendar view helpers
   const calHours = Array.from({ length: 14 }, (_, i) => i + 8); // 08–21
   const calHourH = 64; // px per hour
@@ -611,22 +633,127 @@ export default function Dashboard() {
           <>
             {/* 1. OVERVIEW */}
             {activeTab === "overview" && (
-              <div className="animate-in fade-in duration-500 grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                  <TrendingUp className="text-[#00A3AD] mb-4" size={24}/>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam Kazanç</p>
-                  <h3 className="text-4xl font-black text-black">₺{totalRevenue.toLocaleString('tr-TR')}</h3>
-                  <p className="text-[9px] text-gray-300 mt-1 uppercase font-bold tracking-wider">Onaylanan randevulardan</p>
-                </div>
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                  <Users className="text-[#00A3AD] mb-4" size={24}/>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Benzersiz Müşteri</p>
-                  <h3 className="text-4xl font-black text-black">{uniqueCustomers}</h3>
-                </div>
-                <div className="bg-black text-white p-10 rounded-[3rem] shadow-2xl">
-                  <Calendar className="text-[#00A3AD] mb-4" size={24}/>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bekleyen Randevu</p>
-                  <h3 className="text-4xl font-black">{pendingCount}</h3>
+              <div className="animate-in fade-in duration-500 space-y-8 mb-8">
+
+                {/* ── Profil Tamamlama Kartı (sadece yayınlanmamışsa göster) ── */}
+                {!isPublished && (
+                  <div className="bg-black rounded-[2.5rem] p-8 md:p-10 overflow-hidden relative">
+                    {/* bg glow */}
+                    <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10 pointer-events-none" style={{ background: 'radial-gradient(circle, #00A3AD, transparent)', transform: 'translate(40%, -40%)' }} />
+
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
+                      {/* Ring */}
+                      <div className="flex-shrink-0 relative" style={{ width: 120, height: 120 }}>
+                        <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+                          <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+                          <circle
+                            cx="60" cy="60" r="52" fill="none"
+                            stroke={profilePct === 100 ? '#22c55e' : '#00A3AD'}
+                            strokeWidth="10"
+                            strokeLinecap="round"
+                            strokeDasharray="327"
+                            strokeDashoffset={327 - (327 * profilePct / 100)}
+                            style={{ transition: 'stroke-dashoffset 0.8s ease, stroke 0.4s ease' }}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-2xl font-black text-white leading-none">{profilePct}%</span>
+                          <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">Tamamlandı</span>
+                        </div>
+                      </div>
+
+                      {/* Text + Checklist */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#00A3AD] mb-1">Profil Durumu</p>
+                        <h3 className="text-xl font-black uppercase tracking-tight text-white mb-1">
+                          {profilePct === 100 ? 'Yayına Hazır! 🎉' : profilePct >= 60 ? 'Çok Yaklaştın!' : 'Profilini Tamamla'}
+                        </h3>
+                        <p className="text-[11px] text-gray-500 font-medium mb-5">
+                          {canPublish
+                            ? 'Minimum gereksinimler karşılandı. İstersen şimdi yayına alabilirsin.'
+                            : `Yayına çıkmak için ${profileSteps.filter(s => !s.done && s.weight >= 20).length} kritik adım kaldı.`}
+                        </p>
+
+                        {/* Checklist */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
+                          {profileSteps.map((step, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setActiveTab(step.tab)}
+                              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-left group ${step.done ? 'opacity-60 cursor-default' : 'hover:bg-white/5 cursor-pointer'}`}
+                            >
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${step.done ? 'bg-[#00A3AD]' : 'border-2 border-gray-700 group-hover:border-[#00A3AD]'}`}>
+                                {step.done && (
+                                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-[11px] font-black uppercase tracking-wider leading-tight ${step.done ? 'text-gray-600 line-through' : 'text-white'}`}>{step.label}</p>
+                                {!step.done && <p className="text-[10px] text-gray-600 font-medium mt-0.5 truncate">{step.desc}</p>}
+                              </div>
+                              {!step.done && (
+                                <svg className="flex-shrink-0 ml-auto text-gray-700 group-hover:text-[#00A3AD] transition-colors" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Publish button */}
+                        <button
+                          disabled={!canPublish}
+                          onClick={handlePublish}
+                          className={`inline-flex items-center gap-2 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${
+                            canPublish
+                              ? 'bg-[#00A3AD] text-white hover:bg-white hover:text-black shadow-lg shadow-[#00A3AD]/30'
+                              : 'bg-white/5 text-gray-600 cursor-not-allowed'
+                          }`}
+                        >
+                          {canPublish ? '🚀 İşletmeni Yayına Al' : `Yayına almak için ${3 - [shop?.image_url, services.length > 0, shopHours.some(h => !h.is_closed)].filter(Boolean).length} adım kaldı`}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Yayınlanmış badge */}
+                {isPublished && (
+                  <div className="flex items-center gap-4 bg-green-50 border border-green-100 rounded-2xl px-6 py-4">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-green-700">İşletme Yayında</p>
+                      <p className="text-[10px] font-bold text-green-600 mt-0.5">Müşteriler profilini Randezy'de bulabilir ve randevu alabilir.</p>
+                    </div>
+                    <button
+                      onClick={() => router.push(`/shop/${shop?.id}`)}
+                      className="ml-auto flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-green-600 hover:text-green-800 flex items-center gap-1"
+                    >
+                      Profilimi Gör →
+                    </button>
+                  </div>
+                )}
+
+                {/* Metrik kartlar */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <TrendingUp className="text-[#00A3AD] mb-4" size={24}/>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam Kazanç</p>
+                    <h3 className="text-4xl font-black text-black">₺{totalRevenue.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[9px] text-gray-300 mt-1 uppercase font-bold tracking-wider">Onaylanan randevulardan</p>
+                  </div>
+                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <Users className="text-[#00A3AD] mb-4" size={24}/>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Benzersiz Müşteri</p>
+                    <h3 className="text-4xl font-black text-black">{uniqueCustomers}</h3>
+                  </div>
+                  <div className="bg-black text-white p-10 rounded-[3rem] shadow-2xl">
+                    <Calendar className="text-[#00A3AD] mb-4" size={24}/>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bekleyen Randevu</p>
+                    <h3 className="text-4xl font-black">{pendingCount}</h3>
+                  </div>
                 </div>
               </div>
             )}
@@ -1302,7 +1429,18 @@ export default function Dashboard() {
                   <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Yeni Ekle</button>
                 </div>
                 {services.length === 0 ? (
-                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz hizmet eklemediniz</div>
+                  <div className="py-16 px-8 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100 shadow-sm">
+                    <div className="w-20 h-20 rounded-full bg-[#E6F6F7] flex items-center justify-center mx-auto mb-6 text-4xl">✂️</div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter text-black mb-3">Henüz hizmet eklemediniz</h3>
+                    <p className="text-sm font-medium text-gray-400 max-w-xs mx-auto mb-2 leading-relaxed">Hizmet olmadan randevu alınamaz. İlk hizmetini ekle, müşterilerin seni keşfetmeye başlasın.</p>
+                    <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-8">Randevu almak için en az 1 hizmet gerekli</p>
+                    <button
+                      onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }}
+                      className="inline-flex items-center gap-2 bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl"
+                    >
+                      <Plus size={16} /> İlk Hizmetini Ekle
+                    </button>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {services.map((s) => (
@@ -1375,7 +1513,34 @@ export default function Dashboard() {
                   )}
                 </div>
                 {staff.length === 0 ? (
-                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz personel eklemediniz</div>
+                  <div className="py-16 px-8 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100 shadow-sm">
+                    <div className="w-20 h-20 rounded-full bg-[#E6F6F7] flex items-center justify-center mx-auto mb-6 text-4xl">👤</div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter text-black mb-3">Henüz çalışan eklemediniz</h3>
+                    <p className="text-sm font-medium text-gray-400 max-w-xs mx-auto mb-2 leading-relaxed">Müşterileriniz çalışan seçerek rezervasyon oluşturabilir.</p>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-8">Tek çalışıyorsanız kendinizi ekleyin.</p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                      <button
+                        onClick={() => {
+                          const fullName = (shop as any)?.profiles?.full_name || '';
+                          const parts = fullName.trim().split(' ');
+                          const firstName = parts[0] || '';
+                          const lastName = parts.slice(1).join(' ') || '';
+                          setEditingStaff(null);
+                          setStaffForm({ firstName, lastName, avatarUrl: (shop as any)?.profiles?.avatar_url || '', role: 'Sahibi', specialty: '' });
+                          setIsStaffModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl"
+                      >
+                        👤 Kendimi Ekle
+                      </button>
+                      <button
+                        onClick={() => { setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); setIsStaffModalOpen(true); }}
+                        className="inline-flex items-center gap-2 border-2 border-gray-100 text-gray-500 px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-gray-300 transition-all"
+                      >
+                        <Plus size={14} /> Başkasını Ekle
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {staff.map((s) => (
