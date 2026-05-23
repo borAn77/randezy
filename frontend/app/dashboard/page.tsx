@@ -926,23 +926,35 @@ export default function Dashboard() {
                   );
                 })()}
 
-                {/* Metrik kartlar */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                    <TrendingUp className="text-[#00A3AD] mb-4" size={24}/>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Toplam Kazanç</p>
-                    <h3 className="text-4xl font-black text-black">₺{totalRevenue.toLocaleString('tr-TR')}</h3>
-                    <p className="text-[9px] text-gray-300 mt-1 uppercase font-bold tracking-wider">Onaylanan randevulardan</p>
+                {/* KPI strip — 4 kart */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-[#0c0c0d] text-white p-5 rounded-2xl relative overflow-hidden">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-white/50 mb-3">Bugünkü Ciro</p>
+                    <p className="text-[28px] font-bold leading-none text-[#14b8a6]">₺{todayRevenue.toLocaleString('tr-TR')}</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-white/30 mt-2">Bugün onaylanan randevular</p>
+                    <div className="flex items-end gap-0.5 mt-3 h-7">
+                      {[40,55,70,85,60,90,95].map((h,i) => (
+                        <div key={i} className="flex-1 bg-[#14b8a6] rounded-t-sm" style={{height:h+'%', opacity:i===6?1:0.5}}/>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                    <Users className="text-[#00A3AD] mb-4" size={24}/>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Benzersiz Müşteri</p>
-                    <h3 className="text-4xl font-black text-black">{uniqueCustomers}</h3>
+                  <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Aylık Ciro</p>
+                    <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">₺{monthlyRevenue.toLocaleString('tr-TR')}</p>
+                    {prevMonthRevenue > 0 && <p className={`text-[10px] font-mono mt-2 ${monthlyRevenue >= prevMonthRevenue ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>{monthlyRevenue >= prevMonthRevenue ? '↗' : '↘'} %{Math.abs((monthlyRevenue - prevMonthRevenue) / (prevMonthRevenue||1) * 100).toFixed(1)}</p>}
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">{monthlyApptCount} randevudan</p>
                   </div>
-                  <div className="bg-black text-white p-10 rounded-[3rem] shadow-2xl">
-                    <Calendar className="text-[#00A3AD] mb-4" size={24}/>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bekleyen Randevu</p>
-                    <h3 className="text-4xl font-black">{pendingCount}</h3>
+                  <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Benzersiz Müşteri</p>
+                    <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{uniqueCustomers}</p>
+                    <p className={`text-[10px] font-mono mt-2 ${newCust > 0 ? 'text-[#15803d]' : 'text-[#7a7a7e]'}`}>{newCust > 0 ? `↗ +${newCust} yeni` : 'Yeni müşteri yok'}</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Bu ay toplam</p>
+                  </div>
+                  <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Bekleyen Randevu</p>
+                    <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{pendingCount}</p>
+                    <p className={`text-[10px] font-mono mt-2 ${pendingCount > 0 ? 'text-[#c2410c]' : 'text-[#15803d]'}`}>{pendingCount > 0 ? 'Onay bekliyor' : 'Tümü onaylı'}</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Toplam {appointments.filter((a:any)=>a.status==='Onaylandı').length} onaylı</p>
                   </div>
                 </div>
               </div>
@@ -1568,42 +1580,55 @@ export default function Dashboard() {
 
             {/* 3.5 YORUMLAR */}
             {activeTab === "reviews" && (
-              <div className="animate-in slide-in-from-right-4">
-                <h2 className="text-3xl font-black uppercase tracking-tighter mb-8 italic">Müşteri Yorumları</h2>
+              <div className="animate-in fade-in duration-300">
+                <div className="flex items-end justify-between mb-6">
+                  <div>
+                    <h1 className="text-[32px] font-bold uppercase tracking-tight text-[#0c0c0d]">Yorumlar</h1>
+                    <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mt-1">
+                      ★ {reviews.length > 0 ? (reviews.reduce((s,r)=>s+r.rating,0)/reviews.length).toFixed(1) : '—'} · {reviews.length} doğrulanmış yorum
+                    </p>
+                  </div>
+                </div>
                 {reviews.length === 0 ? (
-                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">Henüz yorum yapılmamış</div>
+                  <div className="py-16 text-center bg-white border border-dashed border-[#ececea] rounded-2xl">
+                    <div className="w-12 h-12 bg-[#e6f7f4] rounded-full flex items-center justify-center mx-auto mb-4"><Star size={20} className="text-[#14b8a6]"/></div>
+                    <h3 className="text-lg font-semibold text-[#0c0c0d] mb-2">Henüz yorum yapılmamış</h3>
+                    <p className="text-[13px] text-[#7a7a7e]">Müşteriler randevu sonrası yorum yapabilir.</p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Ortalama */}
-                    <div className="bg-black text-white p-8 rounded-[2.5rem] flex items-center gap-8 mb-6">
-                      <div className="text-center">
-                        <p className="text-5xl font-black text-[#00A3AD]">{(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}</p>
-                        <p className="text-[9px] uppercase tracking-widest text-gray-400 mt-1">Ortalama Puan</p>
-                      </div>
-                      <div>
-                        <div className="flex gap-1 mb-2">
-                          {[1,2,3,4,5].map(s => (
-                            <Star key={s} size={20} className={s <= Math.round(reviews.reduce((a, r) => a + r.rating, 0) / reviews.length) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-600'} />
-                          ))}
-                        </div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{reviews.length} değerlendirme</p>
-                      </div>
-                    </div>
-
-                    {reviews.map((r) => (
-                      <div key={r.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="font-black text-base uppercase tracking-tight">{r.profiles?.full_name || "Anonim"}</p>
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-1">
-                              {[1,2,3,4,5].map(s => (
-                                <Star key={s} size={14} className={s <= r.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'} />
-                              ))}
+                    {/* Yıldız dağılımı */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-2">
+                      {[5,4,3,2,1].map(star => {
+                        const cnt = reviews.filter(r=>r.rating===star).length;
+                        const pct = reviews.length > 0 ? Math.round(cnt/reviews.length*100) : 0;
+                        return (
+                          <div key={star} className="bg-white border border-[#ececea] rounded-2xl p-4">
+                            <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-2">{star} ★ yorum</p>
+                            <p className="text-[24px] font-bold text-[#0c0c0d] leading-none">{cnt}</p>
+                            <p className="text-[10px] font-mono text-[#7a7a7e] mt-1">%{pct}</p>
+                            <div className="h-1 bg-[#f5f5f3] rounded-full mt-2 overflow-hidden">
+                              <div className="h-full bg-[#14b8a6] rounded-full" style={{width:pct+'%'}}/>
                             </div>
-                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{new Date(r.created_at).toLocaleDateString('tr-TR')}</span>
                           </div>
+                        );
+                      })}
+                    </div>
+                    {reviews.map((r) => (
+                      <div key={r.id} className="bg-white border border-[#ececea] rounded-2xl p-5 grid gap-4" style={{gridTemplateColumns:'44px 1fr'}}>
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[13px] font-bold flex items-center justify-center">
+                          {(r.profiles?.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}
                         </div>
-                        {r.comment && <p className="text-gray-500 text-sm font-medium">{r.comment}</p>}
+                        <div>
+                          <p className="font-semibold text-[14px] text-[#0c0c0d]">{r.profiles?.full_name || "Anonim"}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mt-0.5">
+                            {new Date(r.created_at).toLocaleDateString('tr-TR')} · ✓ Doğrulanmış
+                          </p>
+                          <div className="flex gap-0.5 mt-2 text-[#14b8a6]">
+                            {'★'.repeat(r.rating)}{'☆'.repeat(5-r.rating)}
+                          </div>
+                          {r.comment && <p className="text-[13px] text-[#3a3a3d] mt-2 leading-relaxed">{r.comment}</p>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1750,39 +1775,65 @@ export default function Dashboard() {
 
             {/* 4. HİZMET YÖNETİMİ */}
             {activeTab === "services" && (
-              <div className="animate-in slide-in-from-right-4">
-                <div className="flex justify-between items-center mb-12">
-                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Servis & Portfolyo</h2>
-                  <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Yeni Ekle</button>
+              <div className="animate-in fade-in duration-300">
+                <div className="flex items-end justify-between mb-6">
+                  <div>
+                    <h1 className="text-[32px] font-bold uppercase tracking-tight text-[#0c0c0d]">Hizmetler</h1>
+                    <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mt-1">{services.length} aktif hizmet</p>
+                  </div>
+                  <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                    <Plus size={14}/> Yeni Hizmet
+                  </button>
                 </div>
                 {services.length === 0 ? (
-                  <div className="py-16 px-8 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100 shadow-sm">
-                    <div className="w-20 h-20 rounded-full bg-[#E6F6F7] flex items-center justify-center mx-auto mb-6 text-4xl">✂️</div>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter text-black mb-3">Henüz hizmet eklemediniz</h3>
-                    <p className="text-sm font-medium text-gray-400 max-w-xs mx-auto mb-2 leading-relaxed">Hizmet olmadan randevu alınamaz. İlk hizmetini ekle, müşterilerin seni keşfetmeye başlasın.</p>
-                    <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-8">Randevu almak için en az 1 hizmet gerekli</p>
-                    <button
-                      onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }}
-                      className="inline-flex items-center gap-2 bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl"
-                    >
-                      <Plus size={16} /> İlk Hizmetini Ekle
+                  <div className="py-16 text-center bg-white border border-dashed border-[#ececea] rounded-2xl">
+                    <div className="w-12 h-12 bg-[#e6f7f4] rounded-full flex items-center justify-center mx-auto mb-4"><Package size={20} className="text-[#14b8a6]"/></div>
+                    <h3 className="text-lg font-semibold text-[#0c0c0d] mb-2">Henüz hizmet eklemediniz</h3>
+                    <p className="text-[13px] text-[#7a7a7e] max-w-xs mx-auto mb-6">Hizmet olmadan randevu alınamaz. İlk hizmetini ekle.</p>
+                    <button onClick={() => { setEditingService(null); setServiceForm({ name:"",price:"",duration:"",image_url:"" }); setIsServiceModalOpen(true); }}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0c0c0d] text-white text-[13px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                      <Plus size={14}/> İlk Hizmetini Ekle
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {services.map((s) => (
-                      <div key={s.id} className="bg-white rounded-[3.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-500">
-                        <div className="h-48 bg-gray-50">{s.image_url && <img src={s.image_url} className="w-full h-full object-cover" />}</div>
-                        <div className="p-8">
-                          <h4 className="font-black uppercase text-xl mb-2">{s.name}</h4>
-                          <p className="text-[10px] font-black text-[#00A3AD] mb-8">₺{s.price} • {s.duration} DK</p>
-                          <div className="flex gap-2">
-                            <button onClick={() => { setEditingService(s); setServiceForm({ name: s.name, price: s.price.toString(), duration: s.duration.toString(), image_url: s.image_url }); setIsServiceModalOpen(true); }} className="flex-1 py-3 bg-gray-50 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-1"><Edit3 size={14}/> Düzenle</button>
-                            <button onClick={async () => { if(confirm("Silinsin mi?")) { await supabase.from('services').delete().eq('id', s.id); fetchInitialData(); } }} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {services.map((s, si) => {
+                      const gradients = [
+                        'linear-gradient(135deg,#f9c0d4,#d68fa6,#6b3548)',
+                        'linear-gradient(135deg,#e8d5c4,#b89580,#5c3924)',
+                        'linear-gradient(135deg,#c4d9e8,#80a9b8,#243f5c)',
+                        'linear-gradient(135deg,#d4c4e8,#9580b8,#39245c)',
+                        'linear-gradient(135deg,#c4e8d4,#80b89e,#244f3a)',
+                        'linear-gradient(135deg,#f4e4d4,#c0a080,#5c3924)',
+                      ];
+                      const grad = gradients[si % gradients.length];
+                      return (
+                        <div key={s.id} className="bg-white border border-[#ececea] rounded-2xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg duration-150">
+                          <div className="h-40 relative" style={{background: s.image_url ? undefined : grad}}>
+                            {s.image_url && <img src={s.image_url} className="w-full h-full object-cover" alt={s.name}/>}
+                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[9px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded-md">
+                              {s.duration} DK
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <h4 className="font-bold text-[16px] uppercase tracking-tight text-[#0c0c0d] mb-1">{s.name}</h4>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mb-1">{staff.length} personel yapıyor</p>
+                            <p className="text-[18px] font-bold text-[#0d9488] mt-2">₺{Number(s.price).toLocaleString('tr-TR')}</p>
+                          </div>
+                          <div className="flex gap-1.5 px-4 pb-4">
+                            <button onClick={() => { setEditingService(s); setServiceForm({ name:s.name, price:s.price.toString(), duration:s.duration.toString(), image_url:s.image_url }); setIsServiceModalOpen(true); }}
+                              className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#7a7a7e] transition-all flex items-center justify-center gap-1">
+                              <Edit3 size={12}/> Düzenle
+                            </button>
+                            <button onClick={async () => { if(confirm("Silinsin mi?")) { await supabase.from('services').delete().eq('id',s.id); fetchInitialData(); } }}
+                              className="py-2 px-3 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[#7a7a7e] hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all">
+                              <Trash2 size={13}/>
+                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1791,40 +1842,49 @@ export default function Dashboard() {
             {/* 5. ÇALIŞMA SAATLERİ */}
             {activeTab === "hours" && (
               <div className="animate-in slide-in-from-right-4 max-w-2xl">
-                <h2 className="text-4xl font-black uppercase tracking-tighter italic mb-12">Çalışma Saatleri</h2>
-                <div className="bg-white rounded-[3rem] p-10 border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-end justify-between mb-8">
+                  <div>
+                    <h1 className="text-[32px] font-bold text-[#0c0c0d] tracking-tight uppercase leading-none">Çalışma Saatleri</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1.5">Haftanın her günü için açılış ve kapanış saatlerini ayarlayın</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-[#ececea] p-6 space-y-2">
                   {shopHours.map((h, i) => (
-                    <div key={i} className={`flex items-center justify-between p-6 rounded-[2rem] transition-all ${h.is_closed ? 'bg-gray-50 opacity-60' : 'border-2 border-gray-50'}`}>
+                    <div key={i} className={`flex items-center justify-between px-4 py-3.5 rounded-xl transition-all ${h.is_closed ? 'opacity-50' : 'bg-[#fafaf8]'}`}>
                       <div className="flex items-center gap-4">
-                        <button onClick={() => updateHour(i, 'is_closed', !h.is_closed)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${h.is_closed ? 'bg-gray-200 border-gray-200' : 'bg-[#00A3AD] border-[#00A3AD]'}`}>
-                          {!h.is_closed && <CheckCircle2 size={14} className="text-white" />}
+                        {/* CSS toggle switch */}
+                        <button
+                          onClick={() => updateHour(i, 'is_closed', !h.is_closed)}
+                          className={`relative w-9 h-5 rounded-full transition-all duration-200 flex-shrink-0 ${h.is_closed ? 'bg-[#ececea]' : 'bg-[#14b8a6]'}`}
+                        >
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200 ${h.is_closed ? 'left-0.5' : 'left-[18px]'}`} />
                         </button>
-                        <span className="font-black uppercase text-[10px] tracking-widest w-24">{h.day_name}</span>
+                        <span className={`text-[13px] font-semibold w-20 ${h.is_closed ? 'text-[#7a7a7e]' : 'text-[#0c0c0d]'}`}>{h.day_name}</span>
                       </div>
                       {!h.is_closed ? (
                         <div className="flex items-center gap-2">
-                          <input type="time" className="bg-gray-100 p-2 rounded-lg text-xs font-bold text-black border-none focus:ring-1 ring-[#00A3AD]" value={h.open_time} onChange={(e) => updateHour(i, 'open_time', e.target.value)} />
-                          <span className="text-gray-300 font-bold">–</span>
-                          <input type="time" className="bg-gray-100 p-2 rounded-lg text-xs font-bold text-black border-none focus:ring-1 ring-[#00A3AD]" value={h.close_time} onChange={(e) => updateHour(i, 'close_time', e.target.value)} />
+                          <input type="time" className="bg-white border border-[#ececea] px-3 py-1.5 rounded-lg text-[13px] font-mono text-[#0c0c0d] focus:outline-none focus:border-[#14b8a6]" value={h.open_time} onChange={(e) => updateHour(i, 'open_time', e.target.value)} />
+                          <span className="text-[#ececea] font-bold">–</span>
+                          <input type="time" className="bg-white border border-[#ececea] px-3 py-1.5 rounded-lg text-[13px] font-mono text-[#0c0c0d] focus:outline-none focus:border-[#14b8a6]" value={h.close_time} onChange={(e) => updateHour(i, 'close_time', e.target.value)} />
                         </div>
                       ) : (
-                        <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest italic">TATİL / KAPALI</span>
+                        <span className="text-[11px] font-mono uppercase text-[#7a7a7e] tracking-widest">Kapalı</span>
                       )}
                     </div>
                   ))}
                   {/* Apply to all */}
                   <div className="flex gap-3 pt-2">
-                    {shopHours.filter(h => !h.is_closed).slice(0, 1).map((ref, _) => (
+                    {shopHours.filter(h => !h.is_closed).slice(0, 1).map((ref) => (
                       <button key="apply-all" type="button"
                         onClick={() => setShopHours(prev => prev.map(h => h.is_closed ? h : { ...h, open_time: ref.open_time, close_time: ref.close_time }))}
-                        className="flex-1 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#00A3AD] hover:text-[#00A3AD] transition-all"
+                        className="flex-1 py-3 rounded-xl text-[11px] font-mono uppercase tracking-widest border border-dashed border-[#ececea] text-[#7a7a7e] hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all"
                       >
-                        Tüm Haftaya Uygula ({ref.open_time?.slice(0,5)} – {ref.close_time?.slice(0,5)})
+                        Tüm açık günlere uygula ({ref.open_time?.slice(0,5)} – {ref.close_time?.slice(0,5)})
                       </button>
                     ))}
                   </div>
-                  <button onClick={handleSaveHours} disabled={savingHours} className="w-full bg-black text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs mt-2 hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-3">
-                    <Save size={18}/> {savingHours ? "Kaydediliyor..." : "Saatleri Kaydet"}
+                  <button onClick={handleSaveHours} disabled={savingHours} className="w-full bg-[#0c0c0d] text-white py-4 rounded-xl text-[11px] font-mono uppercase tracking-widest mt-1 hover:bg-[#14b8a6] transition-all flex items-center justify-center gap-2">
+                    <Save size={15}/> {savingHours ? "Kaydediliyor..." : "Saatleri Kaydet"}
                   </button>
                 </div>
               </div>
@@ -1833,18 +1893,24 @@ export default function Dashboard() {
             {/* 6. PERSONEL */}
             {activeTab === "staff" && (
               <div className="animate-in slide-in-from-right-4">
-                <div className="flex justify-between items-center mb-12">
-                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Personel</h2>
+                <div className="flex items-end justify-between mb-8">
+                  <div>
+                    <h1 className="text-[32px] font-bold text-[#0c0c0d] tracking-tight uppercase leading-none">Personel</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1.5">{staff.length} çalışan · Ekibinizi yönetin</p>
+                  </div>
                   {staff.length < 10 && (
-                    <button onClick={() => { setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); setIsStaffModalOpen(true); }} className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Personel Ekle</button>
+                    <button onClick={() => { setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); setIsStaffModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white px-5 py-3 rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all">
+                      <Plus size={14} /> Personel Ekle
+                    </button>
                   )}
                 </div>
                 {staff.length === 0 ? (
-                  <div className="py-16 px-8 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100 shadow-sm">
-                    <div className="w-20 h-20 rounded-full bg-[#E6F6F7] flex items-center justify-center mx-auto mb-6 text-4xl">👤</div>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter text-black mb-3">Henüz çalışan eklemediniz</h3>
-                    <p className="text-sm font-medium text-gray-400 max-w-xs mx-auto mb-2 leading-relaxed">Müşterileriniz çalışan seçerek rezervasyon oluşturabilir.</p>
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-8">Tek çalışıyorsanız kendinizi ekleyin.</p>
+                  <div className="py-16 px-8 text-center bg-white rounded-2xl border-2 border-dashed border-[#ececea]">
+                    <div className="w-14 h-14 rounded-full bg-[#e6f7f4] flex items-center justify-center mx-auto mb-5">
+                      <Users size={22} className="text-[#14b8a6]" />
+                    </div>
+                    <h3 className="text-[18px] font-semibold text-[#0c0c0d] mb-2">Henüz çalışan eklemediniz</h3>
+                    <p className="text-[13px] text-[#7a7a7e] max-w-xs mx-auto mb-6 leading-relaxed">Müşterileriniz çalışan seçerek rezervasyon oluşturabilir. Tek çalışıyorsanız kendinizi ekleyin.</p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                       <button
                         onClick={() => {
@@ -1856,36 +1922,86 @@ export default function Dashboard() {
                           setStaffForm({ firstName, lastName, avatarUrl: (shop as any)?.profiles?.avatar_url || '', role: 'Sahibi', specialty: '' });
                           setIsStaffModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-2 bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl"
+                        className="inline-flex items-center gap-2 bg-[#0c0c0d] text-white px-6 py-3 rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all"
                       >
-                        👤 Kendimi Ekle
+                        Kendimi Ekle
                       </button>
                       <button
                         onClick={() => { setEditingStaff(null); setStaffForm({ firstName: "", lastName: "", avatarUrl: "", role: "", specialty: "" }); setIsStaffModalOpen(true); }}
-                        className="inline-flex items-center gap-2 border-2 border-gray-100 text-gray-500 px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-gray-300 transition-all"
+                        className="inline-flex items-center gap-2 border border-[#ececea] text-[#7a7a7e] px-6 py-3 rounded-xl text-[11px] font-mono uppercase tracking-widest hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all"
                       >
-                        <Plus size={14} /> Başkasını Ekle
+                        <Plus size={13} /> Başkasını Ekle
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {staff.map((s) => (
-                      <div key={s.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all flex items-center gap-5">
-                        <div className="w-16 h-16 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-md flex items-center justify-center flex-shrink-0">
-                          {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} /> : <span className="text-2xl font-black text-[#00A3AD]">{s.first_name?.charAt(0)}</span>}
+                    {staff.map((s) => {
+                      const staffAppts = appointments.filter((a: any) => a.staff_id === s.id);
+                      const thisWeekStart = new Date(); thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
+                      const weekAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= thisWeekStart);
+                      const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (a.service_price || 0), 0);
+                      const monthStart = new Date(); monthStart.setDate(1);
+                      const monthAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= monthStart);
+                      const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (a.service_price || 0), 0);
+                      const initials = `${s.first_name?.charAt(0) || ''}${s.last_name?.charAt(0) || ''}`;
+                      return (
+                        <div key={s.id} className="bg-white border border-[#ececea] rounded-2xl p-[22px] hover:shadow-md transition-all">
+                          {/* Avatar + name */}
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[18px] font-bold overflow-hidden"
+                              style={{background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 8px 18px -8px rgba(20,184,166,0.5)'}}>
+                              {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} /> : initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[15px] font-semibold text-[#0c0c0d] leading-tight">{s.first_name} {s.last_name}</p>
+                              {s.role && <p className="text-[11px] font-mono text-[#14b8a6] uppercase tracking-widest mt-0.5">{s.role}</p>}
+                            </div>
+                          </div>
+                          {/* Stats 2-col */}
+                          <div className="grid grid-cols-2 rounded-xl overflow-hidden mb-4" style={{background: '#ececea', gap: 1}}>
+                            <div className="bg-[#fafaf8] px-3 py-2.5">
+                              <p className="text-[9px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Bu Hafta</p>
+                              <p className="text-[18px] font-bold text-[#0c0c0d] leading-none">₺{weekRevenue.toLocaleString('tr-TR')}</p>
+                              <p className="text-[9px] font-mono text-[#7a7a7e] mt-0.5">{weekAppts.length} randevu</p>
+                            </div>
+                            <div className="bg-[#fafaf8] px-3 py-2.5">
+                              <p className="text-[9px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Bu Ay</p>
+                              <p className="text-[18px] font-bold text-[#0c0c0d] leading-none">₺{monthRevenue.toLocaleString('tr-TR')}</p>
+                              <p className="text-[9px] font-mono text-[#7a7a7e] mt-0.5">{monthAppts.length} randevu</p>
+                            </div>
+                          </div>
+                          {/* Specialty tag */}
+                          {s.specialty && (
+                            <div className="flex flex-wrap gap-1.5 mb-4">
+                              {s.specialty.split(',').map((sp: string, si: number) => (
+                                <span key={si} className="bg-[#e6f7f4] text-[#0d9488] rounded-full text-[10px] font-mono px-2 py-1">{sp.trim()}</span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Actions */}
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[
+                              { label: 'Vardiya', icon: <Clock size={13}/> },
+                              { label: 'İzin', icon: <Calendar size={13}/> },
+                              { label: 'Kazanç', icon: <TrendingUp size={13}/> },
+                              { label: 'Düzenle', icon: <Edit3 size={13}/>, action: () => openStaffEdit(s) },
+                            ].map((btn, bi) => (
+                              <button key={bi} onClick={btn.action || (() => {})}
+                                className="flex flex-col items-center gap-1 py-2 rounded-lg bg-[#fafaf8] hover:bg-[#e6f7f4] text-[#7a7a7e] hover:text-[#14b8a6] transition-all">
+                                {btn.icon}
+                                <span className="text-[8px] font-mono uppercase tracking-widest">{btn.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          {/* Delete */}
+                          <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }}
+                            className="w-full mt-2 py-1.5 rounded-lg text-[9px] font-mono uppercase tracking-widest text-[#dc2626]/40 hover:text-[#dc2626] hover:bg-red-50 transition-all">
+                            Sil
+                          </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-black text-sm uppercase tracking-tight text-black leading-tight">{s.first_name} {s.last_name}</p>
-                          {s.role && <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mt-0.5">{s.role}</p>}
-                          {s.specialty && <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate">{s.specialty}</p>}
-                        </div>
-                        <div className="flex flex-col gap-2 flex-shrink-0">
-                          <button onClick={() => openStaffEdit(s)} className="p-2 text-gray-400 hover:text-[#00A3AD] transition-colors" title="Düzenle"><Edit3 size={15}/></button>
-                          <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }} className="p-2 text-gray-300 hover:text-red-500 transition-colors" title="Sil"><Trash2 size={15}/></button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1893,69 +2009,72 @@ export default function Dashboard() {
 
             {/* 7. FİNANS */}
             {activeTab === "finance" && (
-              <div className="animate-in slide-in-from-right-4 space-y-8">
+              <div className="animate-in slide-in-from-right-4 space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Finans Paneli</h2>
-                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest bg-white px-5 py-2.5 rounded-2xl border border-gray-100">
+                <div className="flex items-end justify-between mb-2">
+                  <div>
+                    <h1 className="text-[32px] font-bold text-[#0c0c0d] tracking-tight uppercase leading-none">Finans Paneli</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1.5">Gelir, gider ve kâr analizi</p>
+                  </div>
+                  <span className="text-[11px] font-mono text-[#7a7a7e] uppercase tracking-widest bg-white px-4 py-2 rounded-xl border border-[#ececea]">
                     {new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
                   </span>
                 </div>
 
                 {/* ÖZET KARTLAR */}
-                <div className="grid grid-cols-3 gap-5">
-                  <div className="bg-black text-white p-8 rounded-[2.5rem] shadow-2xl">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Bugünkü Ciro</p>
-                    <h3 className="text-3xl font-black text-[#00A3AD]">₺{todayRevenue.toLocaleString('tr-TR')}</h3>
-                    <p className="text-[9px] text-gray-600 mt-2 font-bold uppercase tracking-widest">Bugün onaylanan randevular</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-[#0c0c0d] text-white p-6 rounded-2xl">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-white/50 mb-3">Bugünkü Ciro</p>
+                    <h3 className="text-[28px] font-bold text-[#14b8a6] leading-none">₺{todayRevenue.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[10px] font-mono text-white/30 mt-2">Bugün onaylanan randevular</p>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                     <div className="flex items-start justify-between mb-3">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aylık Ciro</p>
+                      <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e]">Aylık Ciro</p>
                       {prevMonthRevenue > 0 && (
-                        <span className={`flex items-center gap-0.5 text-[9px] font-black px-2 py-0.5 rounded-full ${monthlyRevenue >= prevMonthRevenue ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                        <span className={`flex items-center gap-0.5 text-[9px] font-mono px-2 py-0.5 rounded-full ${monthlyRevenue >= prevMonthRevenue ? 'bg-green-50 text-[#15803d]' : 'bg-red-50 text-[#dc2626]'}`}>
                           {monthlyRevenue >= prevMonthRevenue ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                           %{Math.abs((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-3xl font-black text-black">₺{monthlyRevenue.toLocaleString('tr-TR')}</h3>
-                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">{monthlyApptCount} randevudan</p>
+                    <h3 className="text-[28px] font-bold text-[#0c0c0d] leading-none">₺{monthlyRevenue.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">{monthlyApptCount} randevudan</p>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Est. Net Kar</p>
-                    <h3 className="text-3xl font-black text-[#00A3AD]">₺{finNetProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
-                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">%30 gider tahminiyle</p>
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Est. Net Kâr</p>
+                    <h3 className="text-[28px] font-bold text-[#14b8a6] leading-none">₺{finNetProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
+                    <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">%30 gider tahminiyle</p>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Aylık Randevu</p>
-                    <h3 className="text-3xl font-black text-black">{monthlyApptCount}</h3>
-                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">Bu ay onaylanan</p>
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Aylık Randevu</p>
+                    <h3 className="text-[28px] font-bold text-[#0c0c0d] leading-none">{monthlyApptCount}</h3>
+                    <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">Bu ay onaylanan</p>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Ort. Sepet Tutarı</p>
-                    <h3 className="text-3xl font-black text-black">₺{avgBasket.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
-                    <p className="text-[9px] text-gray-300 mt-2 font-bold uppercase tracking-widest">Randevu başına ortalama</p>
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Ort. Sepet</p>
+                    <h3 className="text-[28px] font-bold text-[#0c0c0d] leading-none">₺{avgBasket.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
+                    <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">Randevu başına ortalama</p>
                   </div>
 
-                  <div className="bg-white p-8 rounded-[2.5rem] border border-red-50 shadow-sm hover:shadow-xl transition-all">
-                    <p className="text-[10px] font-black text-red-300 uppercase tracking-widest mb-3">İptal Kaybı</p>
-                    <h3 className="text-3xl font-black text-red-400">₺{cancellationLoss.toLocaleString('tr-TR')}</h3>
-                    <p className="text-[9px] text-red-200 mt-2 font-bold uppercase tracking-widest">{cancelledThisMonth.length} iptalden kaybedilen</p>
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#c2410c] mb-3">İptal Kaybı</p>
+                    <h3 className="text-[28px] font-bold text-[#c2410c] leading-none">₺{cancellationLoss.toLocaleString('tr-TR')}</h3>
+                    <p className="text-[10px] font-mono text-[#c2410c]/50 mt-2">{cancelledThisMonth.length} iptalden kaybedilen</p>
                   </div>
                 </div>
 
                 {/* CİRO GRAFİĞİ */}
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-[11px] font-black uppercase tracking-widest">Ciro Trendi</h3>
-                    <div className="flex gap-2">
+                <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d]">Ciro Trendi</h3>
+                    <div className="flex gap-1.5">
                       {(['daily', 'weekly', 'monthly'] as const).map(v => (
-                        <button key={v} onClick={() => setFinanceChartView(v)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${financeChartView === v ? 'bg-black text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                        <button key={v} onClick={() => setFinanceChartView(v)} className={`px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all ${financeChartView === v ? 'bg-[#0c0c0d] text-white' : 'bg-[#fafaf8] text-[#7a7a7e] hover:bg-[#f0f0ee]'}`}>
                           {v === 'daily' ? 'Günlük' : v === 'weekly' ? 'Haftalık' : 'Aylık'}
                         </button>
                       ))}
@@ -1972,15 +2091,15 @@ export default function Dashboard() {
                           return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
                               <div className="relative flex-1 w-full flex items-end">
-                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[8px] font-black text-[#00A3AD] bg-[#00A3AD]/10 px-2 py-0.5 rounded-lg pointer-events-none">
+                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-[8px] font-mono text-[#14b8a6] bg-[#e6f7f4] px-2 py-0.5 rounded-lg pointer-events-none">
                                   ₺{d.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
                                 </div>
                                 <div
-                                  className={`w-full rounded-t-xl transition-all duration-700 ${isToday ? 'bg-[#00A3AD]' : d.value > 0 ? 'bg-[#00A3AD]/40 group-hover:bg-[#00A3AD]/70' : 'bg-gray-100'}`}
+                                  className={`w-full rounded-t-lg transition-all duration-700 ${isToday ? 'bg-[#14b8a6]' : d.value > 0 ? 'bg-[#14b8a6]/40 group-hover:bg-[#14b8a6]/70' : 'bg-[#f0f0ee]'}`}
                                   style={{ height: `${Math.max(3, pct)}%` }}
                                 />
                               </div>
-                              <div className="text-[7px] font-bold text-gray-400 uppercase truncate w-full text-center">{d.label}</div>
+                              <div className="text-[7px] font-mono text-[#7a7a7e] uppercase truncate w-full text-center">{d.label}</div>
                             </div>
                           );
                         })}
@@ -1990,21 +2109,21 @@ export default function Dashboard() {
                 </div>
 
                 {/* KAR & GİDER */}
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Kar & Gider Analizi — Bu Ay</h3>
-                  <div className="space-y-5">
+                <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                  <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Kâr & Gider Analizi — Bu Ay</h3>
+                  <div className="space-y-4">
                     {[
-                      { label: 'Toplam Gelir', value: monthlyRevenue, pct: 100, color: 'bg-[#00A3AD]' },
-                      { label: 'Tahmini Gider (%30)', value: finEstExpenses, pct: 30, color: 'bg-gray-300' },
-                      { label: 'Net Kar', value: finNetProfit, pct: 70, color: 'bg-black' },
+                      { label: 'Toplam Gelir', value: monthlyRevenue, pct: 100, color: '#14b8a6' },
+                      { label: 'Tahmini Gider (%30)', value: finEstExpenses, pct: 30, color: '#ececea' },
+                      { label: 'Net Kâr', value: finNetProfit, pct: 70, color: '#0c0c0d' },
                     ].map((item, i) => (
                       <div key={i}>
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{item.label}</p>
-                          <p className="text-sm font-black text-black">₺{item.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <p className="text-[12px] text-[#7a7a7e]">{item.label}</p>
+                          <p className="text-[13px] font-semibold text-[#0c0c0d]">₺{item.value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</p>
                         </div>
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full ${item.color} rounded-full transition-all duration-700`} style={{ width: `${item.pct}%` }} />
+                        <div className="h-1.5 bg-[#f0f0ee] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${item.pct}%`, background: item.color }} />
                         </div>
                       </div>
                     ))}
@@ -2012,34 +2131,34 @@ export default function Dashboard() {
                 </div>
 
                 {/* PERSONEL + HİZMET */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Personel Performansı</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Personel Performansı</h3>
                     {staffPerf.length === 0 ? (
-                      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic py-10 text-center">Personel verisi yok</p>
+                      <p className="text-[13px] text-[#7a7a7e] py-10 text-center">Personel verisi yok</p>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {staffPerf.map((s: any, i: number) => {
                           const maxRev = staffPerf[0].revenue || 1;
                           return (
-                            <div key={s.id} className={`p-4 rounded-2xl ${i === 0 && s.revenue > 0 ? 'bg-[#00A3AD]/5 border border-[#00A3AD]/20' : 'bg-gray-50'}`}>
+                            <div key={s.id} className={`p-4 rounded-xl ${i === 0 && s.revenue > 0 ? 'bg-[#e6f7f4] border border-[#14b8a6]/20' : 'bg-[#fafaf8]'}`}>
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-[#E6F6F7] flex items-center justify-center text-[10px] font-black text-[#00A3AD] flex-shrink-0 overflow-hidden">
+                                  <div className="w-8 h-8 rounded-full bg-[#e6f7f4] flex items-center justify-center text-[10px] font-bold text-[#0d9488] flex-shrink-0 overflow-hidden">
                                     {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt="" /> : s.first_name?.charAt(0)}
                                   </div>
                                   <div>
-                                    <p className="text-xs font-black uppercase">{s.first_name} {s.last_name}</p>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase">{s.apptCount} randevu • Ort. ₺{s.avgBasket.toFixed(0)}</p>
+                                    <p className="text-[13px] font-semibold text-[#0c0c0d]">{s.first_name} {s.last_name}</p>
+                                    <p className="text-[10px] font-mono text-[#7a7a7e]">{s.apptCount} randevu</p>
                                   </div>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                  <p className="text-sm font-black">₺{s.revenue.toLocaleString('tr-TR')}</p>
-                                  {i === 0 && s.revenue > 0 && <p className="text-[8px] font-black text-[#00A3AD] uppercase">En Yüksek</p>}
+                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">₺{s.revenue.toLocaleString('tr-TR')}</p>
+                                  {i === 0 && s.revenue > 0 && <p className="text-[9px] font-mono text-[#14b8a6]">En Yüksek</p>}
                                 </div>
                               </div>
-                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-[#00A3AD] rounded-full" style={{ width: `${Math.max(2, (s.revenue / maxRev) * 100)}%` }} />
+                              <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                                <div className="h-full bg-[#14b8a6] rounded-full" style={{ width: `${Math.max(2, (s.revenue / maxRev) * 100)}%` }} />
                               </div>
                             </div>
                           );
@@ -2048,28 +2167,28 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Hizmet Kârlılığı</h3>
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Hizmet Kârlılığı</h3>
                     {servicePerf.length === 0 ? (
-                      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest italic py-10 text-center">Hizmet verisi yok</p>
+                      <p className="text-[13px] text-[#7a7a7e] py-10 text-center">Hizmet verisi yok</p>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {servicePerf.slice(0, 5).map((s: any, i: number) => {
                           const maxRev = servicePerf[0].totalRevenue || 1;
                           return (
-                            <div key={s.id} className={`p-4 rounded-2xl ${i === 0 && s.totalRevenue > 0 ? 'bg-[#00A3AD]/5 border border-[#00A3AD]/20' : 'bg-gray-50'}`}>
+                            <div key={s.id} className={`p-4 rounded-xl ${i === 0 && s.totalRevenue > 0 ? 'bg-[#e6f7f4] border border-[#14b8a6]/20' : 'bg-[#fafaf8]'}`}>
                               <div className="flex items-center justify-between mb-2">
                                 <div>
-                                  <p className="text-xs font-black uppercase">{s.name}</p>
-                                  <p className="text-[9px] font-bold text-gray-400 uppercase">{s.salesCount} satış • Marj %{s.margin.toFixed(0)}</p>
+                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">{s.name}</p>
+                                  <p className="text-[10px] font-mono text-[#7a7a7e]">{s.salesCount} satış</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                  <p className="text-sm font-black">₺{s.totalRevenue.toLocaleString('tr-TR')}</p>
-                                  {i === 0 && s.totalRevenue > 0 && <p className="text-[8px] font-black text-[#00A3AD] uppercase">En Kârlı</p>}
+                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">₺{s.totalRevenue.toLocaleString('tr-TR')}</p>
+                                  {i === 0 && s.totalRevenue > 0 && <p className="text-[9px] font-mono text-[#14b8a6]">En Kârlı</p>}
                                 </div>
                               </div>
-                              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-[#00A3AD] rounded-full" style={{ width: `${Math.max(2, (s.totalRevenue / maxRev) * 100)}%` }} />
+                              <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                                <div className="h-full bg-[#14b8a6] rounded-full" style={{ width: `${Math.max(2, (s.totalRevenue / maxRev) * 100)}%` }} />
                               </div>
                             </div>
                           );
@@ -2080,18 +2199,18 @@ export default function Dashboard() {
                 </div>
 
                 {/* SAAT BAZLI YOĞUNLUK */}
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-8">Saat Bazlı Yoğunluk Analizi</h3>
+                <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                  <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Saat Bazlı Yoğunluk Analizi</h3>
                   <div className="overflow-x-auto">
                     <div className="min-w-[500px]">
                       <div className="flex gap-1 mb-2 ml-10">
                         {heatmapHours.map(h => (
-                          <div key={h} className="flex-1 text-center text-[7px] font-black text-gray-300">{h}</div>
+                          <div key={h} className="flex-1 text-center text-[7px] font-mono text-[#7a7a7e]">{h}</div>
                         ))}
                       </div>
                       {['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'].map((day, di) => (
                         <div key={di} className="flex gap-1 mb-1 items-center">
-                          <div className="w-10 text-[8px] font-black text-gray-400 uppercase flex-shrink-0">{day}</div>
+                          <div className="w-10 text-[9px] font-mono text-[#7a7a7e] uppercase flex-shrink-0">{day}</div>
                           {heatmapHours.map(h => {
                             const val = heatmapData[di][h];
                             const intensity = val / heatmapMax;
@@ -2099,73 +2218,73 @@ export default function Dashboard() {
                               <div
                                 key={h}
                                 className="flex-1 h-7 rounded-md cursor-default transition-all"
-                                style={{ backgroundColor: val === 0 ? '#F9FAFB' : `rgba(0,163,173,${0.12 + intensity * 0.88})` }}
+                                style={{ backgroundColor: val === 0 ? '#f5f5f3' : `rgba(20,184,166,${0.12 + intensity * 0.88})` }}
                                 title={`${day} ${h}:00 — ${val} randevu`}
                               />
                             );
                           })}
                         </div>
                       ))}
-                      <div className="flex items-center gap-2 mt-5 justify-end">
-                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Boş</span>
+                      <div className="flex items-center gap-2 mt-4 justify-end">
+                        <span className="text-[9px] font-mono text-[#7a7a7e]">Az</span>
                         {[0.12, 0.34, 0.56, 0.78, 1.0].map((o, i) => (
-                          <div key={i} className="w-5 h-4 rounded" style={{ backgroundColor: `rgba(0,163,173,${o})` }} />
+                          <div key={i} className="w-4 h-4 rounded" style={{ backgroundColor: `rgba(20,184,166,${o})` }} />
                         ))}
-                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Dolu</span>
+                        <span className="text-[9px] font-mono text-[#7a7a7e]">Yoğun</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* İPTAL + MÜŞTERİ + ÖNERİLER */}
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="bg-white p-10 rounded-[3rem] border border-red-50 shadow-sm">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 text-red-400">İptal Analizi</h3>
-                    <div className="space-y-6">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <h3 className="text-[12px] font-mono uppercase tracking-widest mb-5 text-[#c2410c]">İptal Analizi</h3>
+                    <div className="space-y-5">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Toplam İptal</p>
-                        <p className="text-3xl font-black text-black">{totalCancellations}</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Toplam İptal</p>
+                        <p className="text-[28px] font-bold text-[#0c0c0d] leading-none">{totalCancellations}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Kaybedilen Gelir</p>
-                        <p className="text-2xl font-black text-red-400">₺{cancellationLoss.toLocaleString('tr-TR')}</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Kaybedilen Gelir</p>
+                        <p className="text-[22px] font-bold text-[#c2410c] leading-none">₺{cancellationLoss.toLocaleString('tr-TR')}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">İptal Oranı</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-2">İptal Oranı</p>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${Math.min(100, cancellationRate)}%` }} />
+                          <div className="flex-1 h-1.5 bg-[#f0f0ee] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#c2410c] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, cancellationRate)}%` }} />
                           </div>
-                          <span className="text-xs font-black text-red-400 flex-shrink-0">%{cancellationRate.toFixed(1)}</span>
+                          <span className="text-[11px] font-mono text-[#c2410c] flex-shrink-0">%{cancellationRate.toFixed(1)}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest mb-6">Müşteri Analizi</h3>
-                    <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                    <h3 className="text-[12px] font-mono uppercase tracking-widest mb-5 text-[#7a7a7e]">Müşteri Analizi</h3>
+                    <div className="space-y-5">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Yeni Müşteri</p>
-                        <p className="text-3xl font-black text-black">{newCust}</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Yeni Müşteri</p>
+                        <p className="text-[28px] font-bold text-[#0c0c0d] leading-none">{newCust}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tekrar Gelen</p>
-                        <p className="text-3xl font-black text-[#00A3AD]">{returningCust}</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Tekrar Gelen</p>
+                        <p className="text-[28px] font-bold text-[#14b8a6] leading-none">{returningCust}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Sadakat Oranı</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-2">Sadakat Oranı</p>
                         <div className="flex items-center gap-3">
-                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-[#00A3AD] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, loyaltyRate)}%` }} />
+                          <div className="flex-1 h-1.5 bg-[#f0f0ee] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#14b8a6] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, loyaltyRate)}%` }} />
                           </div>
-                          <span className="text-xs font-black text-[#00A3AD] flex-shrink-0">%{loyaltyRate.toFixed(1)}</span>
+                          <span className="text-[11px] font-mono text-[#14b8a6] flex-shrink-0">%{loyaltyRate.toFixed(1)}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-black p-10 rounded-[3rem] shadow-2xl">
+                  <div className="bg-[#0c0c0d] p-6 rounded-2xl">
                     <div className="flex items-center gap-3 mb-6">
                       <Lightbulb size={16} className="text-[#00A3AD]" />
                       <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Akıllı Öneriler</h3>
@@ -2173,11 +2292,11 @@ export default function Dashboard() {
                     {smartSuggestions.length === 0 ? (
                       <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest italic">Yeterli veri bekleniyor...</p>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {smartSuggestions.map((tip: string, i: number) => (
                           <div key={i} className="flex gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#00A3AD] flex-shrink-0 mt-1.5" />
-                            <p className="text-[10px] font-bold text-gray-400 leading-relaxed">{tip}</p>
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#14b8a6] flex-shrink-0 mt-2" />
+                            <p className="text-[12px] font-medium text-white/60 leading-relaxed">{tip}</p>
                           </div>
                         ))}
                       </div>
@@ -2186,20 +2305,20 @@ export default function Dashboard() {
                 </div>
 
                 {/* RAPORLAR */}
-                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                  <h3 className="text-[11px] font-black uppercase tracking-widest mb-6">Raporlar</h3>
-                  <div className="flex flex-wrap gap-4">
-                    <button onClick={() => alert('PDF raporu yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl">
-                      <Download size={16} /> PDF İndir
+                <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
+                  <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Raporlar</h3>
+                  <div className="flex flex-wrap gap-3">
+                    <button onClick={() => alert('PDF raporu yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#0c0c0d] text-white rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all">
+                      <Download size={14} /> PDF İndir
                     </button>
-                    <button onClick={() => alert('Excel raporu yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-gray-50 text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-200">
-                      <Download size={16} /> Excel İndir
+                    <button onClick={() => alert('Excel raporu yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#0c0c0d] rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#f0f0ee] transition-all border border-[#ececea]">
+                      <Download size={14} /> Excel İndir
                     </button>
-                    <button onClick={() => alert('Muhasebeci paylaşımı yakında aktif olacak.')} className="flex items-center gap-3 px-8 py-4 bg-gray-50 text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-200">
-                      <Mail size={16} /> Muhasebeciye Gönder
+                    <button onClick={() => alert('Muhasebeci paylaşımı yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#0c0c0d] rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#f0f0ee] transition-all border border-[#ececea]">
+                      <Mail size={14} /> Muhasebeciye Gönder
                     </button>
                   </div>
-                  <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-5">Rapor indirme özelliği yakında aktif olacak.</p>
+                  <p className="text-[10px] font-mono text-[#7a7a7e] mt-4">Rapor indirme özelliği yakında aktif olacak.</p>
                 </div>
               </div>
             )}
@@ -2366,68 +2485,104 @@ export default function Dashboard() {
 
             {/* 8. KAMPANYALAR */}
             {activeTab === "campaigns" && (
-              <div className="animate-in slide-in-from-right-4">
-                <div className="flex justify-between items-center mb-12">
-                  <h2 className="text-4xl font-black uppercase tracking-tighter italic">Kampanyalar</h2>
+              <div className="animate-in slide-in-from-right-4 space-y-6">
+                {/* Page head */}
+                <div className="flex items-end justify-between mb-2">
+                  <div>
+                    <h1 className="text-[32px] font-bold text-[#0c0c0d] tracking-tight uppercase leading-none">Kampanyalar</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1.5">{campaigns.length} kampanya · İndirim ve promosyon yönetimi</p>
+                  </div>
                   <button
                     onClick={() => { setEditingCampaign(null); setCampaignForm({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [], is_active: true }); setIsCampaignModalOpen(true); }}
-                    className="bg-black text-white px-10 py-5 rounded-2xl font-black text-xs uppercase hover:bg-[#00A3AD] transition-all shadow-xl flex items-center gap-2"
+                    className="flex items-center gap-2 bg-[#0c0c0d] text-white px-5 py-3 rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all"
                   >
-                    <Plus size={18} /> Kampanya Oluştur
+                    <Plus size={14} /> Kampanya Oluştur
                   </button>
                 </div>
 
+                {/* Dark hero — quick-start templates */}
+                <div className="bg-[#0c0c0d] rounded-2xl p-6">
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-white/50 mb-2">Hazır Şablon ile Başla</p>
+                  <p className="text-[18px] font-semibold text-white mb-5">Tek tıkla kampanya oluştur</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                      { label: 'Hafta Sonu İndirimi', type: 'percentage', val: '20', color: '#14b8a6', desc: '%20 indirim — Cmt & Paz' },
+                      { label: 'İlk Randevu', type: 'percentage', val: '15', color: '#ca8a04', desc: 'Yeni müşteriye %15 hoşgeldin' },
+                      { label: 'Sadık Müşteri', type: 'percentage', val: '10', color: '#6366f1', desc: '5+ ziyarette %10 indirim' },
+                      { label: 'Bugüne Özel', type: 'today_special', val: '25', color: '#ec4899', desc: 'Günlük özel fiyat' },
+                      { label: 'Son Dakika', type: 'last_minute', val: '30', color: '#f97316', desc: 'Son dakika %30 ucuzlatma' },
+                      { label: 'Doğum Günü', type: 'percentage', val: '20', color: '#22c55e', desc: 'Doğum ayında %20 indirim' },
+                    ].map((tpl, ti) => (
+                      <button key={ti}
+                        onClick={() => {
+                          const now = new Date();
+                          const end = new Date(); end.setDate(end.getDate() + 30);
+                          setEditingCampaign(null);
+                          setCampaignForm({ title: tpl.label, type: tpl.type as any, discount_value: tpl.val, start_date: now.toISOString().slice(0,10), end_date: end.toISOString().slice(0,10), service_ids: [], is_active: true });
+                          setIsCampaignModalOpen(true);
+                        }}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-4 text-left transition-all group"
+                        style={{borderLeftColor: tpl.color, borderLeftWidth: 3}}
+                      >
+                        <p className="text-[12px] font-semibold text-white mb-1">{tpl.label}</p>
+                        <p className="text-[10px] font-mono text-white/40">{tpl.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Campaigns list */}
                 {campaigns.length === 0 ? (
-                  <div className="py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-300 font-black uppercase text-xs tracking-widest italic">
-                    Henüz kampanya oluşturmadınız
+                  <div className="py-16 text-center bg-white rounded-2xl border-2 border-dashed border-[#ececea]">
+                    <p className="text-[13px] text-[#7a7a7e]">Henüz kampanya oluşturmadınız</p>
+                    <p className="text-[11px] font-mono text-[#7a7a7e]/60 mt-1">Yukarıdaki hazır şablonlardan birini deneyin</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {campaigns.map((c) => {
                       const todayStr = new Date().toISOString().slice(0, 10);
                       const isActive = c.is_active && c.start_date <= todayStr && c.end_date >= todayStr;
                       const isUpcoming = c.start_date > todayStr;
-                      const isExpired = c.end_date < todayStr;
                       const typeLabel = c.type === 'percentage' ? `%${c.discount_value} İndirim`
                         : c.type === 'fixed' ? `₺${c.discount_value} İndirim`
                         : c.type === 'today_special' ? 'Bugüne Özel'
                         : 'Son Dakika';
                       return (
-                        <div key={c.id} className={`bg-white p-8 rounded-[2rem] border shadow-sm flex items-center gap-6 hover:shadow-xl transition-all ${isActive ? 'border-[#00A3AD]/30' : 'border-gray-100'}`}>
-                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[#00A3AD]' : isUpcoming ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                            <Percent size={22} className={isActive ? 'text-white' : isUpcoming ? 'text-amber-500' : 'text-gray-400'} />
+                        <div key={c.id} className={`bg-white rounded-2xl border flex items-center gap-5 px-5 py-4 hover:shadow-sm transition-all ${isActive ? 'border-[#14b8a6]/30' : 'border-[#ececea]'}`}>
+                          <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[#e6f7f4]' : isUpcoming ? 'bg-amber-50' : 'bg-[#fafaf8]'}`}>
+                            <Percent size={18} className={isActive ? 'text-[#14b8a6]' : isUpcoming ? 'text-amber-500' : 'text-[#7a7a7e]'} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-1">
-                              <p className="font-black text-sm uppercase tracking-tight text-black">{c.title}</p>
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${isActive ? 'bg-[#00A3AD] text-white' : isUpcoming ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="text-[14px] font-semibold text-[#0c0c0d]">{c.title}</p>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-widest ${isActive ? 'bg-[#e6f7f4] text-[#14b8a6]' : isUpcoming ? 'bg-amber-50 text-amber-600' : 'bg-[#fafaf8] text-[#7a7a7e]'}`}>
                                 {isActive ? 'Aktif' : isUpcoming ? 'Yakında' : 'Sona Erdi'}
                               </span>
                             </div>
-                            <p className="text-[11px] font-bold text-[#00A3AD] uppercase tracking-wide">{typeLabel}</p>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                            <p className="text-[11px] font-mono text-[#14b8a6]">{typeLabel}</p>
+                            <p className="text-[10px] font-mono text-[#7a7a7e] mt-0.5">
                               {c.start_date} → {c.end_date}
                               {c.service_ids?.length > 0 && ` · ${c.service_ids.length} hizmet`}
                             </p>
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                               onClick={async () => {
                                 await supabase.from('campaigns').update({ is_active: !c.is_active }).eq('id', c.id);
                                 setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x));
                               }}
-                              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${c.is_active ? 'bg-[#00A3AD]/10 text-[#00A3AD] hover:bg-red-50 hover:text-red-500' : 'bg-gray-100 text-gray-400 hover:bg-[#00A3AD]/10 hover:text-[#00A3AD]'}`}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all ${c.is_active ? 'bg-[#e6f7f4] text-[#14b8a6] hover:bg-red-50 hover:text-[#dc2626]' : 'bg-[#fafaf8] text-[#7a7a7e] hover:bg-[#e6f7f4] hover:text-[#14b8a6]'}`}
                             >
                               {c.is_active ? 'Durdur' : 'Aktif Et'}
                             </button>
                             <button
                               onClick={() => { setEditingCampaign(c); setCampaignForm({ title: c.title, type: c.type, discount_value: c.discount_value?.toString() || "", start_date: c.start_date, end_date: c.end_date, service_ids: c.service_ids || [], is_active: c.is_active }); setIsCampaignModalOpen(true); }}
-                              className="p-2 text-gray-400 hover:text-[#00A3AD] transition-colors"
+                              className="p-2 text-[#7a7a7e] hover:text-[#14b8a6] transition-colors"
                             >
-                              <Edit3 size={16} />
+                              <Edit3 size={15} />
                             </button>
-                            <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 text-[#7a7a7e]/40 hover:text-[#dc2626] transition-colors">
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         </div>
@@ -2443,46 +2598,49 @@ export default function Dashboard() {
         {/* AYARLAR */}
         {activeTab === "settings" && (
           <div className="animate-in slide-in-from-bottom-4 max-w-5xl">
-            <div className="bg-white rounded-[4rem] p-16 shadow-2xl border border-gray-100">
-              <h2 className="text-4xl font-black uppercase tracking-tighter mb-10 italic underline decoration-[#00A3AD] decoration-8 underline-offset-8">Kurumsal Mühür</h2>
+            <div className="bg-white rounded-2xl p-10 border border-[#ececea]">
+              <div className="mb-8 pb-6 border-b border-[#ececea]">
+                <h1 className="text-[32px] font-bold text-[#0c0c0d] tracking-tight uppercase leading-none">Ayarlar</h1>
+                <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1.5">İşletme bilgileri, adres ve politikalar</p>
+              </div>
               <form className="space-y-10" onSubmit={handleSettingsSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tabela Adı</label><input name="name" defaultValue={shop?.name} required className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Resmi Ünvan</label><input name="legal_name" defaultValue={shop?.legal_name} required className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Tabela Adı</label><input name="name" defaultValue={shop?.name} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Resmi Ünvan</label><input name="legal_name" defaultValue={shop?.legal_name} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">MERSİS NO</label><input name="mersis_no" defaultValue={shop?.mersis_no} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Vergi Dairesi</label><input name="tax_office" defaultValue={shop?.tax_office} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Vergi No</label><input name="tax_no" defaultValue={shop?.tax_no} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">MERSİS NO</label><input name="mersis_no" defaultValue={shop?.mersis_no} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Vergi Dairesi</label><input name="tax_office" defaultValue={shop?.tax_office} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Vergi No</label><input name="tax_no" defaultValue={shop?.tax_no} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İletişim Hattı</label><input name="phone" defaultValue={shop?.shop_phone} required className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">IBAN</label><input name="iban" defaultValue={shop?.iban} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">E-posta</label><input name="email" type="email" defaultValue={shop?.email} placeholder="info@isletme.com" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                  <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Instagram</label><input name="instagram" defaultValue={shop?.instagram} placeholder="@kullaniciadi" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İletişim Hattı</label><input name="phone" defaultValue={shop?.shop_phone} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">IBAN</label><input name="iban" defaultValue={shop?.iban} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">E-posta</label><input name="email" type="email" defaultValue={shop?.email} placeholder="info@isletme.com" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Instagram</label><input name="instagram" defaultValue={shop?.instagram} placeholder="@kullaniciadi" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
 
                 {/* ADRES */}
                 <div className="border-t border-gray-100 pt-10">
-                  <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-6">Adres Bilgileri</p>
+                  <p className="text-[10px] font-mono text-[#14b8a6] uppercase tracking-widest mb-6">Adres Bilgileri</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 relative">
-                      <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İl</label>
-                      <select name="city" defaultValue={shop?.city || ""} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black appearance-none">
+                      <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İl</label>
+                      <select name="city" defaultValue={shop?.city || ""} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d] appearance-none">
                         <option value="">İl Seçiniz</option>
                         {cities.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                       <ChevronDown className="absolute right-6 bottom-6 text-gray-400 pointer-events-none" size={18} />
                     </div>
-                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İlçe</label><input name="district" defaultValue={shop?.district} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Mahalle</label><input name="neighborhood" defaultValue={shop?.neighborhood} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sokak / Cadde</label><input name="street" defaultValue={shop?.street} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Bina No</label><input name="building_no" defaultValue={shop?.building_no} className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
-                    <div className="space-y-2"><label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Posta Kodu</label><input name="postal_code" defaultValue={shop?.postal_code} placeholder="34000" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" /></div>
+                    <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İlçe</label><input name="district" defaultValue={shop?.district} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                    <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Mahalle</label><input name="neighborhood" defaultValue={shop?.neighborhood} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                    <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Sokak / Cadde</label><input name="street" defaultValue={shop?.street} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                    <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Bina No</label><input name="building_no" defaultValue={shop?.building_no} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                    <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Posta Kodu</label><input name="postal_code" defaultValue={shop?.postal_code} placeholder="34000" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   </div>
                   <div className="space-y-2 mt-6">
-                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Google Maps Linki</label>
-                    <input name="maps_link" defaultValue={shop?.maps_link} placeholder="https://maps.google.com/..." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                    <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Google Maps Linki</label>
+                    <input name="maps_link" defaultValue={shop?.maps_link} placeholder="https://maps.google.com/..." className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" />
                   </div>
                   {/* Map preview */}
                   {(shop?.district || shop?.city) && (
@@ -2504,30 +2662,30 @@ export default function Dashboard() {
 
                 {/* İPTAL POLİTİKASI */}
                 <div className="border-t border-gray-100 pt-10">
-                  <p className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest mb-2">İptal & No-Show Politikası</p>
+                  <p className="text-[10px] font-mono text-[#14b8a6] uppercase tracking-widest mb-2">İptal & No-Show Politikası</p>
                   <p className="text-xs text-gray-400 font-medium mb-6">Bu metin, müşterilerin işletme profilinizde "İptal Politikası" butonuna tıkladığında gösterilir.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Ücretsiz İptal Süresi (saat)</label>
-                      <input name="free_cancel_hours" type="number" min="0" max="168" defaultValue={shop?.free_cancel_hours ?? 24} placeholder="24" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                      <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Ücretsiz İptal Süresi (saat)</label>
+                      <input name="free_cancel_hours" type="number" min="0" max="168" defaultValue={shop?.free_cancel_hours ?? 24} placeholder="24" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" />
                       <p className="ml-6 text-[9px] text-gray-300 font-bold uppercase tracking-widest">Randevudan kaç saat önce ücretsiz iptal edilebilir</p>
                     </div>
                     <div className="space-y-2">
-                      <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Depozito Bilgisi</label>
-                      <input name="deposit_info" defaultValue={shop?.deposit_info} placeholder="örn. Randevu tutarının %30'u" className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black" />
+                      <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Depozito Bilgisi</label>
+                      <input name="deposit_info" defaultValue={shop?.deposit_info} placeholder="örn. Randevu tutarının %30'u" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" />
                     </div>
                   </div>
                   <div className="space-y-2 mt-6">
-                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">İptal Politikası Metni</label>
-                    <textarea name="cancellation_policy" rows={4} defaultValue={shop?.cancellation_policy} placeholder="Randevunuzu belirtilen süre içinde iptal etmezseniz veya randevuya gelmezseniz işletme iptal/no-show politikası uygulayabilir. Nihai karar hizmet sağlayıcıya aittir." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black resize-none" />
+                    <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İptal Politikası Metni</label>
+                    <textarea name="cancellation_policy" rows={4} defaultValue={shop?.cancellation_policy} placeholder="Randevunuzu belirtilen süre içinde iptal etmezseniz veya randevuya gelmezseniz işletme iptal/no-show politikası uygulayabilir. Nihai karar hizmet sağlayıcıya aittir." className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d] resize-none" />
                   </div>
                   <div className="space-y-2 mt-6">
-                    <label className="ml-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">No-Show Açıklaması</label>
-                    <textarea name="no_show_policy" rows={3} defaultValue={shop?.no_show_policy} placeholder="Randevuya haber vermeksizin gelmeyen müşteriler için uygulanan politika..." className="p-6 bg-gray-50 rounded-3xl outline-none font-black text-sm border-2 border-transparent focus:border-[#00A3AD] w-full text-black resize-none" />
+                    <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">No-Show Açıklaması</label>
+                    <textarea name="no_show_policy" rows={3} defaultValue={shop?.no_show_policy} placeholder="Randevuya haber vermeksizin gelmeyen müşteriler için uygulanan politika..." className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d] resize-none" />
                   </div>
                 </div>
 
-                <button type="submit" className="w-full bg-black text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-[#00A3AD] transition-all flex items-center justify-center gap-4"><Save size={20} /> Kaydet ve Mühürle</button>
+                <button type="submit" className="w-full bg-[#0c0c0d] text-white py-4 rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all flex items-center justify-center gap-2"><Save size={15} /> Kaydet</button>
               </form>
 
               {/* Tehlikeli Bölge */}
