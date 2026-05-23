@@ -633,31 +633,204 @@ export default function Dashboard() {
 
             {/* 2. GÖRSEL KİMLİK */}
             {activeTab === "branding" && (
-              <div className="animate-in slide-in-from-right-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm text-center">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest mb-6">Tabela & Dış Cephe</h4>
-                  <div className="aspect-video bg-gray-50 rounded-3xl overflow-hidden mb-6 relative">{shop?.image_url ? <img src={shop.image_url} className="w-full h-full object-cover" /> : <ImageIcon className="absolute inset-0 m-auto text-gray-200" size={40} />}</div>
-                  <label className="w-full flex items-center justify-center gap-3 py-5 bg-black text-white rounded-3xl font-black text-[10px] uppercase cursor-pointer hover:bg-[#00A3AD] transition-all"><UploadCloud size={16}/> Fotoğraf Yükle
-                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                      const file = e.target.files?.[0]; if (!file) return;
-                      const url = await handleFileUpload(file, 'shop-covers');
-                      if(url && shop?.id) { await supabase.from('shops').update({ image_url: url }).eq('id', shop.id); fetchInitialData(); }
-                    }} />
-                  </label>
-                </div>
-                <div className="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm text-center">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest mb-6">İç Mekan Galerisi</h4>
-                  <div className="grid grid-cols-2 gap-2 mb-6 h-32 overflow-hidden">
-                    {(shop?.gallery_urls || []).slice(0, 4).map((url: string, i: number) => <img key={i} src={url} className="h-full w-full object-cover rounded-xl" />)}
+              <div className="animate-in slide-in-from-right-4 space-y-8">
+
+                {/* Kapak fotoğrafı yoksa uyarı */}
+                {!shop?.image_url && (
+                  <div className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-6 py-4">
+                    <AlertCircle size={18} className="text-amber-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest text-amber-700">Kapak Fotoğrafı Eksik</p>
+                      <p className="text-[10px] font-bold text-amber-600 mt-0.5">Müşteri sayfanızın daha profesyonel görünmesi için bir kapak fotoğrafı yüklemeniz önerilir.</p>
+                    </div>
                   </div>
-                  <label className="w-full flex items-center justify-center gap-3 py-5 bg-black text-white rounded-3xl font-black text-[10px] uppercase cursor-pointer hover:bg-[#00A3AD] transition-all"><Plus size={16}/> Ekle
-                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                      const file = e.target.files?.[0]; if (!file) return;
-                      const url = await handleFileUpload(file, 'gallery');
-                      if(url && shop?.id) { const g = [...(shop.gallery_urls || []), url]; await supabase.from('shops').update({ gallery_urls: g }).eq('id', shop.id); fetchInitialData(); }
-                    }} />
-                  </label>
+                )}
+
+                {/* Onboarding rehber banner */}
+                <div className="bg-black rounded-[2.5rem] p-8 md:p-10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#00A3AD] mb-2">Rehber</p>
+                  <h3 className="text-xl font-black uppercase tracking-tighter text-white italic mb-2">İşletmenizi en iyi şekilde gösterin</h3>
+                  <p className="text-xs font-bold text-gray-400 mb-7">Kaliteli ve profesyonel fotoğraflar müşteri güvenini artırır, daha fazla rezervasyon almanıza yardımcı olur.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                      { icon: <Camera size={13}/>, text: "Net ve yüksek çözünürlüklü fotoğraflar kullanın" },
+                      { icon: <Lightbulb size={13}/>, text: "Gün ışığı veya güçlü aydınlatma tercih edin" },
+                      { icon: <CheckCircle2 size={13}/>, text: "İşletmenizi temiz ve düzenli gösterin" },
+                    ].map((g, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-2xl px-4 py-3.5 transition-all">
+                        <div className="text-[#00A3AD] flex-shrink-0">{g.icon}</div>
+                        <p className="text-[11px] font-bold text-gray-300">{g.text}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Bölüm 1: Tabela & İç Mekan */}
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
+                  <div className="flex items-center gap-3 mb-8">
+                    <h3 className="text-sm font-black uppercase tracking-tighter">Tabela & İç Mekan</h3>
+                    <div className="relative group/tip1">
+                      <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#00A3AD] hover:text-white transition-all cursor-help text-[10px] font-black">?</div>
+                      <div className="absolute left-0 top-7 z-30 w-72 bg-black text-white text-[11px] font-bold leading-relaxed rounded-2xl p-4 opacity-0 group-hover/tip1:opacity-100 transition-all pointer-events-none shadow-2xl">
+                        Buraya yüklediğiniz fotoğraflar müşterilerinizin işletmenizi ilk gördüğü alanlarda gösterilir. Net, aydınlık ve profesyonel fotoğraflar daha fazla güven oluşturur ve rezervasyon oranını artırır.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* A) Kapak Fotoğrafı - ZORUNLU */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[11px] font-black uppercase tracking-widest">Kapak Fotoğrafı</p>
+                        <span className="text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">Zorunlu</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-gray-400 mb-4">Müşteri sayfasında hero alanında gösterilen ana görseldir. İşletmenizi en iyi şekilde yansıtmalıdır.</p>
+                      <label className="group block cursor-pointer">
+                        <div className={`relative rounded-[2rem] overflow-hidden border-2 border-dashed transition-all ${shop?.image_url ? 'border-transparent' : 'border-gray-200 hover:border-[#00A3AD] hover:shadow-[0_0_0_4px_rgba(0,163,173,0.08)]'}`} style={{ aspectRatio: '16/7' }}>
+                          {shop?.image_url ? (
+                            <>
+                              <img src={shop.image_url} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                <div className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase shadow-xl">
+                                  <UploadCloud size={14}/> Fotoğrafı Değiştir
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full h-full bg-gray-50 group-hover:bg-[#E6F6F7] transition-all flex flex-col items-center justify-center gap-4 py-12">
+                              <div className="w-16 h-16 rounded-2xl bg-gray-100 group-hover:bg-[#00A3AD]/10 flex items-center justify-center transition-all">
+                                <UploadCloud size={28} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 group-hover:text-[#00A3AD] transition-colors mb-1">Kapak Fotoğrafı Yükle</p>
+                                <p className="text-[10px] font-bold text-gray-400 max-w-xs mx-auto">Buraya işletmenizin dışarıdan çekilmiş net bir fotoğrafını yükleyin. Tabelanız ve giriş kısmı görünmelidir.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          const url = await handleFileUpload(file, 'shop-covers');
+                          if(url && shop?.id) { await supabase.from('shops').update({ image_url: url }).eq('id', shop.id); fetchInitialData(); }
+                        }} />
+                      </label>
+                    </div>
+
+                    {/* B) Tabela/Dış Cephe + C) İç Mekan */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* B) Tabela / Dış Cephe */}
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest mb-1">Tabela / Dış Cephe</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-3">Müşteriler işletmenizi sokakta daha kolay bulabilir.</p>
+                        <label className="group block cursor-pointer">
+                          <div className={`rounded-3xl overflow-hidden border-2 border-dashed transition-all ${(shop?.gallery_urls || [])[0] ? 'border-transparent' : 'border-gray-200 hover:border-[#00A3AD] hover:shadow-[0_0_0_4px_rgba(0,163,173,0.08)]'}`} style={{ aspectRatio: '4/3' }}>
+                            {(shop?.gallery_urls || [])[0] ? (
+                              <div className="relative h-full">
+                                <img src={(shop.gallery_urls)[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                  <div className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-xl font-black text-[10px] uppercase"><Plus size={12}/> Ekle</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full bg-gray-50 group-hover:bg-[#E6F6F7] transition-all flex flex-col items-center justify-center gap-3 min-h-[180px]">
+                                <ImageIcon size={24} className="text-gray-200 group-hover:text-[#00A3AD] transition-colors" />
+                                <p className="text-[10px] font-bold text-gray-400 group-hover:text-[#00A3AD] text-center px-6 transition-colors">Tabelanızı ve dış görünüşünüzü net ve aydınlık şekilde yükleyin.</p>
+                              </div>
+                            )}
+                          </div>
+                          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0]; if (!file) return;
+                            const url = await handleFileUpload(file, 'gallery');
+                            if(url && shop?.id) { const g = [...(shop.gallery_urls || []), url]; await supabase.from('shops').update({ gallery_urls: g }).eq('id', shop.id); fetchInitialData(); }
+                          }} />
+                        </label>
+                      </div>
+
+                      {/* C) İç Mekan */}
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-widest mb-1">İç Mekan</p>
+                        <p className="text-[10px] font-bold text-gray-400 mb-3">Kaliteli iç mekan fotoğrafları müşteri güvenini artırır.</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(shop?.gallery_urls || []).slice(1, 4).map((url: string, i: number) => (
+                            <div key={i} className="aspect-square rounded-2xl overflow-hidden">
+                              <img src={url} className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                          <label className="group cursor-pointer">
+                            <div className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#00A3AD] hover:shadow-[0_0_0_4px_rgba(0,163,173,0.08)] transition-all flex flex-col items-center justify-center gap-1.5 group-hover:bg-[#E6F6F7] group-hover:scale-[1.02]">
+                              <Plus size={18} className="text-gray-300 group-hover:text-[#00A3AD] transition-colors" />
+                              <p className="text-[9px] font-black text-gray-300 group-hover:text-[#00A3AD] uppercase tracking-widest transition-colors">Ekle</p>
+                            </div>
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                              const file = e.target.files?.[0]; if (!file) return;
+                              const url = await handleFileUpload(file, 'gallery');
+                              if(url && shop?.id) { const g = [...(shop.gallery_urls || []), url]; await supabase.from('shops').update({ gallery_urls: g }).eq('id', shop.id); fetchInitialData(); }
+                            }} />
+                          </label>
+                        </div>
+                        <p className="text-[10px] font-bold text-gray-400 mt-2">Koltuklarınızı, aynalarınızı ve iç dizaynınızı net ışık altında gösterin.</p>
+                      </div>
+                    </div>
+
+                    {/* D) Opsiyonel bilgi */}
+                    <div className="flex items-center gap-3 bg-[#E6F6F7] rounded-2xl px-5 py-4">
+                      <Lightbulb size={15} className="text-[#00A3AD] flex-shrink-0" />
+                      <p className="text-[11px] font-bold text-[#00A3AD]">Dekorasyon ve ambiyans fotoğrafları eklemek rezervasyon dönüşümünü artırabilir.</p>
+                      <span className="ml-auto text-[9px] font-black uppercase tracking-widest bg-[#00A3AD]/10 text-[#00A3AD] px-2.5 py-1 rounded-full flex-shrink-0 whitespace-nowrap">Opsiyonel</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bölüm 2: Favori Kesimleriniz */}
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
+                  <div className="flex items-center gap-3 mb-3">
+                    <h3 className="text-sm font-black uppercase tracking-tighter">Favori Kesimleriniz</h3>
+                    <div className="relative group/tip2">
+                      <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#00A3AD] hover:text-white transition-all cursor-help text-[10px] font-black">?</div>
+                      <div className="absolute left-0 top-7 z-30 w-72 bg-black text-white text-[11px] font-bold leading-relaxed rounded-2xl p-4 opacity-0 group-hover/tip2:opacity-100 transition-all pointer-events-none shadow-2xl">
+                        Yüklediğiniz kesim fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-0.5 mb-6">
+                    <p className="text-[10px] font-bold text-gray-400">Fade, sakal, uzun saç, boyama veya özel işlemlerinizden örnekler ekleyin.</p>
+                    <p className="text-[10px] font-bold text-gray-400">Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.</p>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {(shop?.haircut_urls || []).map((url: string, i: number) => (
+                      <div key={i} className="aspect-square rounded-2xl overflow-hidden">
+                        <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                      </div>
+                    ))}
+                    {Array.from({ length: Math.max(0, 4 - (shop?.haircut_urls || []).length) }).map((_, i) => (
+                      <label key={`hc-${i}`} className="group cursor-pointer">
+                        <div className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#00A3AD] hover:shadow-[0_0_0_4px_rgba(0,163,173,0.08)] transition-all flex flex-col items-center justify-center gap-2 group-hover:bg-[#E6F6F7] group-hover:scale-[1.02]">
+                          <Camera size={20} className="text-gray-200 group-hover:text-[#00A3AD] transition-colors" />
+                          <p className="text-[9px] font-black text-gray-300 group-hover:text-[#00A3AD] uppercase tracking-widest transition-colors">Ekle</p>
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          const url = await handleFileUpload(file, 'haircuts');
+                          if(url && shop?.id) { const g = [...(shop.haircut_urls || []), url]; await supabase.from('shops').update({ haircut_urls: g }).eq('id', shop.id); fetchInitialData(); }
+                        }} />
+                      </label>
+                    ))}
+                    {(shop?.haircut_urls || []).length >= 4 && (
+                      <label className="group cursor-pointer">
+                        <div className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#00A3AD] hover:shadow-[0_0_0_4px_rgba(0,163,173,0.08)] transition-all flex flex-col items-center justify-center gap-2 group-hover:bg-[#E6F6F7]">
+                          <Plus size={20} className="text-gray-200 group-hover:text-[#00A3AD] transition-colors" />
+                          <p className="text-[9px] font-black text-gray-300 group-hover:text-[#00A3AD] uppercase tracking-widest transition-colors">Daha Fazla</p>
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0]; if (!file) return;
+                          const url = await handleFileUpload(file, 'haircuts');
+                          if(url && shop?.id) { const g = [...(shop.haircut_urls || []), url]; await supabase.from('shops').update({ haircut_urls: g }).eq('id', shop.id); fetchInitialData(); }
+                        }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
               </div>
             )}
 
