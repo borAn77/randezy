@@ -137,25 +137,37 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
   );
 }
 
-function NextUpCard({ apt, onComplete, onGoCalendar }: { apt: AptDisplay; onComplete: (id: string) => void; onGoCalendar: () => void }) {
-  const isNow = apt.dispStatus === 'now';
-  const name  = apt.profiles?.full_name || 'Misafir';
-  const phone = apt.profiles?.phone;
+function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: (id: string, status: string) => void }) {
+  const isNow     = apt.dispStatus === 'now';
+  const isPending = apt.dispStatus === 'pending';
+  const name      = apt.profiles?.full_name || 'Misafir';
+  const phone     = apt.profiles?.phone;
 
-  const handleComplete = () => {
-    Alert.alert('Randevuyu tamamla', `${name} için randevuyu tamamlandı olarak işaretle?`, [
+  const confirm = () =>
+    Alert.alert('Randevuyu onayla', `${name} için randevuyu onaylıyor musun?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Tamamla', style: 'default', onPress: () => onComplete(apt.id) },
+      { text: 'Onayla', onPress: () => onStatusChange(apt.id, 'Onaylandı') },
     ]);
-  };
+
+  const complete = () =>
+    Alert.alert('Müşteri geldi mi?', `${name} için randevuyu tamamlandı olarak işaretle?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: '✓ Geldi', onPress: () => onStatusChange(apt.id, 'Tamamlandı') },
+    ]);
+
+  const noShow = () =>
+    Alert.alert('Müşteri gelmedi', `${name} randevusu iptal edilsin mi?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Gelmedi', style: 'destructive', onPress: () => onStatusChange(apt.id, 'İptal Edildi') },
+    ]);
 
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: CARD, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.07, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: isNow ? 'rgba(27,183,110,0.12)' : 'rgba(91,91,247,0.10)' }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNow ? OK : PRIMARY }} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: isNow ? OK : PRIMARY, letterSpacing: 0.2 }}>{isNow ? 'ŞİMDİ' : 'SIRADAKİ'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: isNow ? 'rgba(27,183,110,0.12)' : isPending ? 'rgba(245,165,36,0.14)' : 'rgba(91,91,247,0.10)' }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNow ? OK : isPending ? WARN : PRIMARY }} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: isNow ? OK : isPending ? WARN : PRIMARY, letterSpacing: 0.2 }}>{isNow ? 'ŞİMDİ' : isPending ? 'BEKLİYOR' : 'SIRADAKİ'}</Text>
           </View>
           <Text style={{ fontSize: 12, color: MUTED, fontWeight: '600' }}>{apt.appointment_time.slice(0, 5)} · {apt.duration_minutes || 30} dk</Text>
         </View>
@@ -170,24 +182,54 @@ function NextUpCard({ apt, onComplete, onGoCalendar }: { apt: AptDisplay; onComp
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-        {phone ? (
-          <TouchableOpacity style={[styles.softBtn, { width: 40 }]} onPress={() => Linking.openURL(`tel:${phone}`)}>
-            <Feather name="phone" size={16} color={INK} />
+      {/* Contact buttons */}
+      {phone ? (
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 10 }}>
+          <TouchableOpacity style={[styles.softBtn, { flex: 1 }]} onPress={() => Linking.openURL(`tel:${phone}`)}>
+            <Feather name="phone" size={15} color={INK} />
+            <Text style={{ fontSize: 13, fontWeight: '600', color: INK, marginLeft: 5 }}>Ara</Text>
           </TouchableOpacity>
-        ) : null}
-        {phone ? (
-          <TouchableOpacity style={[styles.softBtn, { width: 40 }]} onPress={() => Linking.openURL(`sms:${phone}`)}>
-            <Feather name="message-circle" size={16} color={INK} />
+          <TouchableOpacity style={[styles.softBtn, { flex: 1 }]} onPress={() => Linking.openURL(`sms:${phone}`)}>
+            <Feather name="message-circle" size={15} color={INK} />
+            <Text style={{ fontSize: 13, fontWeight: '600', color: INK, marginLeft: 5 }}>Mesaj</Text>
           </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity
-          style={[styles.softBtn, { flex: 1, backgroundColor: isNow ? OK : INK, borderWidth: 0, shadowColor: isNow ? OK : INK, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}
-          onPress={isNow ? handleComplete : onGoCalendar}
-        >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{isNow ? '✓ Tamamla' : 'Detay'}</Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      ) : <View style={{ marginTop: 12 }} />}
+
+      {/* Action buttons */}
+      {isPending ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.softBtn, { flex: 1, backgroundColor: 'rgba(245,165,36,0.10)', borderColor: 'rgba(245,165,36,0.3)' }]}
+            onPress={noShow}
+          >
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: WARN }}>İptal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.softBtn, { flex: 2, backgroundColor: PRIMARY, borderWidth: 0, shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}
+            onPress={confirm}
+          >
+            <Feather name="check" size={16} color="#fff" />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginLeft: 6 }}>Onayla</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.softBtn, { flex: 1, backgroundColor: 'rgba(240,106,139,0.10)', borderColor: 'rgba(240,106,139,0.3)' }]}
+            onPress={noShow}
+          >
+            <Text style={{ fontSize: 13.5, fontWeight: '700', color: ROSE }}>Gelmedi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.softBtn, { flex: 2, backgroundColor: OK, borderWidth: 0, shadowColor: OK, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}
+            onPress={complete}
+          >
+            <Feather name="check" size={16} color="#fff" />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginLeft: 6 }}>Geldi / Tamamla</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -357,13 +399,19 @@ export default function HomeScreen() {
   const goSettings  = () => navigation.navigate('Profil');
   const goFinans    = () => navigation.navigate('Isletme');
 
-  const handleComplete = useCallback(async (aptId: string) => {
-    await supabase.from('appointments').update({ status: 'Tamamlandı' }).eq('id', aptId);
-    setTodayApts(prev => prev.map(a => a.id === aptId ? { ...a, status: 'Tamamlandı', dispStatus: 'done' } : a));
-    setRevenue(prev => {
-      const apt = todayApts.find(a => a.id === aptId);
-      return prev + (apt?.price ?? 0);
-    });
+  const handleStatusChange = useCallback(async (aptId: string, newStatus: string) => {
+    await supabase.from('appointments').update({ status: newStatus }).eq('id', aptId);
+    setTodayApts(prev => prev.map(a => {
+      if (a.id !== aptId) return a;
+      const updated = { ...a, status: newStatus };
+      return { ...updated, dispStatus: computeDispStatus(updated) };
+    }));
+    if (newStatus === 'Tamamlandı') {
+      setRevenue(prev => {
+        const apt = todayApts.find(a => a.id === aptId);
+        return prev + (apt?.price ?? 0);
+      });
+    }
   }, [todayApts]);
 
   const load = useCallback(async () => {
@@ -445,7 +493,7 @@ export default function HomeScreen() {
       >
         <HomeHeader ownerName={ownerName} shopName={shopName} onGoCalendar={goCalendar} onGoSettings={goSettings} />
         <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} />
-        {nextUp && <NextUpCard apt={nextUp} onComplete={handleComplete} onGoCalendar={goCalendar} />}
+        {nextUp && <NextUpCard apt={nextUp} onStatusChange={handleStatusChange} />}
         <QuickActions onGoFinans={goFinans} />
 
         <SectionHeader
@@ -476,5 +524,6 @@ const styles = StyleSheet.create({
   softBtn: {
     height: 40, borderRadius: 12, borderWidth: 1, borderColor: HAIR,
     backgroundColor: BG, alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row',
   },
 });
