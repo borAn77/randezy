@@ -1,13 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Appointment, AppointmentStatus, StaffMember } from '../types/appointment';
 import {
-  fetchDayAppointments, fetchWeekAppointments, fetchStaff,
+  fetchDayAppointments, fetchWeekAppointments, fetchRangeAppointments, fetchStaff,
   updateStatus, reschedule, deleteAppointment, clearShopCache,
 } from '../services/appointments';
-import { toDateStr, getWeekDays } from '../utils/date';
+import { toDateStr, getWeekDays, getMonthStart, getMonthEnd, addDays } from '../utils/date';
 
-export type ViewMode = 'day' | 'week';
-export type TabMode = 'calendar' | 'list';
+// gun=Day, hafta=Week, ay=Month, calisan=Staff-columns, liste=Agenda-list
+export type ViewMode = 'gun' | 'hafta' | 'ay' | 'calisan' | 'liste';
 
 export interface DailyStats {
   total: number; confirmed: number; pending: number;
@@ -15,12 +15,11 @@ export interface DailyStats {
 }
 
 interface AppointmentsCtx {
-  tabMode: TabMode; setTabMode: (m: TabMode) => void;
   viewMode: ViewMode; setViewMode: (m: ViewMode) => void;
   selectedDate: Date; setSelectedDate: (d: Date) => void;
   selectedStaffId: string | null; setSelectedStaffId: (id: string | null) => void;
-  appointments: Appointment[];
-  weekAppointments: Appointment[];
+  appointments: Appointment[];       // single-day (gun / calisan)
+  rangeAppointments: Appointment[];  // week / month / list range
   staff: StaffMember[];
   stats: DailyStats;
   loading: boolean; error: string | null;
@@ -38,7 +37,7 @@ function calcStats(apts: Appointment[]): DailyStats {
   const pending = apts.filter(a => a.status === 'Beklemede').length;
   const cancelled = apts.filter(a => a.status === 'İptal Edildi').length;
   const noShow = apts.filter(a => a.status === 'Gelmedi').length;
-  const totalMinutes = 14 * 60; // 8:00 - 22:00
+  const totalMinutes = 14 * 60;
   const usedMinutes = apts
     .filter(a => a.status === 'Onaylandı' || a.status === 'Tamamlandı')
     .reduce((s, a) => s + a.duration_minutes, 0);
@@ -47,12 +46,11 @@ function calcStats(apts: Appointment[]): DailyStats {
 }
 
 export function AppointmentsProvider({ children }: { children: React.ReactNode }) {
-  const [tabMode, setTabMode] = useState<TabMode>('calendar');
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>('gun');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [weekAppointments, setWeekAppointments] = useState<Appointment[]>([]);
+  const [rangeAppointments, setRangeAppointments] = useState<Appointment[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +63,21 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
       const [staffData] = await Promise.all([fetchStaff()]);
       if (t === token.current) setStaff(staffData);
 
-      if (viewMode === 'day') {
+      if (viewMode === 'gun' || viewMode === 'calisan') {
         const data = await fetchDayAppointments(toDateStr(date));
         if (t === token.current) setAppointments(data);
-      } else {
+      } else if (viewMode === 'hafta') {
         const week = getWeekDays(date);
         const data = await fetchWeekAppointments(toDateStr(week[0]), toDateStr(week[6]));
-        if (t === token.current) setWeekAppointments(data);
+        if (t === token.current) setRangeAppointments(data);
+      } else if (viewMode === 'ay') {
+        const start = getMonthStart(date);
+        const end = getMonthEnd(date);
+        const data = await fetchRangeAppointments(toDateStr(start), toDateStr(end));
+        if (t === token.current) setRangeAppointments(data);
+      } else if (viewMode === 'liste') {
+        const data = await fetchRangeAppointments(toDateStr(date), toDateStr(addDays(date, 6)));
+        if (t === token.current) setRangeAppointments(data);
       }
     } catch (e: any) {
       if (t === token.current) setError(e?.message ?? 'Veri yüklenemedi');
@@ -91,10 +97,11 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
   const stats = calcStats(visibleApts);
 
   const doUpdateStatus = useCallback(async (id: string, status: AppointmentStatus) => {
+    const apt = appointments.find(a => a.id === id) ?? rangeAppointments.find(a => a.id === id);
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-    setWeekAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-    await updateStatus(id, status);
-  }, []);
+    setRangeAppointments(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    await updateStatus(id, status, apt);
+  }, [appointments, rangeAppointments]);
 
   const doReschedule = useCallback(async (id: string, date: string, time: string) => {
     await reschedule(id, date, time); refresh();
@@ -102,16 +109,16 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
 
   const doDelete = useCallback(async (id: string) => {
     setAppointments(prev => prev.filter(a => a.id !== id));
-    setWeekAppointments(prev => prev.filter(a => a.id !== id));
+    setRangeAppointments(prev => prev.filter(a => a.id !== id));
     await deleteAppointment(id);
   }, []);
 
   return (
     <Ctx.Provider value={{
-      tabMode, setTabMode, viewMode, setViewMode,
+      viewMode, setViewMode,
       selectedDate, setSelectedDate,
       selectedStaffId, setSelectedStaffId,
-      appointments: visibleApts, weekAppointments,
+      appointments: visibleApts, rangeAppointments,
       staff, stats, loading, error, refresh,
       doUpdateStatus, doReschedule, doDelete,
     }}>

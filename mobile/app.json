@@ -34,7 +34,8 @@
           "color": "#6366f1",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

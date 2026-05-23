@@ -3,6 +3,23 @@ const DAYS_SHORT_TR = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
 const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
+// Turkish-convention day of week: 0=Mon … 6=Sun
+export function dowTR(d: Date): number {
+  return (d.getDay() + 6) % 7;
+}
+
+export function getMonthStart(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+export function getMonthEnd(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+export function formatMonthTR(date: Date): string {
+  return `${MONTHS_TR[date.getMonth()]} ${date.getFullYear()}`;
+}
+
 export function toDateStr(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -26,6 +43,9 @@ export function formatDateShortTR(date: Date): string {
 export function getDayShortTR(date: Date): string {
   return DAYS_SHORT_TR[date.getDay()];
 }
+
+// Days short in Mon-first order (design system: Pzt Sal Çar Per Cum Cmt Paz)
+export const DAYS_MON_FIRST = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
 export function getWeekDays(date: Date): Date[] {
   const day = date.getDay();

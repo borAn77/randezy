@@ -4,6 +4,7 @@ import {
   TouchableOpacity, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { BRAND, BRAND_LIGHT, BORDER } from '../constants/colors';
 import { clearShopCache } from '../services/appointments';
@@ -66,6 +67,22 @@ export default function SettingsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const testNotification = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Bildirim izni verilmedi.');
+      return;
+    }
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Yeni Randevu',
+        body: 'Ahmet Yılmaz yarın saat 14:00 için randevu aldı.',
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 3 },
+    });
+    Alert.alert('Gönderildi', '3 saniye içinde bildirim gelecek.');
   };
 
   const logout = () => {
@@ -156,6 +173,15 @@ export default function SettingsScreen() {
             <Ionicons name="star" size={18} color="#f59e0b" />
           </View>
           <Text style={styles.menuLabel}>Yorumlar</Text>
+          <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+        </TouchableOpacity>
+
+        {/* Notification test */}
+        <TouchableOpacity style={styles.menuRow} onPress={testNotification}>
+          <View style={[styles.menuIcon, { backgroundColor: '#ede9fe' }]}>
+            <Ionicons name="notifications" size={18} color="#6366f1" />
+          </View>
+          <Text style={styles.menuLabel}>Bildirim Test Et</Text>
           <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
         </TouchableOpacity>
 

@@ -138,7 +138,7 @@ function BookContent() {
           </p>
           <div className="flex gap-4 justify-center">
             <button
-              onClick={() => router.push("/account")}
+              onClick={() => router.push("/randevularim")}
               className="bg-black text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#00A3AD] transition-all"
             >
               Randevularım

@@ -5,27 +5,27 @@ import {
 } from 'react-native';
 import { useAppointments } from '../../contexts/AppointmentsContext';
 import { getWeekDays, toDateStr, isSameDay, getDayShortTR } from '../../utils/date';
-import { STATUS_CONFIG, BRAND } from '../../constants/colors';
+import { BRAND, CATEGORY_COLORS, getCategoryForService } from '../../constants/colors';
 import { Appointment } from '../../types/appointment';
 import { formatTime } from '../../utils/time';
 
 export default function WeekView({ onPressAppointment }: { onPressAppointment: (apt: Appointment) => void }) {
-  const { selectedDate, setSelectedDate, setViewMode, weekAppointments, loading, refresh } = useAppointments();
+  const { selectedDate, setSelectedDate, setViewMode, rangeAppointments, loading, refresh } = useAppointments();
   const week = getWeekDays(selectedDate);
   const today = new Date();
 
   const aptsByDate: Record<string, Appointment[]> = {};
-  weekAppointments.forEach(a => {
+  rangeAppointments.forEach(a => {
     if (!aptsByDate[a.appointment_date]) aptsByDate[a.appointment_date] = [];
     aptsByDate[a.appointment_date].push(a);
   });
 
-  const totalWeek = weekAppointments.length;
-  const pendingWeek = weekAppointments.filter(a => a.status === 'Beklemede').length;
+  const totalWeek = rangeAppointments.length;
+  const pendingWeek = rangeAppointments.filter(a => a.status === 'Beklemede').length;
 
   const goToDay = (date: Date) => {
     setSelectedDate(date);
-    setViewMode('day');
+    setViewMode('gun');
   };
 
   return (
@@ -35,7 +35,7 @@ export default function WeekView({ onPressAppointment }: { onPressAppointment: (
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={BRAND} />}
     >
-      {loading && weekAppointments.length === 0 && (
+      {loading && rangeAppointments.length === 0 && (
         <View style={styles.center}><ActivityIndicator color={BRAND} size="large" /></View>
       )}
 
@@ -54,7 +54,7 @@ export default function WeekView({ onPressAppointment }: { onPressAppointment: (
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryNum, { color: '#16a34a' }]}>
-              {weekAppointments.filter(a => a.status === 'Onaylandı').length}
+              {rangeAppointments.filter(a => a.status === 'Onaylandı').length}
             </Text>
             <Text style={styles.summaryLabel}>Onaylı</Text>
           </View>
@@ -105,22 +105,22 @@ export default function WeekView({ onPressAppointment }: { onPressAppointment: (
             {apts.length > 0 && (
               <View style={styles.chipList}>
                 {apts.slice(0, 4).map(apt => {
-                  const cfg = STATUS_CONFIG[apt.status] ?? STATUS_CONFIG['Beklemede'];
+                  const cc = CATEGORY_COLORS[getCategoryForService(apt.service_name)];
                   return (
                     <TouchableOpacity
                       key={apt.id}
                       onPress={() => onPressAppointment(apt)}
-                      style={[styles.chip, { backgroundColor: cfg.bg, borderColor: cfg.border }]}
+                      style={[styles.chip, { backgroundColor: cc.bg, borderColor: cc.edge }]}
                       activeOpacity={0.8}
                     >
-                      <View style={[styles.chipDot, { backgroundColor: cfg.border }]} />
-                      <Text style={[styles.chipTime, { color: cfg.text }]}>
+                      <View style={[styles.chipDot, { backgroundColor: cc.edge }]} />
+                      <Text style={[styles.chipTime, { color: cc.text }]}>
                         {formatTime(apt.appointment_time)}
                       </Text>
-                      <Text style={[styles.chipName, { color: cfg.text }]} numberOfLines={1}>
+                      <Text style={[styles.chipName, { color: cc.text }]} numberOfLines={1}>
                         {apt.profiles?.full_name || 'Misafir'}
                       </Text>
-                      <Text style={[styles.chipService, { color: cfg.text }]} numberOfLines={1}>
+                      <Text style={[styles.chipService, { color: cc.text }]} numberOfLines={1}>
                         {apt.service_name}
                       </Text>
                     </TouchableOpacity>

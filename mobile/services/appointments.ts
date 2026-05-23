@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase';
+import { api, setAuthToken } from '../lib/api';
 import { Appointment, AppointmentStatus, StaffMember } from '../types/appointment';
 import { DEFAULT_DURATION } from '../constants/layout';
 
 let cachedShopId: number | null = null;
+let cachedShopName: string = '';
 let cachedServiceMap: Record<string, number> = {};
 let cachedStaff: StaffMember[] = [];
 
@@ -13,11 +15,12 @@ async function getShopContext() {
   if (!session) throw new Error('Giriş yapılmamış');
 
   const { data: shops, error: shopErr } = await supabase
-    .from('shops').select('id').eq('owner_id', session.user.id).limit(1);
+    .from('shops').select('id, name').eq('owner_id', session.user.id).limit(1);
   if (shopErr) throw shopErr;
   if (!shops?.length) throw new Error('İşletme bulunamadı');
 
   const shopId = shops[0].id;
+  cachedShopName = shops[0].name ?? '';
 
   const [{ data: services }, { data: staff }] = await Promise.all([
     supabase.from('services').select('name, duration').eq('shop_id', shopId),
@@ -36,6 +39,7 @@ async function getShopContext() {
 
 export function clearShopCache() {
   cachedShopId = null;
+  cachedShopName = '';
   cachedServiceMap = {};
   cachedStaff = [];
 }
@@ -59,6 +63,18 @@ export async function fetchDayAppointments(date: string): Promise<Appointment[]>
   return withDuration(data, serviceMap);
 }
 
+export async function fetchRangeAppointments(start: string, end: string): Promise<Appointment[]> {
+  const { shopId, serviceMap } = await getShopContext();
+  const { data, error } = await supabase
+    .from('appointments').select(SELECT)
+    .eq('shop_id', shopId)
+    .gte('appointment_date', start).lte('appointment_date', end)
+    .order('appointment_date', { ascending: true })
+    .order('appointment_time', { ascending: true });
+  if (error) throw error;
+  return withDuration(data, serviceMap);
+}
+
 export async function fetchWeekAppointments(weekStart: string, weekEnd: string): Promise<Appointment[]> {
   const { shopId, serviceMap } = await getShopContext();
   const { data, error } = await supabase
@@ -76,9 +92,33 @@ export async function fetchStaff(): Promise<StaffMember[]> {
   return staff;
 }
 
-export async function updateStatus(id: string, status: AppointmentStatus): Promise<void> {
+export async function updateStatus(id: string, status: AppointmentStatus, apt?: Appointment): Promise<void> {
   const { error } = await supabase.from('appointments').update({ status }).eq('id', id);
   if (error) throw error;
+
+  if (status === 'Onaylandı' && apt?.profiles?.email) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      setAuthToken(session.access_token);
+      const [h, m] = apt.appointment_time.split(':');
+      const [year, month, day] = apt.appointment_date.split('-');
+      const startTime = new Date(
+        parseInt(year), parseInt(month) - 1, parseInt(day),
+        parseInt(h), parseInt(m)
+      ).toISOString();
+      const staffName = apt.staff
+        ? `${apt.staff.first_name ?? ''} ${apt.staff.last_name ?? ''}`.trim() || null
+        : null;
+      api.post('/appointments/send-confirmed-email', {
+        customer_email: apt.profiles.email,
+        customer_name: apt.profiles.full_name ?? null,
+        business_name: cachedShopName,
+        service_name: apt.service_name,
+        start_time: startTime,
+        staff_name: staffName,
+      }).catch(() => {});
+    }
+  }
 }
 
 export async function reschedule(id: string, date: string, time: string): Promise<void> {

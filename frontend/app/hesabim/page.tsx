@@ -43,10 +43,20 @@ export default function HesabimPage() {
 
         const { data: favData } = await supabase
           .from('favorites')
-          .select('shop_id, shops(id, name, city, district, image_url, score, category)')
+          .select('shop_id')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false });
-        setFavorites((favData || []).map((f: any) => f.shops).filter(Boolean));
+        const shopIds = (favData || []).map((f: any) => f.shop_id).filter(Boolean);
+        if (shopIds.length > 0) {
+          const { data: shopData } = await supabase
+            .from('shops')
+            .select('id, name, city, district, image_url, score, category')
+            .in('id', shopIds);
+          const shopMap = Object.fromEntries((shopData || []).map((s: any) => [s.id, s]));
+          setFavorites(shopIds.map((id: any) => shopMap[id]).filter(Boolean));
+        } else {
+          setFavorites([]);
+        }
 
         if (prof?.role === 'business_owner') {
           const { data: shopRes } = await supabase
@@ -167,8 +177,8 @@ export default function HesabimPage() {
 
             {!isOwner && (
               <button
-                onClick={() => setActiveTab("randevularim")}
-                className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'randevularim' ? 'bg-[#00A3AD] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                onClick={() => router.push("/randevularim")}
+                className="w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 text-gray-500 hover:bg-gray-50"
               >
                 <div className="flex items-center gap-4">
                   <Calendar size={18} />
