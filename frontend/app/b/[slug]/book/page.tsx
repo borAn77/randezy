@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Navbar from "../../../../components/layout/Navbar";
 import { api, type BusinessDetail, type Service, type StaffMember, type TimeSlot, ApiError } from "../../../../lib/api";
 import { CheckCircle2, ChevronLeft, Clock, Calendar, User } from "lucide-react";
+import { supabase } from "../../../../lib/supabase";
 
 type Step = 1 | 2 | 3;
 
@@ -98,6 +99,25 @@ function BookContent() {
         notes: notes || undefined,
       });
       setSuccess(true);
+      // push & email notification — fire and forget
+      const { data: { session } } = await supabase.auth.getSession();
+      const customerName = session?.user?.user_metadata?.full_name
+        || session?.user?.email?.split("@")[0]
+        || "Müşteri";
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "new_appointment",
+          shopId: biz.id,
+          ownerId: biz.owner_id,
+          customerName,
+          serviceName: selectedService.name,
+          appointmentDate: selectedDate,
+          appointmentTime: selectedSlot.start.slice(11, 16),
+          price: selectedService.price ?? 0,
+        }),
+      }).catch(() => {});
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError("Bu saat dilimi artık dolu. Lütfen başka bir saat seçin.");

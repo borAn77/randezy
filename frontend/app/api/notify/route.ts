@@ -36,6 +36,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
+async function sendExpoPush(token: string, title: string, body: string, data?: object) {
+  try {
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ to: token, title, body, data, sound: "default" }),
+    });
+  } catch (e) {
+    console.log("[push] expo send failed:", e);
+  }
+}
+
 async function handleNewAppointment(body: {
   shopId: number;
   ownerId: string;
@@ -47,7 +59,7 @@ async function handleNewAppointment(body: {
 }) {
   const { data: ownerProfile } = await supabaseAdmin
     .from("profiles")
-    .select("email, full_name")
+    .select("email, full_name, expo_push_token")
     .eq("id", body.ownerId)
     .single();
 
@@ -59,9 +71,20 @@ async function handleNewAppointment(body: {
     console.log("[notify] auth fallback email:", ownerEmail ?? "null");
   }
 
-  if (!ownerEmail) { console.log("[notify] no owner email, aborting"); return; }
+  if (!ownerEmail && !ownerProfile?.expo_push_token) { console.log("[notify] no contact info, aborting"); return; }
 
   const dateStr = formatDate(body.appointmentDate);
+
+  if (ownerProfile?.expo_push_token) {
+    await sendExpoPush(
+      ownerProfile.expo_push_token,
+      "Yeni Randevu!",
+      `${body.customerName} — ${body.serviceName} — ${dateStr} ${body.appointmentTime}`,
+      { type: "new_appointment" }
+    );
+  }
+
+  if (!ownerEmail) return;
 
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
