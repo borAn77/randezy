@@ -63,6 +63,9 @@ export default function Dashboard() {
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [savingCampaign, setSavingCampaign] = useState(false);
   const [campaignForm, setCampaignForm] = useState({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [] as number[], is_active: true });
+  const [custFilter, setCustFilter] = useState<'all'|'vip'|'new'|'risk'>('all');
+  const [custSearch, setCustSearch] = useState('');
+  const [selectedCustId, setSelectedCustId] = useState<string|null>(null);
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -514,6 +517,71 @@ export default function Dashboard() {
   if (satTotal > 0 && satTotal === Math.max(...allDayTotals)) smartSuggestions.push('Cumartesi günleri kapasite tamamen doluyor. Rezervasyon önceliği veya fiyat optimizasyonu uygulanabilir.');
   if (monthlyRevenue > prevMonthRevenue && prevMonthRevenue > 0) smartSuggestions.push(`Bu ay geçen aya göre %${((monthlyRevenue - prevMonthRevenue) / prevMonthRevenue * 100).toFixed(1)} daha fazla ciro elde edildi.`);
 
+  // Customer list derived from appointments
+  const customerMap: Record<string, any> = {};
+  appointments.forEach((a: any) => {
+    const uid = a.user_id || ('phone_' + (a.customer_phone || 'anon'));
+    if (!customerMap[uid]) {
+      customerMap[uid] = {
+        id: uid,
+        name: a.profiles?.full_name || a.customer_name || 'İsimsiz Müşteri',
+        phone: a.customer_phone || a.profiles?.phone || '',
+        email: a.profiles?.email || '',
+        visits: 0,
+        totalSpent: 0,
+        lastVisit: null as string | null,
+        firstVisit: null as string | null,
+        favService: '' as string,
+        _svcCount: {} as Record<string, number>,
+      };
+    }
+    const c = customerMap[uid];
+    if (a.status !== 'İptal Edildi') {
+      c.visits++;
+      c.totalSpent += Number(a.services?.price || 0);
+    }
+    const d = a.appointment_date as string;
+    if (d) {
+      if (!c.lastVisit || d > c.lastVisit) c.lastVisit = d;
+      if (!c.firstVisit || d < c.firstVisit) c.firstVisit = d;
+    }
+    const svcName = a.services?.name as string | undefined;
+    if (svcName) c._svcCount[svcName] = (c._svcCount[svcName] || 0) + 1;
+  });
+  const thirtyDaysAgoStr = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  const sixtyDaysAgoStr = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
+  const customerList: any[] = Object.values(customerMap).map((c: any) => {
+    const topSvc = Object.entries(c._svcCount as Record<string, number>).sort((a, b) => b[1] - a[1])[0];
+    const initials = (c.name as string).split(' ').filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+    let tag: 'vip' | 'new' | 'risk' | '' = '';
+    if (c.visits >= 5) tag = 'vip';
+    else if (c.firstVisit && c.firstVisit >= thirtyDaysAgoStr) tag = 'new';
+    else if (c.lastVisit && c.lastVisit < sixtyDaysAgoStr) tag = 'risk';
+    return {
+      ...c,
+      initials,
+      tag,
+      tagLabel: tag === 'vip' ? 'VIP' : tag === 'new' ? 'YENİ' : tag === 'risk' ? 'KAYIP RİSKİ' : '',
+      avgSpend: c.visits > 0 ? Math.round(c.totalSpent / c.visits) : 0,
+      favService: topSvc ? topSvc[0] : '—',
+    };
+  }).sort((a: any, b: any) => b.visits - a.visits);
+  const filteredCustomers = customerList.filter((c: any) => {
+    if (custSearch && !(c.name as string).toLowerCase().includes(custSearch.toLowerCase())) return false;
+    if (custFilter === 'vip') return c.tag === 'vip';
+    if (custFilter === 'new') return c.tag === 'new';
+    if (custFilter === 'risk') return c.tag === 'risk';
+    return true;
+  });
+  const activeCust = selectedCustId ? customerList.find((c: any) => c.id === selectedCustId) : (customerList[0] || null);
+  const custHistory = activeCust
+    ? appointments.filter((a: any) => (a.user_id || ('phone_' + (a.customer_phone || 'anon'))) === activeCust.id)
+        .sort((a: any, b: any) => (b.appointment_date as string).localeCompare(a.appointment_date as string))
+    : [];
+  const vipCount = customerList.filter((c: any) => c.tag === 'vip').length;
+  const newCustCount = customerList.filter((c: any) => c.tag === 'new').length;
+  const riskCount = customerList.filter((c: any) => c.tag === 'risk').length;
+
   // Profile completion system
   const profileSteps = [
     { label: 'Kapak fotoğrafı ekle', desc: 'Müşteriler işletmeni ilk bunu görür', done: !!shop?.image_url, weight: 20, tab: 'branding', icon: '📸' },
@@ -791,6 +859,72 @@ export default function Dashboard() {
                     </button>
                   </div>
                 )}
+
+                {/* Hızlı İşlemler */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+                  {[
+                    { label: 'Randevu Ekle', icon: <Plus size={18}/>, tab: 'appointments', dark: true },
+                    { label: 'Müşteriler', icon: <Users size={18}/>, tab: 'customers', dark: false },
+                    { label: 'Hizmetler', icon: <Package size={18}/>, tab: 'services', dark: false },
+                    { label: 'Kampanya', icon: <Tag size={18}/>, tab: 'campaigns', dark: false },
+                  ].map((btn) => (
+                    <button
+                      key={btn.tab}
+                      onClick={() => setActiveTab(btn.tab)}
+                      className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all text-left group ${
+                        btn.dark
+                          ? 'bg-[#0c0c0d] text-white border-transparent hover:bg-[#14b8a6] hover:text-[#04221d]'
+                          : 'bg-white border-[#ececea] hover:border-[#14b8a6] hover:bg-[#e6f7f4]'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${btn.dark ? 'bg-white/10 text-[#14b8a6] group-hover:bg-[#04221d]/20 group-hover:text-[#04221d]' : 'bg-[#e6f7f4] text-[#0d9488]'}`}>
+                        {btn.icon}
+                      </div>
+                      <span className={`text-[13px] font-semibold ${btn.dark ? 'text-white group-hover:text-[#04221d]' : 'text-[#0c0c0d]'}`}>{btn.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Bugünün Randevuları */}
+                {(() => {
+                  const todayApts = appointments.filter((a: any) => a.appointment_date === today).sort((a: any, b: any) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
+                  if (todayApts.length === 0) return null;
+                  return (
+                    <div className="bg-white border border-[#ececea] rounded-2xl overflow-hidden">
+                      <div className="flex items-center justify-between px-6 py-4 border-b border-[#ececea]">
+                        <h3 className="text-[15px] font-semibold text-[#0c0c0d] flex items-center gap-2">
+                          Bugünün Randevuları
+                          <span className="bg-[#e6f7f4] text-[#0d9488] text-[10px] font-bold px-2.5 py-0.5 rounded-full">{todayApts.length} RANDEVU</span>
+                        </h3>
+                        <button onClick={() => setActiveTab('appointments')} className="text-[11px] font-semibold text-[#7a7a7e] hover:text-[#0d9488] transition-colors">Tümünü gör →</button>
+                      </div>
+                      <div>
+                        {todayApts.slice(0, 6).map((a: any, i: number) => {
+                          const statusColors: Record<string, string> = {
+                            'Beklemede': 'bg-amber-50 text-amber-700',
+                            'Onaylandı': 'bg-[#e9f6ec] text-[#15803d]',
+                            'Tamamlandı': 'bg-[#e6f7f4] text-[#0d9488]',
+                            'İptal Edildi': 'bg-red-50 text-red-600',
+                          };
+                          const initials = (a.profiles?.full_name || a.customer_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+                          return (
+                            <div key={a.id} className="grid items-center border-b border-[#f5f5f3] last:border-0 px-6 py-3.5 hover:bg-[#fafaf8] cursor-pointer transition-colors" style={{gridTemplateColumns: '60px 1fr auto'}} onClick={() => setSelectedApt(a)}>
+                              <span className="font-mono text-[13px] font-semibold text-[#0c0c0d]">{(a.appointment_time || '').slice(0,5)}</span>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
+                                <div>
+                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.profiles?.full_name || a.customer_name || 'Müşteri'}</p>
+                                  <p className="text-[10px] text-[#7a7a7e] uppercase tracking-wide">{a.services?.name || '—'} {a.staff ? '· ' + a.staff.first_name : ''}</p>
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${(statusColors[a.status] || 'bg-gray-50 text-gray-500')}`}>{a.status}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Metrik kartlar */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1477,6 +1611,143 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* CUSTOMERS TAB */}
+            {activeTab === "customers" && (
+              <div className="animate-in fade-in duration-300">
+                <div className="flex items-end justify-between mb-6">
+                  <div>
+                    <h1 className="text-3xl font-bold text-[#0c0c0d] tracking-tight uppercase">Müşteriler</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">{customerList.length} müşteri · {newCustCount} yeni · {vipCount} VIP</p>
+                  </div>
+                  <button className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                    <Download size={14}/> CSV İndir
+                  </button>
+                </div>
+
+                {customerList.length === 0 ? (
+                  <div className="py-20 text-center bg-white rounded-2xl border border-[#ececea]">
+                    <div className="w-16 h-16 bg-[#e6f7f4] rounded-full flex items-center justify-center mx-auto mb-4"><Users size={28} className="text-[#14b8a6]"/></div>
+                    <h3 className="text-lg font-semibold text-[#0c0c0d] mb-2">Henüz müşteri yok</h3>
+                    <p className="text-[13px] text-[#7a7a7e] max-w-xs mx-auto">İlk randevu alındığında müşteriler burada görünecek.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4" style={{gridTemplateColumns: '340px 1fr'}}>
+                    {/* Left: list */}
+                    <div className="bg-white border border-[#ececea] rounded-2xl overflow-hidden flex flex-col">
+                      <div className="p-4 border-b border-[#ececea] relative">
+                        <Search size={14} className="absolute left-7 top-1/2 -translate-y-1/2 text-[#7a7a7e]"/>
+                        <input
+                          className="w-full pl-8 pr-4 py-2.5 bg-[#fafaf8] border border-[#ececea] rounded-xl text-[13px] outline-none focus:border-[#14b8a6] transition-colors"
+                          placeholder="Müşteri ara..."
+                          value={custSearch}
+                          onChange={e => setCustSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-2 px-4 py-3 border-b border-[#ececea] overflow-x-auto">
+                        {([
+                          { id: 'all', label: `Tümü · ${customerList.length}` },
+                          { id: 'vip', label: `VIP · ${vipCount}` },
+                          { id: 'new', label: `Yeni · ${newCustCount}` },
+                          { id: 'risk', label: `Risk · ${riskCount}` },
+                        ] as const).map(f => (
+                          <button key={f.id} onClick={() => setCustFilter(f.id)}
+                            className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-semibold font-mono uppercase tracking-wide transition-all border ${custFilter === f.id ? 'bg-[#0c0c0d] text-white border-[#0c0c0d]' : 'bg-[#fafaf8] text-[#7a7a7e] border-[#ececea] hover:border-[#0c0c0d]'}`}>
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="overflow-y-auto flex-1" style={{maxHeight: 520}}>
+                        {filteredCustomers.map((c: any) => (
+                          <div key={c.id}
+                            onClick={() => setSelectedCustId(c.id)}
+                            className={`grid items-center gap-3 px-4 py-3.5 border-b border-[#f5f5f3] cursor-pointer transition-colors ${activeCust?.id === c.id ? 'bg-[#fafaf8] border-l-2 border-l-[#14b8a6] pl-[14px]' : 'hover:bg-[#fafaf8]'}`}
+                            style={{gridTemplateColumns: '36px 1fr auto'}}
+                          >
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{c.initials}</div>
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-semibold text-[#0c0c0d] truncate">{c.name}</p>
+                              <p className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-wide mt-0.5">{c.visits} ZİYARET · ₺{c.totalSpent.toLocaleString('tr-TR')} · {c.lastVisit ? new Date(c.lastVisit).toLocaleDateString('tr-TR') : '—'}</p>
+                            </div>
+                            {c.tag && (
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md font-mono ${c.tag === 'vip' ? 'bg-yellow-50 text-yellow-700' : c.tag === 'new' ? 'bg-[#e6f7f4] text-[#0d9488]' : 'bg-red-50 text-red-600'}`}>
+                                {c.tagLabel}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right: detail */}
+                    {activeCust ? (
+                      <div className="bg-white border border-[#ececea] rounded-2xl overflow-hidden flex flex-col">
+                        {/* Header */}
+                        <div className="px-6 py-6 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #0c0c0d 0%, #1c1c1f 100%)', color: '#fff'}}>
+                          <div className="absolute right-0 top-0 w-40 h-40 rounded-full opacity-20 pointer-events-none" style={{background: 'radial-gradient(circle, #14b8a6, transparent 70%)', transform: 'translate(30%, -30%)'}}/>
+                          <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[18px] font-bold flex items-center justify-center shadow-lg shadow-[#14b8a6]/30">{activeCust.initials}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-[20px] font-bold tracking-tight">{activeCust.name}</h3>
+                                {activeCust.tag === 'vip' && <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2.5 py-0.5 rounded-full">★ VIP</span>}
+                              </div>
+                              <p className="text-[11px] font-mono tracking-widest uppercase mt-1 opacity-60">{activeCust.phone || activeCust.email || 'İletişim yok'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white/10 backdrop-blur border-none rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
+                              <button onClick={() => activeCust.phone && window.open('tel:' + activeCust.phone)} className="w-9 h-9 bg-white/10 backdrop-blur border-none rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Stats row */}
+                        <div className="grid grid-cols-4 border-b border-[#ececea]" style={{background: 'var(--paper)'}}>
+                          {[
+                            { label: 'Toplam Ziyaret', value: activeCust.visits.toString() },
+                            { label: 'Toplam Harcama', value: '₺' + activeCust.totalSpent.toLocaleString('tr-TR') },
+                            { label: 'Favori Hizmet', value: activeCust.favService },
+                            { label: 'Ort. Sepet', value: activeCust.visits > 0 ? '₺' + activeCust.avgSpend.toLocaleString('tr-TR') : '—' },
+                          ].map((s, i) => (
+                            <div key={i} className="px-4 py-4 border-r border-[#ececea] last:border-r-0">
+                              <p className="text-[9px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">{s.label}</p>
+                              <p className="text-[18px] font-bold text-[#0c0c0d] leading-tight truncate">{s.value}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* History */}
+                        <div className="flex-1 overflow-y-auto">
+                          <div className="px-6 pt-5 pb-2 border-b border-[#ececea]">
+                            <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-[#0c0c0d] border-b-2 border-[#14b8a6] pb-2">Geçmiş</span>
+                          </div>
+                          {custHistory.length === 0 ? (
+                            <div className="py-12 text-center text-[12px] text-[#7a7a7e]">Randevu geçmişi bulunamadı.</div>
+                          ) : (
+                            <div className="divide-y divide-[#f5f5f3]">
+                              {custHistory.map((a: any) => (
+                                <div key={a.id} className="grid items-center px-6 py-3.5 hover:bg-[#fafaf8] cursor-pointer transition-colors" style={{gridTemplateColumns: '100px 1fr 70px'}} onClick={() => setSelectedApt(a)}>
+                                  <p className="text-[11px] font-mono text-[#7a7a7e] uppercase tracking-wide">{new Date(a.appointment_date).toLocaleDateString('tr-TR', {day: 'numeric', month: 'short', year: 'numeric'})}</p>
+                                  <div>
+                                    <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.services?.name || 'Hizmet'}</p>
+                                    <p className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-wide">{a.staff ? a.staff.first_name + ' ' + a.staff.last_name : '—'} · {a.status}</p>
+                                  </div>
+                                  <p className="text-[15px] font-bold text-[#0c0c0d] text-right">₺{Number(a.services?.price || 0).toLocaleString('tr-TR')}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-[#ececea] rounded-2xl flex items-center justify-center">
+                        <p className="text-[13px] text-[#7a7a7e]">Sol listeden bir müşteri seçin</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 4. HİZMET YÖNETİMİ */}
             {activeTab === "services" && (
               <div className="animate-in slide-in-from-right-4">
@@ -1930,6 +2201,166 @@ export default function Dashboard() {
                   </div>
                   <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mt-5">Rapor indirme özelliği yakında aktif olacak.</p>
                 </div>
+              </div>
+            )}
+
+            {/* STATISTICS TAB */}
+            {activeTab === "statistics" && (
+              <div className="animate-in fade-in duration-300 space-y-6">
+                <div className="flex items-end justify-between mb-2">
+                  <div>
+                    <h1 className="text-3xl font-bold text-[#0c0c0d] tracking-tight uppercase">İstatistikler</h1>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">Son 30 gün · Derinlemesine analiz</p>
+                  </div>
+                </div>
+
+                {/* KPI strip */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Geri Dönüş Oranı', value: `%${loyaltyRate.toFixed(1)}`, delta: returningCust + ' müşteri 2+ kez geldi', up: loyaltyRate > 50 },
+                    { label: 'Müşteri Başına Ort.', value: `₺${avgBasket.toLocaleString('tr-TR', {maximumFractionDigits:0})}`, delta: 'sepet ortalaması', up: true },
+                    { label: 'İptal Oranı', value: `%${cancellationRate.toFixed(1)}`, delta: cancellationRate < 5 ? 'Hedef altında ✓' : 'Hedef: <%5', up: cancellationRate < 5 },
+                    { label: 'Toplam Müşteri', value: totalCust.toString(), delta: newCust + ' yeni bu dönemde', up: newCust > 0 },
+                  ].map((k, i) => (
+                    <div key={i} className={`p-5 rounded-2xl border ${i === 0 ? 'bg-[#0c0c0d] border-transparent text-white' : 'bg-white border-[#ececea]'}`}>
+                      <p className={`text-[10px] font-mono uppercase tracking-widest mb-3 ${i === 0 ? 'text-white/50' : 'text-[#7a7a7e]'}`}>{k.label}</p>
+                      <p className={`text-[28px] font-bold leading-none ${i === 0 ? 'text-[#14b8a6]' : 'text-[#0c0c0d]'}`}>{k.value}</p>
+                      <p className={`text-[10px] font-mono mt-2 ${i === 0 ? 'text-white/40' : k.up ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>{k.delta}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Heatmap */}
+                <div className="bg-white border border-[#ececea] rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d]">Saat × Gün Doluluk Haritası</h3>
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-[#7a7a7e]">
+                      <span>Az</span>
+                      {[0.12, 0.34, 0.56, 0.78, 1.0].map((o, i) => (
+                        <div key={i} className="w-4 h-4 rounded" style={{backgroundColor: `rgba(20,184,166,${o})`}}/>
+                      ))}
+                      <span>Yoğun</span>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <div style={{minWidth: 500}}>
+                      <div className="flex gap-1 mb-2 ml-10">
+                        {heatmapHours.map(h => (
+                          <div key={h} className="flex-1 text-center text-[8px] font-mono text-[#7a7a7e]">{h}</div>
+                        ))}
+                      </div>
+                      {['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'].map((day, di) => (
+                        <div key={di} className="flex gap-1 mb-1 items-center">
+                          <div className="w-10 text-[9px] font-mono font-semibold text-[#7a7a7e] uppercase flex-shrink-0">{day}</div>
+                          {heatmapHours.map(h => {
+                            const val = heatmapData[di][h];
+                            const intensity = val / heatmapMax;
+                            return (
+                              <div key={h} className="flex-1 h-7 rounded-md transition-all cursor-default"
+                                style={{backgroundColor: val === 0 ? '#f5f5f3' : `rgba(20,184,166,${0.12 + intensity * 0.88})`}}
+                                title={`${day} ${h}:00 — ${val} randevu`}
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Two columns: retention + staff */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white border border-[#ececea] rounded-2xl p-6">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Müşteri Elde Tutma</h3>
+                    <div className="space-y-4">
+                      {[
+                        { label: '1 kez gelen', val: customerList.filter((c:any) => c.visits === 1).length, color: '#7a7a7e' },
+                        { label: '2–3 kez gelen', val: customerList.filter((c:any) => c.visits >= 2 && c.visits <= 3).length, color: '#14b8a6' },
+                        { label: '4–6 kez gelen', val: customerList.filter((c:any) => c.visits >= 4 && c.visits <= 6).length, color: '#0d9488' },
+                        { label: '7+ kez gelen (sadık)', val: customerList.filter((c:any) => c.visits >= 7).length, color: '#ca8a04' },
+                      ].map((s, i) => {
+                        const max = Math.max(1, customerList.length);
+                        return (
+                          <div key={i}>
+                            <div className="flex justify-between text-[13px] mb-1.5">
+                              <span className="text-[#0c0c0d]">{s.label}</span>
+                              <span className="font-mono font-semibold text-[#7a7a7e]">{s.val} müşteri</span>
+                            </div>
+                            <div className="h-2 bg-[#f5f5f3] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-700" style={{width: `${(s.val/max)*100}%`, background: s.color}}/>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-[#ececea] rounded-2xl p-6">
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Personel Performansı</h3>
+                    {staffPerf.length === 0 ? (
+                      <div className="py-10 text-center text-[13px] text-[#7a7a7e]">Personel verisi yok</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {staffPerf.map((s: any, i: number) => {
+                          const maxRev = staffPerf[0].revenue || 1;
+                          return (
+                            <div key={s.id} className="grid items-center gap-3" style={{gridTemplateColumns: '32px 1fr 80px 50px'}}>
+                              <div className="w-8 h-8 rounded-full bg-[#e6f7f4] flex items-center justify-center text-[10px] font-bold text-[#0d9488] overflow-hidden flex-shrink-0">
+                                {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt=""/> : s.first_name?.charAt(0)}
+                              </div>
+                              <span className="text-[13px] font-semibold text-[#0c0c0d] truncate">{s.first_name} {s.last_name}</span>
+                              <div className="h-2 bg-[#f5f5f3] rounded-full overflow-hidden">
+                                <div className="h-full bg-[#14b8a6] rounded-full" style={{width: `${Math.max(2,(s.revenue/maxRev)*100)}%`}}/>
+                              </div>
+                              <span className="text-[11px] font-mono text-[#7a7a7e] text-right">{s.apptCount}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Popular services */}
+                <div className="bg-white border border-[#ececea] rounded-2xl p-6">
+                  <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Popüler Hizmetler</h3>
+                  {servicePerf.length === 0 ? (
+                    <div className="py-8 text-center text-[13px] text-[#7a7a7e]">Yeterli veri yok</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {servicePerf.slice(0,6).map((s: any, i: number) => {
+                        const maxSales = servicePerf[0].salesCount || 1;
+                        return (
+                          <div key={s.id} className="grid items-center gap-4" style={{gridTemplateColumns: '1fr 120px 60px'}}>
+                            <span className="text-[13px] font-semibold text-[#0c0c0d]">{s.name}</span>
+                            <div className="h-2 bg-[#f5f5f3] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#14b8a6] rounded-full" style={{width: `${(s.salesCount/maxSales)*100}%`}}/>
+                            </div>
+                            <span className="text-[11px] font-mono text-[#7a7a7e] text-right">{s.salesCount}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Smart suggestions */}
+                {smartSuggestions.length > 0 && (
+                  <div className="bg-[#0c0c0d] rounded-2xl p-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Lightbulb size={15} className="text-[#14b8a6]"/>
+                      <h3 className="text-[11px] font-mono uppercase tracking-widest text-white/60">Akıllı Öneriler</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {smartSuggestions.map((tip: string, i: number) => (
+                        <div key={i} className="flex gap-3">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#14b8a6] flex-shrink-0 mt-2"/>
+                          <p className="text-[12px] font-medium text-white/60 leading-relaxed">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
