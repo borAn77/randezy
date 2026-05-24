@@ -233,7 +233,7 @@ export default function Dashboard() {
     const { error } = editingService
       ? await supabase.from('services').update(payload).eq('id', editingService.id)
       : await supabase.from('services').insert([payload]);
-    if (!error) { setIsServiceModalOpen(false); setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); fetchInitialData(); }
+    if (error) { showToast('Hata: ' + error.message, 'err'); } else { setIsServiceModalOpen(false); setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); fetchInitialData(); }
   };
 
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
@@ -1971,14 +1971,14 @@ export default function Dashboard() {
                       return (
                         <div key={s.id} className="bg-white border border-[#ececea] rounded-2xl overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-lg duration-150">
                           <div className="h-40 relative" style={{background: s.image_url ? undefined : grad}}>
-                            {s.image_url && <img src={s.image_url} className="w-full h-full object-cover" alt={s.name}/>}
+                            {s.image_url && <img src={s.image_url} className="w-full h-full object-cover" alt={s.name} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}/>}
                             <div className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[9px] font-bold uppercase tracking-[0.06em] px-2 py-1 rounded-md">
                               {s.duration} DK
                             </div>
                           </div>
                           <div className="p-4">
                             <h4 className="font-bold text-[16px] uppercase tracking-tight text-[#0c0c0d] mb-1">{s.name}</h4>
-                            <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mb-1">{staff.length} personel yapıyor</p>
+                            {staff.length > 0 && <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mb-1">{staff.length} personel yapıyor</p>}
                             <p className="text-[18px] font-bold text-[#0d9488] mt-2">₺{Number(s.price).toLocaleString('tr-TR')}</p>
                           </div>
                           <div className="flex gap-1.5 px-4 pb-4">
@@ -2950,10 +2950,10 @@ export default function Dashboard() {
                 </select>
                 <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
               </div>
-              {(campaignForm.type === 'percentage' || campaignForm.type === 'fixed') && (
+              {(campaignForm.type === 'percentage' || campaignForm.type === 'fixed' || campaignForm.type === 'today_special' || campaignForm.type === 'last_minute') && (
                 <input
                   type="number"
-                  placeholder={campaignForm.type === 'percentage' ? "İndirim oranı (%) *" : "İndirim tutarı (₺) *"}
+                  placeholder={campaignForm.type === 'fixed' ? "İndirim tutarı (₺) *" : "İndirim oranı (%) *"}
                   className="w-full p-5 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
                   value={campaignForm.discount_value}
                   onChange={e => setCampaignForm(f => ({ ...f, discount_value: e.target.value }))}
@@ -2987,12 +2987,12 @@ export default function Dashboard() {
                       <label key={svc.id} className="flex items-center gap-3 cursor-pointer group">
                         <input
                           type="checkbox"
-                          checked={campaignForm.service_ids.includes(svc.id)}
+                          checked={campaignForm.service_ids.map(String).includes(String(svc.id))}
                           onChange={e => setCampaignForm(f => ({
                             ...f,
                             service_ids: e.target.checked
-                              ? [...f.service_ids, svc.id]
-                              : f.service_ids.filter(id => id !== svc.id)
+                              ? [...f.service_ids, String(svc.id)]
+                              : f.service_ids.filter(id => String(id) !== String(svc.id))
                           }))}
                           className="accent-[#00A3AD] w-4 h-4"
                         />
@@ -3095,14 +3095,14 @@ export default function Dashboard() {
             <h3 className="text-3xl font-black uppercase tracking-tighter mb-10">{editingService ? "Hizmeti Düzenle" : "Hizmet Ekle"}</h3>
             <form onSubmit={handleServiceSubmit} className="space-y-6">
               <div className="mb-4">
-                {serviceForm.image_url ? <img src={serviceForm.image_url} className="h-40 w-full object-cover rounded-3xl" /> : (
+                {serviceForm.image_url ? <img src={serviceForm.image_url} className="h-40 w-full object-cover rounded-3xl" onError={() => setServiceForm(f => ({ ...f, image_url: '' }))} /> : (
                   <label className="flex flex-col items-center justify-center h-40 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl cursor-pointer hover:border-[#00A3AD] transition-all"><UploadCloud className="text-gray-300 mb-2" size={32} /><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Fotoğraf Yükle</span><input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if(!file) return; const url = await handleFileUpload(file, 'service-portfolios'); if(url) setServiceForm({...serviceForm, image_url: url}); }} /></label>
                 )}
               </div>
               <input required placeholder="Hizmet Adı" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.name} onChange={e => setServiceForm({...serviceForm, name: e.target.value})} />
               <div className="grid grid-cols-2 gap-6">
-                <input required type="number" placeholder="Fiyat (₺)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.price} onChange={e => setServiceForm({...serviceForm, price: e.target.value})} />
-                <input required type="number" placeholder="Süre (DK)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.duration} onChange={e => setServiceForm({...serviceForm, duration: e.target.value})} />
+                <input required type="number" min="0" placeholder="Fiyat (₺)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.price} onChange={e => setServiceForm({...serviceForm, price: e.target.value})} />
+                <input required type="number" min="1" placeholder="Süre (DK)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.duration} onChange={e => setServiceForm({...serviceForm, duration: e.target.value})} />
               </div>
               <button className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">YAYINLA</button>
             </form>
