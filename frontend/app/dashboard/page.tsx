@@ -320,7 +320,7 @@ export default function Dashboard() {
         type: 'appointment_rejected',
         appointmentId: apt.id,
         customerEmail: apt.profiles?.email,
-        customerName: apt.profiles?.full_name || 'Müşteri',
+        customerName: apt.profiles?.full_name || apt.customer_name || 'Müşteri',
         shopName: shop?.name || '',
         serviceName: apt.service_name,
         appointmentDate: apt.appointment_date,
@@ -1376,7 +1376,7 @@ export default function Dashboard() {
                                       {apt.profiles?.phone && <span className="text-[11px] text-gray-400 truncate">· {apt.profiles.phone}</span>}
                                     </div>
                                   </div>
-                                  <p className="text-sm font-black text-black flex-shrink-0 hidden md:block">₺{apt.price}</p>
+                                  <p className="text-sm font-black text-black flex-shrink-0 hidden md:block">₺{apt.price || 0}</p>
                                   <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full flex-shrink-0 ${badgeCls[apt.status]||'bg-gray-100 text-gray-600'}`}>{apt.status}</span>
                                   <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                     {apt.status === 'Beklemede' && (
@@ -1560,7 +1560,8 @@ export default function Dashboard() {
                             {calWeekDays.map((day, di) => {
                               const ds = day.toISOString().split('T')[0];
                               const isToday = ds === today;
-                              const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              if (calFilterStaff) dayApts = calFilterStaff === '__unassigned' ? dayApts.filter((a: any) => !a.staff_id) : dayApts.filter((a: any) => a.staff_id === calFilterStaff);
                               return (
                                 <div key={di}
                                   className={`flex-1 border-l border-gray-100 relative ${isToday ? 'bg-[#00A3AD]/[0.02]' : ''}`}
@@ -1622,7 +1623,8 @@ export default function Dashboard() {
                               const ds = day.toISOString().split('T')[0];
                               const isThisMonth = day.getMonth() === mStart.getMonth();
                               const isTodayCell = ds === today;
-                              const dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              if (calFilterStaff) dayApts = calFilterStaff === '__unassigned' ? dayApts.filter((a: any) => !a.staff_id) : dayApts.filter((a: any) => a.staff_id === calFilterStaff);
                               return (
                                 <div key={i}
                                   className={`min-h-[90px] border-b border-r border-gray-100 p-2 cursor-pointer hover:bg-gray-50 transition-all ${!isThisMonth ? 'opacity-25' : ''} ${isTodayCell ? 'bg-[#00A3AD]/5' : ''}`}
@@ -1644,8 +1646,8 @@ export default function Dashboard() {
                       );
                     })()}
 
-                    {/* Bottom summary bar */}
-                    <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-5 flex-wrap">
+                    {/* Bottom summary bar — day mode only (calCurrentDayApts is day-scoped) */}
+                    {calViewMode === 'day' && <div className="border-t border-gray-100 px-6 py-3 flex items-center gap-5 flex-wrap">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Özet:</p>
                       {[
                         { label: 'Toplam', value: calCurrentDayApts.length, cls: 'text-black' },
@@ -1669,7 +1671,7 @@ export default function Dashboard() {
                           </div>
                         );
                       })()}
-                    </div>
+                    </div>}
                   </div>
                 )}
               </div>
@@ -3172,7 +3174,7 @@ export default function Dashboard() {
       {/* RANDEVU DETAY MODALİ */}
       {selectedApt && (() => {
         const close = () => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); };
-        const nameParts = (selectedApt.profiles?.full_name || 'M').split(' ');
+        const nameParts = (selectedApt.profiles?.full_name || selectedApt.customer_name || 'M').split(' ');
         const initials = nameParts.map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
         const aptId = (selectedApt.id as string)?.slice(-8)?.toUpperCase() || '--------';
         const timeline = [
@@ -3212,14 +3214,21 @@ export default function Dashboard() {
                     <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.profiles.email}</p>
                   )}
                 </div>
-                {selectedApt.profiles?.phone && (
+                {(selectedApt.profiles?.phone || selectedApt.customer_phone) && (
                   <div className="flex gap-2 flex-shrink-0">
-                    <a href={`tel:${selectedApt.profiles.phone}`} className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-xl hover:bg-[#00A3AD] transition-all" title="Ara">
-                      <Phone size={16} />
-                    </a>
-                    <a href={`https://wa.me/${(selectedApt.profiles.phone as string).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all" title="WhatsApp">
-                      <MessageSquare size={16} />
-                    </a>
+                    {(() => {
+                      const phone = (selectedApt.profiles?.phone || selectedApt.customer_phone) as string;
+                      return (
+                        <>
+                          <a href={`tel:${phone}`} className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-xl hover:bg-[#00A3AD] transition-all" title="Ara">
+                            <Phone size={16} />
+                          </a>
+                          <a href={`https://wa.me/${phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all" title="WhatsApp">
+                            <MessageSquare size={16} />
+                          </a>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -3231,7 +3240,7 @@ export default function Dashboard() {
                   { label: 'Saat', value: (selectedApt.appointment_time as string)?.slice(0, 5) || '--:--' },
                   { label: 'Hizmet', value: selectedApt.service_name },
                   { label: 'Personel', value: selectedApt.staff ? `${selectedApt.staff.first_name} ${selectedApt.staff.last_name}` : 'Atanmadı' },
-                  { label: 'Fiyat', value: `₺${selectedApt.price}` },
+                  { label: 'Fiyat', value: `₺${selectedApt.price || 0}` },
                   { label: 'Süre', value: selectedApt.duration_minutes ? `${selectedApt.duration_minutes} dk` : '—' },
                 ] as { label: string; value: string }[]).map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3">
