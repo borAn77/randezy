@@ -585,7 +585,7 @@ export default function Dashboard() {
       if (!c.lastVisit || d > c.lastVisit) c.lastVisit = d;
       if (!c.firstVisit || d < c.firstVisit) c.firstVisit = d;
     }
-    const svcName = a.services?.name as string | undefined;
+    const svcName = (a.service_name || a.services?.name) as string | undefined;
     if (svcName) c._svcCount[svcName] = (c._svcCount[svcName] || 0) + 1;
   });
   const thirtyDaysAgoStr = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
