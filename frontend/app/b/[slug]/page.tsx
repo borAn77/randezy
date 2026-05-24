@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "../../../components/layout/Navbar";
 import { api, type BusinessDetail, type Service, type StaffMember } from "../../../lib/api";
 import { MapPin, Phone, Clock, ChevronRight, Star, ArrowLeft } from "lucide-react";
+import { supabase } from "../../../lib/supabase";
 
 const DAY_NAMES = ["", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
@@ -16,10 +17,19 @@ export default function BusinessDetailPage() {
   const [biz, setBiz] = useState<BusinessDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     api.getBusiness(slug)
-      .then(setBiz)
+      .then(async (b) => {
+        setBiz(b);
+        const { data } = await supabase
+          .from('reviews')
+          .select('*, profiles(full_name), owner_reply, owner_reply_at')
+          .eq('shop_id', b.id)
+          .order('created_at', { ascending: false });
+        setReviews(data || []);
+      })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -147,6 +157,44 @@ export default function BusinessDetailPage() {
                     </div>
                     <p className="font-black text-xs text-black uppercase">{member.name}</p>
                     {member.role && <p className="text-[10px] text-gray-400 mt-1">{member.role}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Reviews */}
+          {reviews.length > 0 && (
+            <div className="bg-white rounded-[3.5rem] p-10 shadow-xl border border-gray-100">
+              <h2 className="text-xs font-black text-[#00A3AD] uppercase tracking-widest mb-2">Müşteri Yorumları</h2>
+              <div className="flex items-baseline gap-2 mb-6">
+                <span className="text-3xl font-black text-black">
+                  {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                </span>
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map(i => (
+                    <Star key={i} size={13} className={i <= Math.round(reviews.reduce((s,r)=>s+r.rating,0)/reviews.length) ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+                  ))}
+                </div>
+                <span className="text-xs text-gray-400">{reviews.length} yorum</span>
+              </div>
+              <div className="space-y-5">
+                {reviews.map((r: any) => (
+                  <div key={r.id} className="border-b border-gray-100 pb-5 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-black text-black">{r.profiles?.full_name || 'Müşteri'}</span>
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map(i => (
+                          <Star key={i} size={11} className={i <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+                        ))}
+                      </div>
+                    </div>
+                    {r.comment && <p className="text-[13px] text-gray-600 leading-relaxed">{r.comment}</p>}
+                    {r.owner_reply && (
+                      <div className="mt-3 bg-gray-50 border border-gray-100 rounded-2xl p-3">
+                        <p className="text-[10px] font-semibold text-[#00A3AD] uppercase tracking-widest mb-1">İşletme Yanıtı</p>
+                        <p className="text-[13px] text-gray-600 leading-relaxed">{r.owner_reply}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
