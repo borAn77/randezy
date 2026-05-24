@@ -68,7 +68,7 @@ interface CartItemBase { service: any; date: Date; time: string; staff: any | nu
 interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
-  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, allServices
+  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, allServices, cartItems
 }: {
   service: any;
   shopHours: any[];
@@ -78,6 +78,7 @@ function InlineBookingPanel({
   onAdd: (item: CartItemBase) => void;
   onAuthRequired: () => void;
   allServices: any[];
+  cartItems: CartItem[];
 }) {
   const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
   const BUFFER_MIN = 5;
@@ -85,6 +86,7 @@ function InlineBookingPanel({
     const svc = allServices.find((s: any) => String(s.id) === String(apt.service_id));
     return svc?.duration ?? 30;
   };
+  // Buffer is two-sided: both new and existing appointments need 5 min gap between them
   const isBlocked = (slotStart: string, newDur: number, apts: any[]): boolean => {
     const ns = toMin(slotStart);
     const ne = ns + newDur;
@@ -92,9 +94,19 @@ function InlineBookingPanel({
       if (!a.appointment_time) return false;
       const es = toMin(a.appointment_time.slice(0, 5));
       const ee = es + aptDuration(a) + BUFFER_MIN;
-      return ns < ee && ne > es;
+      return ns < ee && ne + BUFFER_MIN > es;
     });
   };
+  // Convert current cart items into appointment-like objects so they block slots
+  const cartAsApts = (dateStr: string, forStaffId: string | null): any[] =>
+    cartItems
+      .filter(c => {
+        if (localDateStr(c.date) !== dateStr) return false;
+        // forStaffId=null means no-staff shop — include all cart items for the date
+        if (forStaffId !== null) return !c.staff?.id || c.staff.id === forStaffId;
+        return true;
+      })
+      .map(c => ({ appointment_time: c.time, service_id: c.service.id, staff_id: c.staff?.id || null }));
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -131,19 +143,23 @@ function InlineBookingPanel({
           const dayBooked = (booked || []).filter((a: any) => a.appointment_date === dateStr);
           let available: string[];
           if (selectedStaff) {
-            const staffApts = dayBooked.filter((a: any) => a.staff_id === selectedStaff.id);
-            available = allSlots.filter(s => !isBlocked(s, service.duration, staffApts));
+            const apts = [...dayBooked.filter((a: any) => a.staff_id === selectedStaff.id), ...cartAsApts(dateStr, selectedStaff.id)];
+            available = allSlots.filter(s => !isBlocked(s, service.duration, apts));
           } else if (staff.length > 0) {
-            available = allSlots.filter(s => staff.some(sm => !isBlocked(s, service.duration, dayBooked.filter((a: any) => a.staff_id === sm.id))));
+            available = allSlots.filter(s => staff.some(sm => {
+              const apts = [...dayBooked.filter((a: any) => a.staff_id === sm.id), ...cartAsApts(dateStr, sm.id)];
+              return !isBlocked(s, service.duration, apts);
+            }));
           } else {
-            available = allSlots.filter(s => !isBlocked(s, service.duration, dayBooked));
+            const apts = [...dayBooked, ...cartAsApts(dateStr, null)];
+            available = allSlots.filter(s => !isBlocked(s, service.duration, apts));
           }
           if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
           counts[dateStr] = available.length;
         });
         setSlotCounts(counts);
       });
-  }, [service.duration, shopHours, shopId, selectedStaff, staff.length]);
+  }, [service.duration, shopHours, shopId, selectedStaff, staff.length, cartItems]);
 
   // Load slots when day selected
   useEffect(() => {
@@ -163,21 +179,41 @@ function InlineBookingPanel({
         const now = new Date();
         const isToday = selectedDay.toDateString() === now.toDateString();
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const dateStr = localDateStr(selectedDay);
         let available: string[];
         if (selectedStaff) {
-          const staffApts = (booked || []).filter((a: any) => a.staff_id === selectedStaff.id);
-          available = slots.filter(s => !isBlocked(s, service.duration, staffApts));
+          const apts = [...(booked || []).filter((a: any) => a.staff_id === selectedStaff.id), ...cartAsApts(dateStr, selectedStaff.id)];
+          available = slots.filter(s => !isBlocked(s, service.duration, apts));
         } else if (staff.length > 0) {
-          available = slots.filter(s => staff.some(sm => !isBlocked(s, service.duration, (booked || []).filter((a: any) => a.staff_id === sm.id))));
+          available = slots.filter(s => staff.some(sm => {
+            const apts = [...(booked || []).filter((a: any) => a.staff_id === sm.id), ...cartAsApts(dateStr, sm.id)];
+            return !isBlocked(s, service.duration, apts);
+          }));
         } else {
-          available = slots.filter(s => !isBlocked(s, service.duration, booked || []));
+          const apts = [...(booked || []), ...cartAsApts(dateStr, null)];
+          available = slots.filter(s => !isBlocked(s, service.duration, apts));
         }
         if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
         setAvailableSlots(available);
       });
-  }, [selectedDay, selectedStaff]);
+  }, [selectedDay, selectedStaff, cartItems]);
 
   const canAdd = !!(selectedDay && selectedTime);
+
+  // First available slot that follows all current cart items for the same day/staff
+  const suggestedSlot = (() => {
+    if (!selectedDay || cartItems.length === 0) return null;
+    const dateStr = localDateStr(selectedDay);
+    const staffId = selectedStaff?.id || null;
+    const dayCart = cartItems.filter(c => {
+      if (localDateStr(c.date) !== dateStr) return false;
+      if (staffId !== null && c.staff?.id && c.staff.id !== staffId) return false;
+      return true;
+    });
+    if (dayCart.length === 0) return null;
+    const latestEnd = dayCart.reduce((max, c) => Math.max(max, toMin(c.time) + c.service.duration + BUFFER_MIN), 0);
+    return availableSlots.find(s => toMin(s) >= latestEnd) || null;
+  })();
 
   return (
     <div className="border-t border-gray-100 p-5 bg-[#fafaf8]">
@@ -255,8 +291,15 @@ function InlineBookingPanel({
                 <button
                   key={t}
                   onClick={() => setSelectedTime(t)}
-                  className={`py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' : 'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'}`}
+                  className={`relative py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${
+                    selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' :
+                    t === suggestedSlot ? 'border-amber-400 bg-amber-50 text-[#0c0c0d] hover:border-amber-500' :
+                    'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'
+                  }`}
                 >
+                  {t === suggestedSlot && (
+                    <span className="absolute -top-1.5 -right-1 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[7px] font-black text-black leading-none">★</span>
+                  )}
                   {t}
                 </button>
               ))}
@@ -876,6 +919,7 @@ export default function ShopDetail() {
                                 shopId={shopId}
                                 currentUserId={currentUserId}
                                 allServices={services}
+                                cartItems={cart}
                                 onAdd={(item) => {
                   const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
                   const _BUFFER = 5;
