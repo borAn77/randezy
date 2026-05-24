@@ -595,7 +595,8 @@ export default function Dashboard() {
   // Customer list derived from appointments
   const customerMap: Record<string, any> = {};
   appointments.forEach((a: any) => {
-    const uid = a.user_id || ('phone_' + (a.customer_phone || 'anon'));
+    // anonymous walk-in with no phone gets its own slot per appointment (avoids merging strangers)
+    const uid = a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id);
     if (!customerMap[uid]) {
       customerMap[uid] = {
         id: uid,
@@ -614,14 +615,14 @@ export default function Dashboard() {
     if (a.status !== 'İptal Edildi') {
       c.visits++;
       c.totalSpent += Number(a.price || 0);
+      const d = a.appointment_date as string;
+      if (d) {
+        if (!c.lastVisit || d > c.lastVisit) c.lastVisit = d;
+        if (!c.firstVisit || d < c.firstVisit) c.firstVisit = d;
+      }
+      const svcName = (a.service_name || a.services?.name) as string | undefined;
+      if (svcName) c._svcCount[svcName] = (c._svcCount[svcName] || 0) + 1;
     }
-    const d = a.appointment_date as string;
-    if (d) {
-      if (!c.lastVisit || d > c.lastVisit) c.lastVisit = d;
-      if (!c.firstVisit || d < c.firstVisit) c.firstVisit = d;
-    }
-    const svcName = (a.service_name || a.services?.name) as string | undefined;
-    if (svcName) c._svcCount[svcName] = (c._svcCount[svcName] || 0) + 1;
   });
   const thirtyDaysAgoStr = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
   const sixtyDaysAgoStr = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
@@ -642,7 +643,11 @@ export default function Dashboard() {
     };
   }).sort((a: any, b: any) => b.visits - a.visits);
   const filteredCustomers = customerList.filter((c: any) => {
-    if (custSearch && !(c.name as string).toLowerCase().includes(custSearch.toLowerCase())) return false;
+    if (custSearch) {
+      const q = custSearch.toLowerCase();
+      const match = (c.name as string).toLowerCase().includes(q) || (c.phone as string).toLowerCase().includes(q) || (c.email as string).toLowerCase().includes(q);
+      if (!match) return false;
+    }
     if (custFilter === 'vip') return c.tag === 'vip';
     if (custFilter === 'new') return c.tag === 'new';
     if (custFilter === 'risk') return c.tag === 'risk';
@@ -650,7 +655,7 @@ export default function Dashboard() {
   });
   const activeCust = selectedCustId ? customerList.find((c: any) => c.id === selectedCustId) : (customerList[0] || null);
   const custHistory = activeCust
-    ? appointments.filter((a: any) => (a.user_id || ('phone_' + (a.customer_phone || 'anon'))) === activeCust.id)
+    ? appointments.filter((a: any) => (a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id)) === activeCust.id)
         .sort((a: any, b: any) => (b.appointment_date as string).localeCompare(a.appointment_date as string))
     : [];
   const vipCount = customerList.filter((c: any) => c.tag === 'vip').length;
@@ -1791,7 +1796,7 @@ export default function Dashboard() {
                     <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">{customerList.length} müşteri · {newCustCount} yeni · {vipCount} VIP</p>
                   </div>
                   <button onClick={() => {
-                    const rows = [['İsim','Telefon','E-posta','Ziyaret','Harcama','Son Ziyaret','Etiket'],...customerList.map((c:any)=>[c.name,c.phone,c.email,c.visits,c.totalSpent,c.lastVisit||'',c.tagLabel])];
+                    const rows = [['İsim','Telefon','E-posta','Ziyaret','Harcama','Son Ziyaret','Etiket'],...filteredCustomers.map((c:any)=>[c.name,c.phone,c.email,c.visits,c.totalSpent,c.lastVisit||'',c.tagLabel])];
                     const csv = rows.map(r=>r.map((v:any)=>String(v).replace(/,/g,';')).join(',')).join('\n');
                     const a = document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='musteriler.csv'; a.click();
                   }} className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
@@ -1869,11 +1874,11 @@ export default function Dashboard() {
                               <p className="text-[11px] font-mono tracking-widest uppercase mt-1 opacity-60">{activeCust.phone || activeCust.email || 'İletişim yok'}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
+                              <button onClick={() => { setNewAptForm({ customerName: activeCust.name, phone: activeCust.phone, serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
                               {activeCust.phone && (
                                 <>
                                   <a href={`tel:${activeCust.phone}`} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></a>
-                                  <a href={`https://wa.me/${(activeCust.phone as string).replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="w-9 h-9 bg-[#25D366]/20 rounded-xl text-white hover:bg-[#25D366]/40 transition-all flex items-center justify-center" title="WhatsApp"><MessageSquare size={15}/></a>
+                                  <a href={`https://wa.me/${(activeCust.phone as string).replace(/\D/g,'').replace(/^0/,'90')}`} target="_blank" rel="noreferrer" className="w-9 h-9 bg-[#25D366]/20 rounded-xl text-white hover:bg-[#25D366]/40 transition-all flex items-center justify-center" title="WhatsApp"><MessageSquare size={15}/></a>
                                 </>
                               )}
                             </div>
@@ -3223,7 +3228,7 @@ export default function Dashboard() {
                           <a href={`tel:${phone}`} className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-xl hover:bg-[#00A3AD] transition-all" title="Ara">
                             <Phone size={16} />
                           </a>
-                          <a href={`https://wa.me/${phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all" title="WhatsApp">
+                          <a href={`https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '90')}`} target="_blank" rel="noreferrer" className="w-10 h-10 flex items-center justify-center bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all" title="WhatsApp">
                             <MessageSquare size={16} />
                           </a>
                         </>
