@@ -36,21 +36,31 @@ const DAY_NAMES_SHORT = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
 function calcDiscountedPrice(service: any, campaigns: any[]): { original: number; discounted: number; campaign: any | null; pct: number } {
   const original = Number(service.price) || 0;
   const sid = String(service.id);
-  const campaign = campaigns.find(c =>
+  // Filter to campaigns that apply to this specific service
+  const applicable = campaigns.filter(c =>
     !c.service_ids?.length || c.service_ids.map(String).includes(sid)
   );
-  if (!campaign) return { original, discounted: original, campaign: null, pct: 0 };
-  let discounted = original;
-  let pct = 0;
-  const val = Number(campaign.discount_value) || 0;
-  if ((campaign.type === 'percentage' || campaign.type === 'today_special' || campaign.type === 'last_minute') && val) {
-    pct = val;
-    discounted = Math.round(original * (1 - pct / 100));
-  } else if (campaign.type === 'fixed' && val) {
-    discounted = Math.max(0, Math.round(original - val));
-    pct = original > 0 ? Math.round(((original - discounted) / original) * 100) : 0;
+  if (!applicable.length) return { original, discounted: original, campaign: null, pct: 0 };
+  // Pick campaign with highest savings (anti-stacking: only one applies)
+  let bestCampaign: any = null;
+  let bestDiscounted = original;
+  let bestPct = 0;
+  for (const c of applicable) {
+    const val = Number(c.discount_value) || 0;
+    let disc = original;
+    let pct = 0;
+    if ((c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') && val) {
+      pct = val;
+      disc = Math.round(original * (1 - pct / 100));
+    } else if (c.type === 'fixed' && val) {
+      disc = Math.max(0, Math.round(original - val));
+      pct = original > 0 ? Math.round(((original - disc) / original) * 100) : 0;
+    }
+    if (disc < bestDiscounted) { bestDiscounted = disc; bestPct = pct; bestCampaign = c; }
   }
-  return { original, discounted, campaign, pct };
+  // Return null campaign when no actual price change occurs
+  if (bestDiscounted >= original) return { original, discounted: original, campaign: null, pct: 0 };
+  return { original, discounted: bestDiscounted, campaign: bestCampaign, pct: bestPct };
 }
 
 // ---------- Inline Booking Panel ----------
@@ -506,7 +516,7 @@ export default function ShopDetail() {
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'new_appointment', shopId, ownerId: shop.owner_id, customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri', serviceName: item.service.name, appointmentDate: localDateStr(item.date), appointmentTime: item.time, price: item.service.price }),
+          body: JSON.stringify({ type: 'new_appointment', shopId, ownerId: shop.owner_id, customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri', serviceName: item.service.name, appointmentDate: localDateStr(item.date), appointmentTime: item.time, price: item.discountedPrice }),
         }).catch(() => {});
       });
       setCart([]);
@@ -603,6 +613,18 @@ export default function ShopDetail() {
               <div className="pt-4 border-t border-gray-50">
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><MapPin size={10} /> Konum</p>
                 <p className="font-bold text-xs text-gray-500 uppercase tracking-widest">{shop.district}, {shop.city}</p>
+              </div>
+              <div className="pt-4 border-t border-gray-50 flex flex-col items-center gap-1">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tutar</p>
+                {lastConfirmed.campaign && lastConfirmed.discountedPrice < Number(lastConfirmed.service.price) ? (
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-gray-300 font-mono text-sm">₺{lastConfirmed.service.price}</span>
+                    <span className="font-black text-[#14b8a6] text-lg">₺{lastConfirmed.discountedPrice}</span>
+                    <span className="bg-amber-400 text-black text-[9px] font-black px-2 py-0.5 rounded-lg uppercase">🏷 {lastConfirmed.campaign.title}</span>
+                  </div>
+                ) : (
+                  <p className="font-black text-[#0c0c0d] text-lg">₺{lastConfirmed.discountedPrice}</p>
+                )}
               </div>
             </div>
             <button onClick={() => router.push('/')} className="bg-[#0c0c0d] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-[#14b8a6] transition-all text-sm">
@@ -1098,7 +1120,7 @@ export default function ShopDetail() {
                       <div key={i} className="grid items-center py-3 border-t text-sm" style={{ gridTemplateColumns: '1fr auto', gap: '12px', borderColor: 'rgba(255,255,255,0.1)' }}>
                         <div>
                           <div className="font-semibold">{item.service.name}</div>
-                          {item.campaign && <div className="text-[9px] font-mono mt-0.5" style={{ color: '#14b8a6' }}>🏷 {item.campaign.title}</div>}
+                          {item.campaign && hasDiscount && <div className="text-[9px] font-mono mt-0.5" style={{ color: '#14b8a6' }}>🏷 {item.campaign.title}</div>}
                           <div className="font-mono text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
                             {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
                           </div>
