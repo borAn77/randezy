@@ -423,6 +423,17 @@ export default function Dashboard() {
 
   const handleCampaignSubmit = async () => {
     if (!shop?.id || !campaignForm.title || !campaignForm.start_date || !campaignForm.end_date) return;
+    const needsValue = ['percentage', 'fixed', 'today_special', 'last_minute'].includes(campaignForm.type);
+    const discVal = parseFloat(campaignForm.discount_value);
+    if (needsValue && (!campaignForm.discount_value || isNaN(discVal) || discVal <= 0)) {
+      showToast('Geçerli bir indirim değeri girin.', 'err'); return;
+    }
+    if (campaignForm.type === 'percentage' && discVal > 100) {
+      showToast("Yüzde indirim 100'den fazla olamaz.", 'err'); return;
+    }
+    if (campaignForm.start_date > campaignForm.end_date) {
+      showToast('Başlangıç tarihi bitiş tarihinden önce olmalı.', 'err'); return;
+    }
     setSavingCampaign(true);
     const payload = {
       shop_id: shop.id,
@@ -452,7 +463,8 @@ export default function Dashboard() {
 
   const handleDeleteCampaign = async (id: string) => {
     if (!confirm("Bu kampanya silinsin mi?")) return;
-    await supabase.from('campaigns').delete().eq('id', id);
+    const { error } = await supabase.from('campaigns').delete().eq('id', id);
+    if (error) { showToast('Silme hatası: ' + error.message, 'err'); return; }
     setCampaigns(prev => prev.filter(c => c.id !== id));
   };
 
@@ -2728,8 +2740,8 @@ export default function Dashboard() {
                       const isUpcoming = c.start_date > today;
                       const typeLabel = c.type === 'percentage' ? `%${c.discount_value} İndirim`
                         : c.type === 'fixed' ? `₺${c.discount_value} İndirim`
-                        : c.type === 'today_special' ? 'Bugüne Özel'
-                        : 'Son Dakika';
+                        : c.type === 'today_special' ? `Bugüne Özel${c.discount_value ? ` (%${c.discount_value})` : ''}`
+                        : `Son Dakika${c.discount_value ? ` (%${c.discount_value})` : ''}`;
                       return (
                         <div key={c.id} className={`bg-white rounded-2xl border flex items-center gap-5 px-5 py-4 hover:shadow-sm transition-all ${isActive ? 'border-[#14b8a6]/30' : 'border-[#ececea]'}`}>
                           <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-[#e6f7f4]' : isUpcoming ? 'bg-amber-50' : 'bg-[#fafaf8]'}`}>
@@ -2756,7 +2768,7 @@ export default function Dashboard() {
                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                                   {affectedSvcs.slice(0, 3).map((s: any) => {
                                     let disc = s.price;
-                                    if (c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') disc = Math.round(s.price * (1 - val / 100));
+                                    if (c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') disc = Math.max(0, Math.round(s.price * (1 - Math.min(100, val) / 100)));
                                     else if (c.type === 'fixed') disc = Math.max(0, Math.round(s.price - val));
                                     return (
                                       <span key={s.id} className="text-[10px] font-mono bg-[#fafaf8] border border-[#ececea] px-2 py-0.5 rounded-lg">
@@ -2772,7 +2784,8 @@ export default function Dashboard() {
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <button
                               onClick={async () => {
-                                await supabase.from('campaigns').update({ is_active: !c.is_active }).eq('id', c.id);
+                                const { error } = await supabase.from('campaigns').update({ is_active: !c.is_active }).eq('id', c.id);
+                                if (error) { showToast('Güncelleme hatası: ' + error.message, 'err'); return; }
                                 setCampaigns(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x));
                               }}
                               className={`px-3 py-1.5 rounded-lg text-[10px] font-mono uppercase tracking-widest transition-all ${c.is_active ? 'bg-[#e6f7f4] text-[#14b8a6] hover:bg-red-50 hover:text-[#dc2626]' : 'bg-[#fafaf8] text-[#7a7a7e] hover:bg-[#e6f7f4] hover:text-[#14b8a6]'}`}
@@ -3043,7 +3056,7 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       {selectedSvcs.slice(0, 4).map((s: any) => {
                         let disc = s.price;
-                        if (campaignForm.type === 'percentage' || campaignForm.type === 'today_special' || campaignForm.type === 'last_minute') disc = Math.round(s.price * (1 - val / 100));
+                        if (campaignForm.type === 'percentage' || campaignForm.type === 'today_special' || campaignForm.type === 'last_minute') disc = Math.max(0, Math.round(s.price * (1 - Math.min(100, val) / 100)));
                         else if (campaignForm.type === 'fixed') disc = Math.max(0, Math.round(s.price - val));
                         return (
                           <div key={s.id} className="flex items-center justify-between text-sm">

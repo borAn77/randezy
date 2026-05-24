@@ -50,8 +50,8 @@ function calcDiscountedPrice(service: any, campaigns: any[]): { original: number
     let disc = original;
     let pct = 0;
     if ((c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') && val) {
-      pct = val;
-      disc = Math.round(original * (1 - pct / 100));
+      pct = Math.min(100, val);
+      disc = Math.max(0, Math.round(original * (1 - pct / 100)));
     } else if (c.type === 'fixed' && val) {
       disc = Math.max(0, Math.round(original - val));
       pct = original > 0 ? Math.round(((original - disc) / original) * 100) : 0;
@@ -449,8 +449,8 @@ export default function ShopDetail() {
       setServices(servicesData || []);
       setShopHours(hoursData || []);
       setStaff(staffData || []);
-      const todayStr = new Date().toISOString().slice(0, 10);
-      setActiveCampaigns((campData || []).filter((c: any) => c.start_date <= todayStr && c.end_date >= todayStr));
+      const todayLocal = localDateStr(new Date());
+      setActiveCampaigns((campData || []).filter((c: any) => c.start_date <= todayLocal && c.end_date >= todayLocal));
     });
     fetchReviews();
     supabase.auth.getUser().then(({ data: { user } }) => {
