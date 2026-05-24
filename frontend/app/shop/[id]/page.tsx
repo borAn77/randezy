@@ -475,7 +475,7 @@ export default function ShopDetail() {
     if (!currentUserId) { alert("Yorum yazmak için giriş yapmalısınız."); return; }
     if (reviewRating === 0) { alert("Lütfen bir puan seçin."); return; }
     setSubmittingReview(true);
-    const { error } = await supabase.from('reviews').insert([{ shop_id: shopId, user_id: currentUserId, rating: reviewRating, comment: reviewComment }]);
+    const { error } = await supabase.from('reviews').upsert([{ shop_id: shopId, user_id: currentUserId, rating: reviewRating, comment: reviewComment }], { onConflict: 'shop_id,user_id' });
     if (error) {
       alert("Hata: " + error.message);
     } else {

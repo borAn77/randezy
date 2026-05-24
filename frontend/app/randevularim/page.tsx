@@ -201,6 +201,11 @@ export default function Randevularim() {
       { shop_id: apt.shop_id, user_id: user.id, rating, comment: review.trim() || null },
       { onConflict: 'shop_id,user_id' }
     );
+    const { data: allReviews } = await supabase.from('reviews').select('rating').eq('shop_id', apt.shop_id);
+    if (allReviews && allReviews.length > 0) {
+      const avg = allReviews.reduce((s: number, r: any) => s + r.rating, 0) / allReviews.length;
+      await supabase.from('shops').update({ score: Math.round(avg * 10) / 10 }).eq('id', apt.shop_id);
+    }
     setLocalRatings(prev => ({ ...prev, [id]: rating }));
     setRateTarget(null);
   };
