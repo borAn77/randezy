@@ -2706,8 +2706,29 @@ export default function Dashboard() {
                             <p className="text-[11px] font-mono text-[#14b8a6]">{typeLabel}</p>
                             <p className="text-[10px] font-mono text-[#7a7a7e] mt-0.5">
                               {c.start_date} → {c.end_date}
-                              {c.service_ids?.length > 0 && ` · ${c.service_ids.length} hizmet`}
                             </p>
+                            {(() => {
+                              const val = Number(c.discount_value) || 0;
+                              const affectedSvcs = services.filter((s: any) =>
+                                !c.service_ids?.length || c.service_ids.map(String).includes(String(s.id))
+                              );
+                              if (!affectedSvcs.length || !val) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                  {affectedSvcs.slice(0, 3).map((s: any) => {
+                                    let disc = s.price;
+                                    if (c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') disc = Math.round(s.price * (1 - val / 100));
+                                    else if (c.type === 'fixed') disc = Math.max(0, Math.round(s.price - val));
+                                    return (
+                                      <span key={s.id} className="text-[10px] font-mono bg-[#fafaf8] border border-[#ececea] px-2 py-0.5 rounded-lg">
+                                        {s.name}: <span className="line-through text-[#7a7a7e]">₺{s.price}</span> → <span className="text-[#14b8a6] font-bold">₺{disc}</span>
+                                      </span>
+                                    );
+                                  })}
+                                  {affectedSvcs.length > 3 && <span className="text-[10px] font-mono text-[#7a7a7e]">+{affectedSvcs.length - 3} daha</span>}
+                                </div>
+                              );
+                            })()}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <button
@@ -2970,6 +2991,36 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+              {/* Live price preview */}
+              {campaignForm.discount_value && services.length > 0 && (() => {
+                const val = parseFloat(campaignForm.discount_value) || 0;
+                const selectedSvcs = campaignForm.service_ids.length > 0
+                  ? services.filter((s: any) => campaignForm.service_ids.map(String).includes(String(s.id)))
+                  : services;
+                if (!val || !selectedSvcs.length) return null;
+                return (
+                  <div className="bg-gray-50 rounded-2xl p-4">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Fiyat Önizlemesi</p>
+                    <div className="space-y-2">
+                      {selectedSvcs.slice(0, 4).map((s: any) => {
+                        let disc = s.price;
+                        if (campaignForm.type === 'percentage' || campaignForm.type === 'today_special' || campaignForm.type === 'last_minute') disc = Math.round(s.price * (1 - val / 100));
+                        else if (campaignForm.type === 'fixed') disc = Math.max(0, Math.round(s.price - val));
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-sm">
+                            <span className="font-bold text-black truncate max-w-[180px]">{s.name}</span>
+                            <span className="flex items-center gap-2 flex-shrink-0">
+                              <span className="line-through text-gray-400 font-mono text-xs">₺{s.price}</span>
+                              <span className="font-black text-[#00A3AD]">₺{disc}</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {selectedSvcs.length > 4 && <p className="text-[10px] text-gray-400 font-mono">+{selectedSvcs.length - 4} hizmet daha</p>}
+                    </div>
+                  </div>
+                );
+              })()}
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"

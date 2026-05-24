@@ -111,7 +111,7 @@ export default function Home() {
   useEffect(() => {
     supabase
       .from("shops")
-      .select("*")
+      .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active)")
       .eq("is_active", true)
       .then(({ data, error }) => {
         if (error) { setError(true); } else { setShops(data || []); }
@@ -434,37 +434,56 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-12">
-            {filteredShops.map((shop: any) => (
-              <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
-                <div className="relative h-52 sm:h-64 md:h-80 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-3 md:mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
-                  {shop.image_url
-                    ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
-                    : <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center gap-2">
-                        <ImageIcon size={40} className="text-gray-300" />
-                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{shop.category || "İşletme"}</span>
+            {filteredShops.map((shop: any) => {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const activeCampaign = (shop.campaigns || []).find((c: any) =>
+                c.is_active && c.start_date <= todayStr && c.end_date >= todayStr
+              );
+              const campaignLabel = activeCampaign
+                ? activeCampaign.type === 'percentage' ? `%${activeCampaign.discount_value} İndirim`
+                  : activeCampaign.type === 'fixed' ? `₺${activeCampaign.discount_value} İndirim`
+                  : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
+                  : 'Son Dakika'
+                : null;
+              return (
+                <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
+                  <div className="relative h-52 sm:h-64 md:h-80 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-3 md:mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
+                    {shop.image_url
+                      ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
+                      : <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center gap-2">
+                          <ImageIcon size={40} className="text-gray-300" />
+                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{shop.category || "İşletme"}</span>
+                        </div>
+                    }
+                    <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
+                      ⭐ {shop.score ?? "—"}
+                    </div>
+                    {campaignLabel && (
+                      <div className="absolute top-3 left-3 md:top-6 md:left-6">
+                        <span className="bg-amber-400 text-black px-2.5 py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wide shadow-sm">
+                          🏷 {campaignLabel}
+                        </span>
                       </div>
-                  }
-                  <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
-                    ⭐ {shop.score ?? "—"}
+                    )}
+                    <button
+                      onClick={e => toggleFavorite(e, shop.id)}
+                      className="absolute bottom-3 right-3 md:bottom-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
+                    >
+                      <Heart
+                        size={16}
+                        className={favoriteIds.has(shop.id) ? "fill-red-500 text-red-500" : "text-gray-400"}
+                      />
+                    </button>
                   </div>
-                  <button
-                    onClick={e => toggleFavorite(e, shop.id)}
-                    className="absolute bottom-3 right-3 md:bottom-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
-                  >
-                    <Heart
-                      size={16}
-                      className={favoriteIds.has(shop.id) ? "fill-red-500 text-red-500" : "text-gray-400"}
-                    />
-                  </button>
-                </div>
-                <h3 className="font-black text-sm md:text-xl text-[#222] uppercase tracking-tighter leading-none mb-1">
-                  {shop.name}
-                </h3>
-                <p className="text-gray-400 font-bold text-[10px] md:text-[12px] uppercase tracking-widest">
-                  {shop.district}, {shop.city}
-                </p>
-              </Link>
-            ))}
+                  <h3 className="font-black text-sm md:text-xl text-[#222] uppercase tracking-tighter leading-none mb-1">
+                    {shop.name}
+                  </h3>
+                  <p className="text-gray-400 font-bold text-[10px] md:text-[12px] uppercase tracking-widest">
+                    {shop.district}, {shop.city}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

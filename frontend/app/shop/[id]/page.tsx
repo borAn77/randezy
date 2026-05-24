@@ -32,8 +32,30 @@ const MONTHS_SHORT = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','E
 const MONTHS_LONG = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const DAY_NAMES_SHORT = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
 
+// ---------- Campaign price helper ----------
+function calcDiscountedPrice(service: any, campaigns: any[]): { original: number; discounted: number; campaign: any | null; pct: number } {
+  const original = Number(service.price) || 0;
+  const sid = String(service.id);
+  const campaign = campaigns.find(c =>
+    !c.service_ids?.length || c.service_ids.map(String).includes(sid)
+  );
+  if (!campaign) return { original, discounted: original, campaign: null, pct: 0 };
+  let discounted = original;
+  let pct = 0;
+  const val = Number(campaign.discount_value) || 0;
+  if ((campaign.type === 'percentage' || campaign.type === 'today_special' || campaign.type === 'last_minute') && val) {
+    pct = val;
+    discounted = Math.round(original * (1 - pct / 100));
+  } else if (campaign.type === 'fixed' && val) {
+    discounted = Math.max(0, Math.round(original - val));
+    pct = original > 0 ? Math.round(((original - discounted) / original) * 100) : 0;
+  }
+  return { original, discounted, campaign, pct };
+}
+
 // ---------- Inline Booking Panel ----------
-interface CartItem { service: any; date: Date; time: string; staff: any | null; }
+interface CartItemBase { service: any; date: Date; time: string; staff: any | null; }
+interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
   service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired
@@ -43,7 +65,7 @@ function InlineBookingPanel({
   staff: any[];
   shopId: number;
   currentUserId: string | null;
-  onAdd: (item: CartItem) => void;
+  onAdd: (item: CartItemBase) => void;
   onAuthRequired: () => void;
 }) {
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -471,7 +493,7 @@ export default function ShopDetail() {
       customer_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
       service_id: item.service.id,
       service_name: item.service.name,
-      price: item.service.price,
+      price: item.discountedPrice,
       appointment_date: localDateStr(item.date),
       appointment_time: item.time,
       status: 'Beklemede',
@@ -543,7 +565,9 @@ export default function ShopDetail() {
   const mapQuery = [streetPart, shop.neighborhood, shop.district, shop.city].filter(Boolean).join(', ') || [shop.district, shop.city].filter(Boolean).join(', ');
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
 
-  const cartTotal = cart.reduce((a, c) => a + c.service.price, 0);
+  const cartOriginalTotal = cart.reduce((a, c) => a + (Number(c.service.price) || 0), 0);
+  const cartTotal = cart.reduce((a, c) => a + c.discountedPrice, 0);
+  const cartDiscount = cartOriginalTotal - cartTotal;
   const cartDuration = cart.reduce((a, c) => a + c.service.duration, 0);
 
   // Success screen
@@ -769,13 +793,27 @@ export default function ShopDetail() {
                                   {staff.length > 0 && <span>✦ {serviceStaffFilter ? serviceStaffFilter.first_name : 'Tüm Personel'}</span>}
                                 </div>
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-[22px] font-bold tracking-tight">{service.price} ₺</div>
-                                <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-gray-400'}`}>
-                                  {isExpanded ? 'Kapat' : 'Saat seç'}
-                                  <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-                              </div>
+                              {(() => {
+                                const { original, discounted, pct } = calcDiscountedPrice(service, activeCampaigns);
+                                const hasDiscount = discounted < original;
+                                return (
+                                  <div className="text-right flex-shrink-0">
+                                    {hasDiscount ? (
+                                      <>
+                                        <div className="text-[13px] line-through text-gray-300 font-mono leading-tight">{original} ₺</div>
+                                        <div className="text-[22px] font-bold tracking-tight text-[#14b8a6] leading-tight">{discounted} ₺</div>
+                                        <div className="inline-block bg-amber-400 text-black px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wide mt-1">-%{pct}</div>
+                                      </>
+                                    ) : (
+                                      <div className="text-[22px] font-bold tracking-tight">{original} ₺</div>
+                                    )}
+                                    <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-gray-400'}`}>
+                                      {isExpanded ? 'Kapat' : 'Saat seç'}
+                                      <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {isExpanded && (
                               <InlineBookingPanel
@@ -784,7 +822,12 @@ export default function ShopDetail() {
                                 staff={serviceStaffFilter ? [serviceStaffFilter] : staff}
                                 shopId={shopId}
                                 currentUserId={currentUserId}
-                                onAdd={(item) => { setCart(prev => [...prev, item]); setToast(`${item.service.name} sepete eklendi`); setExpandedServiceId(null); }}
+                                onAdd={(item) => {
+                  const { discounted, campaign } = calcDiscountedPrice(item.service, activeCampaigns);
+                  setCart(prev => [...prev, { ...item, discountedPrice: discounted, campaign }]);
+                  setToast(`${item.service.name} sepete eklendi`);
+                  setExpandedServiceId(null);
+                }}
                                 onAuthRequired={() => setIsAuthOpen(true)}
                               />
                             )}
@@ -1049,20 +1092,33 @@ export default function ShopDetail() {
                 </div>
               ) : (
                 <>
-                  {cart.map((item, i) => (
-                    <div key={i} className="grid items-center py-3 border-t text-sm" style={{ gridTemplateColumns: '1fr auto', gap: '12px', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      <div>
-                        <div className="font-semibold">{item.service.name}</div>
-                        <div className="font-mono text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                          {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
+                  {cart.map((item, i) => {
+                    const hasDiscount = item.discountedPrice < (Number(item.service.price) || 0);
+                    return (
+                      <div key={i} className="grid items-center py-3 border-t text-sm" style={{ gridTemplateColumns: '1fr auto', gap: '12px', borderColor: 'rgba(255,255,255,0.1)' }}>
+                        <div>
+                          <div className="font-semibold">{item.service.name}</div>
+                          {item.campaign && <div className="text-[9px] font-mono mt-0.5" style={{ color: '#14b8a6' }}>🏷 {item.campaign.title}</div>}
+                          <div className="font-mono text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                            {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            {hasDiscount && <div className="text-[10px] line-through font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{item.service.price} ₺</div>}
+                            <span className="font-mono font-semibold" style={{ color: hasDiscount ? '#14b8a6' : '#fff' }}>{item.discountedPrice} ₺</span>
+                          </div>
+                          <button onClick={() => setCart(c => c.filter((_, j) => j !== i))} className="border-0 p-0 text-base" style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'}>×</button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold">{item.service.price} ₺</span>
-                        <button onClick={() => setCart(c => c.filter((_, j) => j !== i))} className="border-0 p-0 text-base" style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'}>×</button>
-                      </div>
+                    );
+                  })}
+                  {cartDiscount > 0 && (
+                    <div className="flex justify-between items-baseline pt-2 font-mono text-[11px]" style={{ color: '#14b8a6' }}>
+                      <span>Kampanya İndirimi</span>
+                      <span>-{cartDiscount} ₺</span>
                     </div>
-                  ))}
+                  )}
                   <div className="flex justify-between items-baseline my-3 font-mono text-[13px]">
                     <span style={{ color: 'rgba(255,255,255,0.6)' }}>Toplam · {cartDuration} dk</span>
                     <span className="text-lg font-bold">{cartTotal} ₺</span>
