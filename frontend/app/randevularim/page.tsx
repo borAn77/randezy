@@ -16,7 +16,7 @@ type AptRow = {
   status: string;             // 'Beklemede' | 'Onaylandı' | 'İptal Edildi' | 'Tamamlandı'
   price: number;
   cancel_reason?: string | null;
-  staff_name?: string | null;
+  staff?: { first_name: string; last_name: string } | null;
   notes?: string | null;
   shops: { name: string; city: string; district: string } | null;
 };
@@ -155,7 +155,7 @@ export default function Randevularim() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.replace('/'); return; }
     const [{ data: apts }, { data: reviewsData }] = await Promise.all([
-      supabase.from('appointments').select('*, shops(name, city, district)').eq('user_id', user.id).order('appointment_date', { ascending: false }),
+      supabase.from('appointments').select('*, shops(name, city, district), staff(first_name, last_name)').eq('user_id', user.id).order('appointment_date', { ascending: false }),
       supabase.from('reviews').select('shop_id, rating').eq('user_id', user.id),
     ]);
     const aptRows = (apts as AptRow[]) ?? [];
@@ -367,7 +367,7 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
             )}
 
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e8edf2', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <InfoCol label="Hizmet" value={apt.service_name} sub={apt.staff_name ?? '—'} />
+              <InfoCol label="Hizmet" value={apt.service_name} sub={apt.staff ? `${apt.staff.first_name} ${apt.staff.last_name}` : '—'} />
               <InfoCol label="Tarih"  value={`${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${DAYS_TR[d.getDay()]}`} sub={fmtTimeParts(apt.appointment_time)} />
               <InfoCol label="Ücret"  value={`${apt.price}₺`} sub="Yerinde ödeme" mono />
             </div>

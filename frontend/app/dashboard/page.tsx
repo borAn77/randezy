@@ -2097,13 +2097,16 @@ export default function Dashboard() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {staff.map((s) => {
-                      const staffAppts = appointments.filter((a: any) => a.staff_id === s.id);
-                      const thisWeekStart = new Date(); thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
+                      const staffAppts = appointments.filter((a: any) => a.staff_id === s.id && a.status === 'Onaylandı');
+                      const thisWeekStart = new Date();
+                      const dow = thisWeekStart.getDay();
+                      thisWeekStart.setDate(thisWeekStart.getDate() - (dow === 0 ? 6 : dow - 1));
+                      thisWeekStart.setHours(0, 0, 0, 0);
                       const weekAppts = staffAppts.filter((a: any) => new Date(a.appointment_date + 'T12:00:00') >= thisWeekStart);
-                      const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
-                      const monthStart = new Date(); monthStart.setDate(1);
+                      const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (Number(a.price) || 0), 0);
+                      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
                       const monthAppts = staffAppts.filter((a: any) => new Date(a.appointment_date + 'T12:00:00') >= monthStart);
-                      const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
+                      const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (Number(a.price) || 0), 0);
                       const initials = `${s.first_name?.charAt(0) || ''}${s.last_name?.charAt(0) || ''}`;
                       return (
                         <div key={s.id} className="bg-white border border-[#ececea] rounded-2xl p-[22px] hover:shadow-md transition-all">
@@ -2111,7 +2114,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-4 mb-4">
                             <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[18px] font-bold overflow-hidden"
                               style={{background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 8px 18px -8px rgba(20,184,166,0.5)'}}>
-                              {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} /> : initials}
+                              {s.avatar_url ? <img src={s.avatar_url} className="w-full h-full object-cover" alt={s.first_name} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} /> : initials}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[15px] font-semibold text-[#0c0c0d] leading-tight">{s.first_name} {s.last_name}</p>
@@ -2142,7 +2145,7 @@ export default function Dashboard() {
                           {/* Actions */}
                           <div className="grid grid-cols-4 gap-1.5">
                             {[
-                              { label: 'Takvim', icon: <Clock size={13}/>, action: () => setActiveTab('appointments') },
+                              { label: 'Takvim', icon: <Clock size={13}/>, action: () => { setCalFilterStaff(s.id); setActiveTab('appointments'); } },
                               { label: 'Kazanç', icon: <TrendingUp size={13}/>, action: () => setActiveTab('finance') },
                               { label: 'Düzenle', icon: <Edit3 size={13}/>, action: () => openStaffEdit(s) },
                               { label: 'Sil', icon: <Trash2 size={13}/>, action: async () => { if(confirm('Personel silinsin mi?')) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }, danger: true },
@@ -3062,7 +3065,7 @@ export default function Dashboard() {
             <div className="flex flex-col items-center gap-5">
               <label className="relative cursor-pointer group">
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-[#E6F6F7] border-4 border-white shadow-xl flex items-center justify-center">
-                  {staffForm.avatarUrl ? <img src={staffForm.avatarUrl} className="w-full h-full object-cover" /> : <span className="text-3xl font-black text-[#00A3AD]">{staffForm.firstName?.charAt(0) || "?"}</span>}
+                  {staffForm.avatarUrl ? <img src={staffForm.avatarUrl} className="w-full h-full object-cover" onError={() => setStaffForm(f => ({ ...f, avatarUrl: '' }))} /> : <span className="text-3xl font-black text-[#00A3AD]">{staffForm.firstName?.charAt(0) || "?"}</span>}
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-all rounded-full">
                   <UploadCloud size={20} className="text-white" />
