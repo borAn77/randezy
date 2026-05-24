@@ -113,15 +113,65 @@ export default function Dashboard() {
 
   const handleCreateAppointment = async () => {
     if (!shop?.id || !newAptForm.customerName.trim() || !newAptForm.date || !newAptForm.time) return;
+
+    const staffId = newAptForm.staffId || null;
+
+    // Require staff selection when the shop has staff — prevents ambiguous calendar entries
+    if (!staffId && staff.length > 0) {
+      showToast('Lütfen bir personel seçin.', 'err');
+      return;
+    }
+
     setSavingNewApt(true);
+
     const svc = services.find((s: any) => String(s.id) === String(newAptForm.serviceId));
+    const newDuration = svc?.duration_minutes ?? 30;
+    const BUFFER_MIN = 5;
+    const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+    const newStart = toMin(newAptForm.time);
+    const newEnd = newStart + newDuration;
+
+    // Pre-insert overlap check against active appointments on the same date
+    let aptQuery = supabase
+      .from('appointments')
+      .select('appointment_time, service_id, service_name')
+      .eq('shop_id', shop.id)
+      .eq('appointment_date', newAptForm.date)
+      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı']);
+
+    if (staffId) {
+      aptQuery = aptQuery.eq('staff_id', staffId);
+    }
+
+    const { data: existing, error: checkError } = await aptQuery;
+    if (checkError) {
+      showToast('Kontrol hatası: ' + checkError.message, 'err');
+      setSavingNewApt(false);
+      return;
+    }
+
+    for (const apt of (existing || [])) {
+      if (!apt.appointment_time) continue;
+      const existStart = toMin(apt.appointment_time);
+      const existSvc = apt.service_id
+        ? services.find((s: any) => String(s.id) === String(apt.service_id))
+        : services.find((s: any) => s.name === apt.service_name);
+      const existDuration = existSvc?.duration_minutes ?? 30;
+      const existEnd = existStart + existDuration + BUFFER_MIN;
+      if (newStart < existEnd && newEnd > existStart) {
+        showToast('Bu personel bu saat aralığında dolu. Lütfen başka bir saat seçin.', 'err');
+        setSavingNewApt(false);
+        return;
+      }
+    }
+
     const payload: any = {
       shop_id: shop.id,
       customer_name: newAptForm.customerName.trim(),
       customer_phone: newAptForm.phone.trim() || null,
       service_id: svc?.id || null,
       service_name: svc?.name || '',
-      staff_id: newAptForm.staffId || null,
+      staff_id: staffId,
       appointment_date: newAptForm.date,
       appointment_time: newAptForm.time,
       price: svc?.price || 0,

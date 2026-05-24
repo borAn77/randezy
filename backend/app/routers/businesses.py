@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Optional
@@ -24,6 +25,28 @@ from app.schemas import (
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 SLOT_INTERVAL = timedelta(minutes=30)
+BUFFER = timedelta(minutes=5)
+_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show]
+
+
+def _slots_for(
+    open_dt: datetime,
+    close_dt: datetime,
+    duration: timedelta,
+    existing: list,
+) -> list[TimeSlot]:
+    """Return free TimeSlots in [open_dt, close_dt) given a list of existing Appointments."""
+    slots: list[TimeSlot] = []
+    current = open_dt
+    while current + duration <= close_dt:
+        slot_end = current + duration
+        if all(
+            not (current < a.end_time + BUFFER and slot_end > a.start_time)
+            for a in existing
+        ):
+            slots.append(TimeSlot(start=current, end=slot_end))
+        current += SLOT_INTERVAL
+    return slots
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -252,25 +275,58 @@ def get_availability(
     )
     duration = timedelta(minutes=service.duration_minutes)
 
-    apt_stmt = select(Appointment).where(
-        Appointment.business_id == business_id,
-        Appointment.status.not_in([AppointmentStatus.cancelled]),
-        Appointment.start_time >= open_dt,
-        Appointment.start_time < close_dt + timedelta(hours=1),
-    )
-    if staff_id:
-        apt_stmt = apt_stmt.where(Appointment.staff_id == staff_id)
+    # Fetch window wider than the business day so appointments that started before
+    # open_dt but whose buffered end overlaps into it are included.
+    window_start = open_dt - duration - BUFFER
+    window_end = close_dt + duration + BUFFER
 
-    existing = db.execute(apt_stmt).scalars().all()
+    def _fetch(sid: Optional[uuid.UUID]) -> list:
+        stmt = select(Appointment).where(
+            Appointment.business_id == business_id,
+            Appointment.status.not_in(_NON_BLOCKING),
+            Appointment.start_time < window_end,
+            Appointment.end_time > window_start,
+        )
+        if sid is not None:
+            stmt = stmt.where(Appointment.staff_id == sid)
+        return db.execute(stmt).scalars().all()
+
+    if staff_id is not None:
+        return _slots_for(open_dt, close_dt, duration, _fetch(staff_id))
+
+    # "Any staff" — slot is available if at least one active staff member is free.
+    active_staff = db.execute(
+        select(Staff).where(Staff.business_id == business_id, Staff.is_active.is_(True))
+    ).scalars().all()
+
+    if not active_staff:
+        # Business has no staff — shop-level unassigned appointment check
+        unassigned = [a for a in _fetch(None) if a.staff_id is None]
+        return _slots_for(open_dt, close_dt, duration, unassigned)
+
+    # Bulk-fetch all active staff appointments; build per-staff map
+    bulk_stmt = select(Appointment).where(
+        Appointment.business_id == business_id,
+        Appointment.status.not_in(_NON_BLOCKING),
+        Appointment.start_time < window_end,
+        Appointment.end_time > window_start,
+        Appointment.staff_id.isnot(None),
+    )
+    per_staff: dict = defaultdict(list)
+    for a in db.execute(bulk_stmt).scalars().all():
+        per_staff[a.staff_id].append(a)
 
     slots: list[TimeSlot] = []
     current = open_dt
     while current + duration <= close_dt:
         slot_end = current + duration
-        if all(
-            not (current < a.end_time and slot_end > a.start_time) for a in existing
-        ):
-            slots.append(TimeSlot(start=current, end=slot_end))
+        for s in active_staff:
+            if all(
+                not (current < a.end_time + BUFFER and slot_end > a.start_time)
+                for a in per_staff[s.id]
+            ):
+                slots.append(TimeSlot(start=current, end=slot_end))
+                break
         current += SLOT_INTERVAL
 
     return slots

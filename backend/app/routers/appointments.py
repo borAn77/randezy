@@ -16,6 +16,9 @@ from app import push as push_service
 from app.models import Appointment, AppointmentStatus, Business, Service, Staff, User
 from app.schemas import AppointmentCreate, AppointmentDetail, AppointmentOut
 
+BUFFER = timedelta(minutes=5)
+_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show]
+
 router = APIRouter(tags=["appointments"])
 
 
@@ -47,23 +50,65 @@ def create_appointment(
         start = start.replace(tzinfo=timezone.utc)
     end = start + timedelta(minutes=service.duration_minutes)
 
-    # Conflict check — same staff, overlapping window, non-cancelled
+    # effective_staff_id may be auto-assigned when customer chose "any staff"
+    effective_staff_id = payload.staff_id
+
     if payload.staff_id:
+        # Specific staff — check overlap including 5-minute buffer after existing appointments
         conflict = db.execute(
             select(Appointment).where(
                 Appointment.staff_id == payload.staff_id,
-                Appointment.status.not_in([AppointmentStatus.cancelled]),
+                Appointment.status.not_in(_NON_BLOCKING),
                 Appointment.start_time < end,
-                Appointment.end_time > start,
+                Appointment.end_time > start - BUFFER,
             )
         ).scalar_one_or_none()
         if conflict:
-            raise HTTPException(409, "Bu zaman diliminde çakışan randevu mevcut")
+            raise HTTPException(409, "Bu saat az önce doldu. Lütfen başka bir saat seçin.")
+    else:
+        # No staff specified — auto-assign first available active staff member
+        active_staff = db.execute(
+            select(Staff).where(
+                Staff.business_id == payload.business_id,
+                Staff.is_active.is_(True),
+            )
+        ).scalars().all()
+
+        if active_staff:
+            for s in active_staff:
+                busy = db.execute(
+                    select(Appointment).where(
+                        Appointment.staff_id == s.id,
+                        Appointment.status.not_in(_NON_BLOCKING),
+                        Appointment.start_time < end,
+                        Appointment.end_time > start - BUFFER,
+                    )
+                ).scalar_one_or_none()
+                if not busy:
+                    effective_staff_id = s.id
+                    break
+            if not effective_staff_id:
+                raise HTTPException(
+                    409, "Bu saat için müsait personel bulunmuyor. Lütfen başka bir saat seçin."
+                )
+        else:
+            # Business has no staff — guard against unassigned appointment overlap
+            conflict = db.execute(
+                select(Appointment).where(
+                    Appointment.business_id == payload.business_id,
+                    Appointment.staff_id.is_(None),
+                    Appointment.status.not_in(_NON_BLOCKING),
+                    Appointment.start_time < end,
+                    Appointment.end_time > start - BUFFER,
+                )
+            ).scalar_one_or_none()
+            if conflict:
+                raise HTTPException(409, "Bu saat az önce doldu. Lütfen başka bir saat seçin.")
 
     appointment = Appointment(
         customer_id=user.supabase_id,
         business_id=payload.business_id,
-        staff_id=payload.staff_id,
+        staff_id=effective_staff_id,
         service_id=payload.service_id,
         start_time=start,
         end_time=end,
