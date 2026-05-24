@@ -189,7 +189,12 @@ export default function Dashboard() {
         })));
       } else {
         const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-        setShopHours(hours.map((h: any) => ({ ...h, day_name: dayNames[h.day_of_week] })));
+        const trWeekOrder = [1, 2, 3, 4, 5, 6, 0];
+        setShopHours(
+          hours
+            .map((h: any) => ({ ...h, day_name: dayNames[h.day_of_week] }))
+            .sort((a: any, b: any) => trWeekOrder.indexOf(a.day_of_week) - trWeekOrder.indexOf(b.day_of_week))
+        );
       }
     } else {
       setShop(null);
@@ -452,6 +457,11 @@ export default function Dashboard() {
 
   const handleSaveHours = async () => {
     if (!shop?.id) return;
+    const invalid = shopHours.filter(h => !h.is_closed && h.open_time >= h.close_time);
+    if (invalid.length > 0) {
+      showToast('Açılış saati kapanış saatinden önce olmalı.', 'err');
+      return;
+    }
     setSavingHours(true);
     const hoursToUpsert = shopHours.map(h => ({
       shop_id: shop.id,
