@@ -517,7 +517,7 @@ export default function Dashboard() {
   // Real metrics
   const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı' || a.status === 'Tamamlandı');
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
-  const uniqueCustomers = new Set(appointments.map(a => a.user_id).filter(Boolean)).size;
+  const uniqueCustomers = new Set(appointments.map((a: any) => a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id))).size;
   const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
   const pendingAppointments = appointments.filter(a => a.status === 'Beklemede');
   const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
@@ -610,7 +610,7 @@ export default function Dashboard() {
   for (let d = 1; d <= 5; d++) { for (let h = 9; h <= 17; h++) { if (heatmapData[d][h] < lbVal) { lbVal = heatmapData[d][h]; lbDay = d; lbHour = h; } } }
   if (appointments.length > 0 && lbDay > -1) smartSuggestions.push(`${fDayNames[lbDay]} ${lbHour}:00–${lbHour + 1}:00 arası düşük yoğunluk var. Bu saatler için kampanya önerilir.`);
   if (servicePerf.length > 0 && servicePerf[0].totalRevenue > 0) smartSuggestions.push(`"${servicePerf[0].name}" en yüksek ciro getiren hizmet (₺${servicePerf[0].totalRevenue.toLocaleString('tr-TR')} · ${servicePerf[0].salesCount} satış).`);
-  if (cancellationRate > 10) smartSuggestions.push(`İptal oranı %${cancellationRate.toFixed(1)} — müşterilere hatırlatma mesajı gönderilmesi önerilir.`);
+  if (cancellationRateMonth > 10) smartSuggestions.push(`Bu ay iptal oranı %${cancellationRateMonth.toFixed(1)} — müşterilere hatırlatma mesajı gönderilmesi önerilir.`);
   if (staffPerf.length > 0 && staffPerf[0].revenue > 0) smartSuggestions.push(`En çok ciro getiren personel: ${staffPerf[0].first_name} ${staffPerf[0].last_name} (₺${staffPerf[0].revenue.toLocaleString('tr-TR')}).`);
   const satTotal = heatmapData[6].reduce((a: number, b: number) => a + b, 0);
   const allDayTotals = heatmapData.map((d: number[]) => d.reduce((a: number, b: number) => a + b, 0));
@@ -1069,7 +1069,7 @@ export default function Dashboard() {
                   <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
                     <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Benzersiz Müşteri</p>
                     <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{uniqueCustomers}</p>
-                    <p className={`text-[10px] font-mono mt-2 ${newCust > 0 ? 'text-[#15803d]' : 'text-[#7a7a7e]'}`}>{newCust > 0 ? `↗ +${newCust} yeni` : 'Yeni müşteri yok'}</p>
+                    <p className={`text-[10px] font-mono mt-2 ${newCustCount > 0 ? 'text-[#15803d]' : 'text-[#7a7a7e]'}`}>{newCustCount > 0 ? `↗ +${newCustCount} yeni (30 gün)` : 'Yeni müşteri yok'}</p>
                     <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Tüm zamanlar</p>
                   </div>
                   <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
@@ -2514,7 +2514,7 @@ export default function Dashboard() {
                 <div className="flex items-end justify-between mb-2">
                   <div>
                     <h1 className="text-3xl font-bold text-[#0c0c0d] tracking-tight uppercase">İstatistikler</h1>
-                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">Son 30 gün · Derinlemesine analiz</p>
+                    <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">Tüm randevular · Derinlemesine analiz</p>
                   </div>
                 </div>
 
@@ -2523,8 +2523,8 @@ export default function Dashboard() {
                   {[
                     { label: 'Geri Dönüş Oranı', value: `%${loyaltyRate.toFixed(1)}`, delta: returningCust + ' müşteri 2+ kez geldi', up: loyaltyRate > 50 },
                     { label: 'Ort. Randevu Tutarı', value: `₺${avgBasket.toLocaleString('tr-TR', {maximumFractionDigits:0})}`, delta: 'bu ay randevu başına', up: true },
-                    { label: 'İptal Oranı', value: `%${cancellationRate.toFixed(1)}`, delta: cancellationRate < 5 ? 'Hedef altında ✓' : 'Hedef: <%5', up: cancellationRate < 5 },
-                    { label: 'Toplam Müşteri', value: totalCust.toString(), delta: newCust + ' yeni bu dönemde', up: newCust > 0 },
+                    { label: 'İptal Oranı (Bu Ay)', value: `%${cancellationRateMonth.toFixed(1)}`, delta: cancellationRateMonth < 5 ? 'Hedef altında ✓' : 'Hedef: <%5', up: cancellationRateMonth < 5 },
+                    { label: 'Toplam Müşteri', value: totalCust.toString(), delta: newCustCount + ' yeni — son 30 gün', up: newCustCount > 0 },
                   ].map((k, i) => (
                     <div key={i} className={`p-5 rounded-2xl border ${i === 0 ? 'bg-[#0c0c0d] border-transparent text-white' : 'bg-white border-[#ececea]'}`}>
                       <p className={`text-[10px] font-mono uppercase tracking-widest mb-3 ${i === 0 ? 'text-white/50' : 'text-[#7a7a7e]'}`}>{k.label}</p>
@@ -2583,7 +2583,7 @@ export default function Dashboard() {
                         { label: '4–6 kez gelen', val: customerList.filter((c:any) => c.visits >= 4 && c.visits <= 6).length, color: '#0d9488' },
                         { label: '7+ kez gelen (sadık)', val: customerList.filter((c:any) => c.visits >= 7).length, color: '#ca8a04' },
                       ].map((s, i) => {
-                        const max = Math.max(1, customerList.length);
+                        const max = Math.max(1, totalCust);
                         return (
                           <div key={i}>
                             <div className="flex justify-between text-[13px] mb-1.5">
@@ -2632,8 +2632,8 @@ export default function Dashboard() {
                     <div className="py-8 text-center text-[13px] text-[#7a7a7e]">Yeterli veri yok</div>
                   ) : (
                     <div className="space-y-3">
-                      {servicePerf.slice(0,6).map((s: any, i: number) => {
-                        const maxSales = servicePerf[0].salesCount || 1;
+                      {[...servicePerf].sort((a: any, b: any) => b.salesCount - a.salesCount).slice(0,6).map((s: any) => {
+                        const maxSales = Math.max(1, ...servicePerf.map((x: any) => x.salesCount));
                         return (
                           <div key={s.id} className="grid items-center gap-4" style={{gridTemplateColumns: '1fr 120px 60px'}}>
                             <span className="text-[13px] font-semibold text-[#0c0c0d]">{s.name}</span>
