@@ -250,7 +250,7 @@ export default function Dashboard() {
               type: 'appointment_confirmed',
               appointmentId: apt.id,
               customerEmail: apt.profiles?.email,
-              customerName: apt.profiles?.full_name || 'Müşteri',
+              customerName: apt.profiles?.full_name || apt.customer_name || 'Müşteri',
               shopName: shop?.name || '',
               serviceName: apt.service_name,
               appointmentDate: apt.appointment_date,
@@ -1337,6 +1337,7 @@ export default function Dashboard() {
                       if (listFilter !== 'all') filtered = filtered.filter((a:any) => a.status === listFilter);
                       if (listSearch.trim()) filtered = filtered.filter((a:any) =>
                         (a.profiles?.full_name||'').toLowerCase().includes(listSearch.toLowerCase()) ||
+                        (a.customer_name||'').toLowerCase().includes(listSearch.toLowerCase()) ||
                         (a.service_name||'').toLowerCase().includes(listSearch.toLowerCase())
                       );
                       if (filtered.length === 0) return (
@@ -1627,7 +1628,7 @@ export default function Dashboard() {
                                     <div key={apt.id}
                                       className={`text-[9px] font-bold text-white px-1.5 py-0.5 rounded-md mb-0.5 truncate ${mColors[apt.status]||'bg-gray-400'}`}
                                       onClick={e=>{e.stopPropagation();setSelectedApt(apt);setDetailRejectMode(false);setDetailRejectReason('');setDetailRejectError('');}}>
-                                      {apt.appointment_time?.slice(0,5)} {apt.profiles?.full_name?.split(' ')[0]||'Misafir'}
+                                      {apt.appointment_time?.slice(0,5)} {(apt.profiles?.full_name || apt.customer_name || 'Misafir').split(' ')[0]}
                                     </div>
                                   ))}
                                   {dayApts.length > 3 && <p className="text-[9px] font-bold text-gray-400">+{dayApts.length-3}</p>}
@@ -2087,10 +2088,10 @@ export default function Dashboard() {
                     {staff.map((s) => {
                       const staffAppts = appointments.filter((a: any) => a.staff_id === s.id);
                       const thisWeekStart = new Date(); thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
-                      const weekAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= thisWeekStart);
+                      const weekAppts = staffAppts.filter((a: any) => new Date(a.appointment_date + 'T12:00:00') >= thisWeekStart);
                       const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
                       const monthStart = new Date(); monthStart.setDate(1);
-                      const monthAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= monthStart);
+                      const monthAppts = staffAppts.filter((a: any) => new Date(a.appointment_date + 'T12:00:00') >= monthStart);
                       const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
                       const initials = `${s.first_name?.charAt(0) || ''}${s.last_name?.charAt(0) || ''}`;
                       return (
@@ -3151,7 +3152,7 @@ export default function Dashboard() {
                   <span className="text-white font-black text-lg">{initials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-lg font-black text-black truncate">{selectedApt.profiles?.full_name || 'Misafir'}</h4>
+                  <h4 className="text-lg font-black text-black truncate">{selectedApt.profiles?.full_name || selectedApt.customer_name || 'Misafir'}</h4>
                   {selectedApt.profiles?.email && (
                     <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.profiles.email}</p>
                   )}
