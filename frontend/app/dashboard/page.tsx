@@ -444,7 +444,7 @@ export default function Dashboard() {
     setSavingCampaign(false);
   };
 
-  const handleDeleteCampaign = async (id: number) => {
+  const handleDeleteCampaign = async (id: string) => {
     if (!confirm("Bu kampanya silinsin mi?")) return;
     await supabase.from('campaigns').delete().eq('id', id);
     setCampaigns(prev => prev.filter(c => c.id !== id));
@@ -1364,7 +1364,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="w-px h-10 bg-gray-100 flex-shrink-0"/>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                    <p className="text-sm font-black text-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                       <span className="text-[11px] font-bold text-gray-500 truncate">{apt.service_name}</span>
                                       {apt.staff && <span className="text-[11px] font-bold text-[#00A3AD] truncate">· {apt.staff.first_name} {apt.staff.last_name}</span>}
@@ -1501,7 +1501,7 @@ export default function Dashboard() {
                                           <p className="text-[9px] font-semibold opacity-60 leading-none mb-1">
                                             {`${String(aH).padStart(2,'0')}:${String(aM).padStart(2,'0')} – ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`}
                                           </p>
-                                          <p className="text-[11px] font-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                          <p className="text-[11px] font-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
                                           {heightPx >= 54 && <p className="text-[9px] opacity-70 truncate mt-0.5">{apt.service_name}</p>}
                                         </div>
                                       </div>
@@ -1581,7 +1581,7 @@ export default function Dashboard() {
                                         style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                                         onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}>
                                         <div className="px-2 py-1.5">
-                                          <p className="text-[10px] font-black truncate">{apt.profiles?.full_name || 'Misafir'}</p>
+                                          <p className="text-[10px] font-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
                                           {heightPx >= 46 && <p className="text-[8px] opacity-70 truncate">{apt.appointment_time?.slice(0,5)} · {apt.service_name}</p>}
                                         </div>
                                       </div>

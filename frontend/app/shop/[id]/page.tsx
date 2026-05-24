@@ -468,6 +468,8 @@ export default function ShopDetail() {
     const inserts = cart.map(item => ({
       user_id: session.user.id,
       shop_id: shopId,
+      customer_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
+      service_id: item.service.id,
       service_name: item.service.name,
       price: item.service.price,
       appointment_date: localDateStr(item.date),

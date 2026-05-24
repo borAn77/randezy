@@ -154,12 +154,17 @@ export default function Randevularim() {
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.replace('/'); return; }
-    const { data } = await supabase
-      .from('appointments')
-      .select('*, shops(name, city, district)')
-      .eq('user_id', user.id)
-      .order('appointment_date', { ascending: false });
-    setAppointments((data as AptRow[]) ?? []);
+    const [{ data: apts }, { data: reviewsData }] = await Promise.all([
+      supabase.from('appointments').select('*, shops(name, city, district)').eq('user_id', user.id).order('appointment_date', { ascending: false }),
+      supabase.from('reviews').select('shop_id, rating').eq('user_id', user.id),
+    ]);
+    const aptRows = (apts as AptRow[]) ?? [];
+    setAppointments(aptRows);
+    const shopRatings: Record<string, number> = {};
+    (reviewsData || []).forEach((r: any) => { shopRatings[r.shop_id] = r.rating; });
+    const initialRatings: Record<string, number> = {};
+    aptRows.forEach(a => { if (shopRatings[a.shop_id]) initialRatings[a.id] = shopRatings[a.shop_id]; });
+    setLocalRatings(initialRatings);
     setLoading(false);
   }, [router]);
 
@@ -178,14 +183,24 @@ export default function Randevularim() {
   const favId   = Object.keys(shopCounts).sort((a, b) => shopCounts[b] - shopCounts[a])[0];
   const favName = completed.find(a => a.shop_id === favId)?.shops?.name;
 
-  const handleCancel = async (id: string) => {
-    const { error } = await supabase.from('appointments').update({ status: 'İptal Edildi' }).eq('id', id);
+  const handleCancel = async (id: string, reason: string) => {
+    const update: any = { status: 'İptal Edildi' };
+    if (reason.trim()) update.cancel_reason = reason.trim();
+    const { error } = await supabase.from('appointments').update(update).eq('id', id);
     if (error) { alert('İptal başarısız: ' + error.message); return; }
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'İptal Edildi' } : a));
     setCancelTarget(null);
   };
 
-  const handleRate = (id: string, rating: number) => {
+  const handleRate = async (id: string, rating: number, review: string) => {
+    const apt = appointments.find(a => a.id === id);
+    if (!apt) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('reviews').upsert(
+      { shop_id: apt.shop_id, user_id: user.id, rating, comment: review.trim() || null },
+      { onConflict: 'shop_id,user_id' }
+    );
     setLocalRatings(prev => ({ ...prev, [id]: rating }));
     setRateTarget(null);
   };
@@ -592,7 +607,7 @@ function ModalHeader({ title, subtitle, onClose }: { title: string; subtitle?: s
   );
 }
 
-function CancelModal({ apt, onClose, onConfirm }: { apt: AptRow; onClose: () => void; onConfirm: (id: string) => void }) {
+function CancelModal({ apt, onClose, onConfirm }: { apt: AptRow; onClose: () => void; onConfirm: (id: string, reason: string) => void }) {
   const [reason, setReason] = useState('');
   const d = aptDateTime(apt);
   return (
@@ -620,7 +635,7 @@ function CancelModal({ apt, onClose, onConfirm }: { apt: AptRow; onClose: () => 
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
         <ActionBtn onClick={onClose}>Vazgeç</ActionBtn>
-        <ActionBtn danger onClick={() => { onConfirm(apt.id); setReason(''); }}>Evet, iptal et</ActionBtn>
+        <ActionBtn danger onClick={() => { onConfirm(apt.id, reason); }}>Evet, iptal et</ActionBtn>
       </div>
     </ModalOverlay>
   );
