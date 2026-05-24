@@ -62,7 +62,7 @@ export default function Dashboard() {
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [savingCampaign, setSavingCampaign] = useState(false);
-  const [campaignForm, setCampaignForm] = useState({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [] as number[], is_active: true });
+  const [campaignForm, setCampaignForm] = useState({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [] as string[], is_active: true });
   const [custFilter, setCustFilter] = useState<'all'|'vip'|'new'|'risk'>('all');
   const [custSearch, setCustSearch] = useState('');
   const [selectedCustId, setSelectedCustId] = useState<string|null>(null);
@@ -71,6 +71,10 @@ export default function Dashboard() {
   const [replyText, setReplyText] = useState('');
   const [savingReply, setSavingReply] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [calFilterStaff, setCalFilterStaff] = useState<string|null>(null);
+  const [isNewAptModalOpen, setIsNewAptModalOpen] = useState(false);
+  const [newAptForm, setNewAptForm] = useState({ customerName: '', phone: '', serviceId: '', staffId: '', date: '', time: '', status: 'Onaylandı' });
+  const [savingNewApt, setSavingNewApt] = useState(false);
 
   const showToast = (msg: string, type: 'ok'|'err' = 'ok') => {
     const id = Date.now();
@@ -105,6 +109,34 @@ export default function Dashboard() {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     });
+  };
+
+  const handleCreateAppointment = async () => {
+    if (!shop?.id || !newAptForm.customerName.trim() || !newAptForm.date || !newAptForm.time) return;
+    setSavingNewApt(true);
+    const svc = services.find((s: any) => s.id === newAptForm.serviceId);
+    const payload: any = {
+      shop_id: shop.id,
+      customer_name: newAptForm.customerName.trim(),
+      customer_phone: newAptForm.phone.trim() || null,
+      service_id: svc?.id || null,
+      service_name: svc?.name || '',
+      staff_id: newAptForm.staffId || null,
+      appointment_date: newAptForm.date,
+      appointment_time: newAptForm.time,
+      price: svc?.price || 0,
+      status: newAptForm.status,
+    };
+    const { error } = await supabase.from('appointments').insert([payload]);
+    if (error) {
+      showToast('Hata: ' + error.message, 'err');
+    } else {
+      showToast('Randevu oluşturuldu.');
+      setIsNewAptModalOpen(false);
+      setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: '', time: '', status: 'Onaylandı' });
+      fetchInitialData();
+    }
+    setSavingNewApt(false);
   };
 
   const fetchInitialData = useCallback(async () => {
@@ -399,7 +431,10 @@ export default function Dashboard() {
     const { error } = editingCampaign
       ? await supabase.from('campaigns').update(payload).eq('id', editingCampaign.id)
       : await supabase.from('campaigns').insert([payload]);
-    if (!error) {
+    if (error) {
+      showToast('Hata: ' + error.message, 'err');
+    } else {
+      showToast(editingCampaign ? 'Kampanya güncellendi.' : 'Kampanya yayınlandı.');
       setIsCampaignModalOpen(false);
       setEditingCampaign(null);
       setCampaignForm({ title: "", type: "percentage", discount_value: "", start_date: "", end_date: "", service_ids: [], is_active: true });
@@ -444,8 +479,7 @@ export default function Dashboard() {
       first_name: staffForm.firstName.trim(),
       last_name: staffForm.lastName.trim(),
       avatar_url: staffForm.avatarUrl || null,
-      role: staffForm.role.trim() || null,
-      specialty: staffForm.specialty.trim() || null,
+      specialty: [staffForm.role.trim(), staffForm.specialty.trim()].filter(Boolean).join(' — ') || null,
     };
     const { error } = editingStaff
       ? await supabase.from('staff').update(payload).eq('id', editingStaff.id)
@@ -462,7 +496,8 @@ export default function Dashboard() {
 
   const openStaffEdit = (s: any) => {
     setEditingStaff(s);
-    setStaffForm({ firstName: s.first_name || "", lastName: s.last_name || "", avatarUrl: s.avatar_url || "", role: s.role || "", specialty: s.specialty || "" });
+    const parts = (s.specialty || '').split(' — ');
+    setStaffForm({ firstName: s.first_name || "", lastName: s.last_name || "", avatarUrl: s.avatar_url || "", role: parts[0] || "", specialty: parts[1] || "" });
     setIsStaffModalOpen(true);
   };
 
@@ -679,7 +714,7 @@ export default function Dashboard() {
   const currentTimeTop = isCurrentDayToday ? (_now.getHours() + _now.getMinutes() / 60 - 8) * calHourH : -1;
   const dayViewColumns = [
     { id: '__unassigned', label: 'Tüm Personel', avatar: null as string | null, role: '' },
-    ...staff.map((s: any) => ({ id: s.id, label: `${s.first_name} ${s.last_name}`, avatar: (s.avatar_url as string | null) || null, role: (s.role as string) || '' })),
+    ...staff.map((s: any) => ({ id: s.id, label: `${s.first_name} ${s.last_name}`, avatar: (s.avatar_url as string | null) || null, role: (s.specialty as string || '').split(' — ')[0] })),
   ];
   const getColApts = (colId: string) =>
     colId === '__unassigned'
@@ -780,7 +815,7 @@ export default function Dashboard() {
                 </button>
               </>
             )}
-            <button onClick={() => setActiveTab('appointments')} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
               <Plus size={14}/> Randevu Ekle
             </button>
             <div className="relative">
@@ -1382,13 +1417,16 @@ export default function Dashboard() {
                     {/* Calendar body */}
                     {calViewMode === 'day' && (
                       <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '700px' }}>
-                        <div style={{ minWidth: `${64 + Math.max(dayViewColumns.length, 1) * 160}px` }}>
+                        <div style={{ minWidth: `${64 + Math.max(calFilterStaff ? 1 : dayViewColumns.length, 1) * 160}px` }}>
                           {/* Staff column headers with avatars */}
                           <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
                             <div style={{ width: '64px', flexShrink: 0 }} />
-                            {dayViewColumns.map((col) => (
-                              <div key={col.id} style={{ width: '160px', flexShrink: 0 }} className="border-l border-gray-100 py-3 px-2 flex flex-col items-center gap-1.5">
-                                <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm ${col.id === '__unassigned' ? 'bg-gray-100' : 'bg-[#E6F6F7]'}`}>
+                            {dayViewColumns.map((col) => {
+                              const isSelected = calFilterStaff === col.id || (calFilterStaff === null && col.id === '__unassigned');
+                              const isFiltered = calFilterStaff !== null && calFilterStaff !== col.id;
+                              return (
+                              <div key={col.id} style={{ width: '160px', flexShrink: 0 }} onClick={() => setCalFilterStaff(calFilterStaff === col.id ? null : col.id)} className={`border-l border-gray-100 py-3 px-2 flex flex-col items-center gap-1.5 cursor-pointer transition-all ${isFiltered ? 'opacity-30' : 'hover:bg-gray-50'} ${calFilterStaff === col.id ? 'bg-[#e6f7f4]' : ''}`}>
+                                <div className={`w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 shadow-sm transition-all ${calFilterStaff === col.id ? 'border-[#14b8a6] bg-[#e6f7f4]' : 'border-white ' + (col.id === '__unassigned' ? 'bg-gray-100' : 'bg-[#E6F6F7]')}`}>
                                   {col.id === '__unassigned' ? (
                                     <Users size={16} className="text-gray-400" />
                                   ) : col.avatar ? (
@@ -1397,10 +1435,11 @@ export default function Dashboard() {
                                     <span className="text-sm font-black text-[#00A3AD]">{col.label.charAt(0)}</span>
                                   )}
                                 </div>
-                                <p className="text-[10px] font-black text-gray-700 text-center truncate w-full">{col.label}</p>
+                                <p className={`text-[10px] font-black text-center truncate w-full ${calFilterStaff === col.id ? 'text-[#0d9488]' : 'text-gray-700'}`}>{col.label}</p>
                                 {col.role && <p className="text-[8px] font-bold text-gray-400 uppercase text-center truncate w-full">{col.role}</p>}
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                           {/* Time grid */}
                           <div className="flex relative">
@@ -1424,7 +1463,7 @@ export default function Dashboard() {
                               })}
                             </div>
                             {/* Staff columns */}
-                            {dayViewColumns.map((col) => {
+                            {(calFilterStaff ? dayViewColumns.filter(c => c.id === calFilterStaff) : dayViewColumns).map((col) => {
                               const colApts = getColApts(col.id);
                               return (
                                 <div key={col.id}
@@ -2064,7 +2103,7 @@ export default function Dashboard() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[15px] font-semibold text-[#0c0c0d] leading-tight">{s.first_name} {s.last_name}</p>
-                              {s.role && <p className="text-[11px] font-mono text-[#14b8a6] uppercase tracking-widest mt-0.5">{s.role}</p>}
+                              {s.specialty && <p className="text-[11px] font-mono text-[#14b8a6] uppercase tracking-widest mt-0.5">{s.specialty.split(' — ')[0]}</p>}
                             </div>
                           </div>
                           {/* Stats 2-col */}
@@ -3004,6 +3043,72 @@ export default function Dashboard() {
               </div>
               <button className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">YAYINLA</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* YENİ RANDEVU MODALI */}
+      {isNewAptModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 relative overflow-y-auto max-h-[90vh]">
+            <button onClick={() => setIsNewAptModalOpen(false)} className="absolute top-6 right-6 text-gray-300 hover:text-black transition-colors"><X size={24}/></button>
+            <h3 className="text-xl font-bold text-[#0c0c0d] uppercase tracking-tight mb-6">Manuel Randevu Oluştur</h3>
+            <div className="space-y-3">
+              <input
+                placeholder="Müşteri adı *"
+                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]"
+                value={newAptForm.customerName}
+                onChange={e => setNewAptForm(f => ({ ...f, customerName: e.target.value }))}
+              />
+              <input
+                placeholder="Telefon"
+                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]"
+                value={newAptForm.phone}
+                onChange={e => setNewAptForm(f => ({ ...f, phone: e.target.value }))}
+              />
+              <select
+                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
+                value={newAptForm.serviceId}
+                onChange={e => setNewAptForm(f => ({ ...f, serviceId: e.target.value }))}
+              >
+                <option value="">Hizmet seç (isteğe bağlı)</option>
+                {services.map((s: any) => <option key={s.id} value={s.id}>{s.name} — ₺{s.price}</option>)}
+              </select>
+              <select
+                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
+                value={newAptForm.staffId}
+                onChange={e => setNewAptForm(f => ({ ...f, staffId: e.target.value }))}
+              >
+                <option value="">Personel seç (isteğe bağlı)</option>
+                {staff.map((s: any) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block mb-1">Tarih *</label>
+                  <input type="date" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]" value={newAptForm.date} onChange={e => setNewAptForm(f => ({ ...f, date: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block mb-1">Saat *</label>
+                  <input type="time" className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]" value={newAptForm.time} onChange={e => setNewAptForm(f => ({ ...f, time: e.target.value }))} />
+                </div>
+              </div>
+              <select
+                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
+                value={newAptForm.status}
+                onChange={e => setNewAptForm(f => ({ ...f, status: e.target.value }))}
+              >
+                <option value="Onaylandı">Onaylandı</option>
+                <option value="Beklemede">Beklemede</option>
+                <option value="Tamamlandı">Tamamlandı</option>
+              </select>
+              <button
+                onClick={handleCreateAppointment}
+                disabled={savingNewApt || !newAptForm.customerName.trim() || !newAptForm.date || !newAptForm.time}
+                className="w-full bg-[#0c0c0d] text-white py-4 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-[#14b8a6] transition-all disabled:opacity-40"
+              >
+                {savingNewApt ? 'KAYDEDİLİYOR...' : 'RANDEVU OLUŞTUR'}
+              </button>
+            </div>
           </div>
         </div>
       )}

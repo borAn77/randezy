@@ -18,17 +18,19 @@ export default function BusinessDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
 
   useEffect(() => {
     api.getBusiness(slug)
       .then(async (b) => {
         setBiz(b);
-        const { data } = await supabase
-          .from('reviews')
-          .select('*, profiles(full_name), owner_reply, owner_reply_at')
-          .eq('shop_id', b.id)
-          .order('created_at', { ascending: false });
-        setReviews(data || []);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const [{ data: revData }, { data: campData }] = await Promise.all([
+          supabase.from('reviews').select('*, profiles(full_name), owner_reply, owner_reply_at').eq('shop_id', b.id).order('created_at', { ascending: false }),
+          supabase.from('campaigns').select('*').eq('shop_id', b.id).eq('is_active', true).lte('start_date', todayStr).gte('end_date', todayStr),
+        ]);
+        setReviews(revData || []);
+        setActiveCampaigns(campData || []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -105,6 +107,25 @@ export default function BusinessDetailPage() {
             <div className="bg-white rounded-[3.5rem] p-10 shadow-xl border border-gray-100">
               <h2 className="text-xs font-black text-[#00A3AD] uppercase tracking-widest mb-4">Hakkında</h2>
               <p className="text-gray-600 leading-relaxed text-sm">{biz.description}</p>
+            </div>
+          )}
+
+          {/* Active campaigns */}
+          {activeCampaigns.length > 0 && (
+            <div className="space-y-3">
+              {activeCampaigns.map((c: any) => {
+                const label = c.type === 'percentage' ? `%${c.discount_value} İndirim` : c.type === 'fixed' ? `₺${c.discount_value} İndirim` : c.type === 'today_special' ? 'Bugüne Özel' : 'Son Dakika';
+                return (
+                  <div key={c.id} className="bg-amber-50 border border-amber-200 rounded-2xl px-6 py-4 flex items-center gap-4">
+                    <span className="text-2xl">🏷️</span>
+                    <div>
+                      <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">{label}</p>
+                      <p className="text-sm font-bold text-amber-900">{c.title}</p>
+                    </div>
+                    <span className="ml-auto text-[10px] text-amber-500 font-mono whitespace-nowrap">{c.end_date}'e kadar</span>
+                  </div>
+                );
+              })}
             </div>
           )}
 

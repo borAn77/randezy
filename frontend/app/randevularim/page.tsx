@@ -35,54 +35,21 @@ function classifyApt(apt: AptRow): TabKey {
 
 // ── Visual helpers ─────────────────────────────────────────────────────────────
 
+const BG_COLORS = ['#e6f7f4','#fef3c7','#ede9fe','#fce7f3','#dbeafe','#dcfce7','#fee2e2','#f3e8ff'];
+const FG_COLORS = ['#0d9488','#b45309','#7c3aed','#be185d','#1d4ed8','#15803d','#dc2626','#7c3aed'];
+
 function strHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0xffff;
   return h;
 }
 
-const PALETTE_HUES = [30, 65, 155, 200, 230, 265, 295, 340];
-const PATTERN_KEYS = ['lines', 'crosshatch', 'dots', 'wave'] as const;
-type PatternKey = typeof PATTERN_KEYS[number];
-
-function bizHue(id: string) { return PALETTE_HUES[strHash(id) % PALETTE_HUES.length]; }
-function bizPat(id: string): PatternKey { return PATTERN_KEYS[(strHash(id) >> 4) % PATTERN_KEYS.length]; }
-
-// ── SVG thumbnail ──────────────────────────────────────────────────────────────
-
-function BusinessThumb({ shopId, size = 60, radius = 14 }: { shopId: string; size?: number; radius?: number }) {
-  const h = bizHue(shopId);
-  const pat = bizPat(shopId);
+function BusinessThumb({ shopId, shopName = '', size = 60, radius = 14 }: { shopId: string; shopName?: string; size?: number; radius?: number }) {
+  const idx = strHash(shopId) % BG_COLORS.length;
+  const initial = (shopName || shopId || 'R').charAt(0).toUpperCase();
   return (
-    <div style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.06)' }}>
-      {pat === 'lines' && (
-        <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.88 0.06 ${h})`} />
-          {Array.from({ length: 12 }, (_, i) => <line key={i} x1={i * 8} y1="0" x2={i * 8 - 30} y2="80" stroke={`oklch(0.78 0.08 ${h})`} strokeWidth="2.4" />)}
-        </svg>
-      )}
-      {pat === 'crosshatch' && (
-        <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.86 0.05 ${h})`} />
-          {Array.from({ length: 10 }, (_, i) => <line key={i} x1={i * 9} y1="0" x2={i * 9 - 30} y2="80" stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" />)}
-          {Array.from({ length: 10 }, (_, i) => <line key={`b${i}`} x1="0" y1={i * 9} x2="80" y2={i * 9 - 30} stroke={`oklch(0.74 0.07 ${h})`} strokeWidth="2" opacity="0.5" />)}
-        </svg>
-      )}
-      {pat === 'dots' && (
-        <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.88 0.045 ${h})`} />
-          {Array.from({ length: 8 }, (_, r) => Array.from({ length: 8 }, (_, c) => (
-            <circle key={`${r}-${c}`} cx={c * 10 + 5} cy={r * 10 + 5} r={r % 2 === 0 ? 1.8 : 1.4} fill={`oklch(0.65 0.10 ${h})`} />
-          )))}
-        </svg>
-      )}
-      {pat === 'wave' && (
-        <svg width="100%" height="100%" viewBox="0 0 80 80" preserveAspectRatio="none">
-          <rect width="80" height="80" fill={`oklch(0.88 0.05 ${h})`} />
-          <path d="M0 30 Q20 20 40 30 T80 30 L80 80 L0 80 Z" fill={`oklch(0.80 0.07 ${h})`} />
-          <path d="M0 50 Q20 40 40 50 T80 50 L80 80 L0 80 Z" fill={`oklch(0.72 0.08 ${h})`} opacity="0.7" />
-        </svg>
-      )}
+    <div style={{ width: size, height: size, borderRadius: radius, flexShrink: 0, background: BG_COLORS[idx], display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: size * 0.38, fontWeight: 700, color: FG_COLORS[idx], lineHeight: 1 }}>{initial}</span>
     </div>
   );
 }
@@ -343,19 +310,19 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
     );
   }
 
-  const h  = bizHue(apt.shop_id);
+  const bgColor = BG_COLORS[strHash(apt.shop_id) % BG_COLORS.length];
   const cd = computeCountdown(apt);
   const d  = aptDateTime(apt);
 
   return (
     <div style={{
-      background: `linear-gradient(135deg, oklch(0.96 0.03 ${h}) 0%, #fff 65%)`,
+      background: `linear-gradient(135deg, ${bgColor} 0%, #fff 65%)`,
       border: '1px solid #e8edf2', borderRadius: 20, padding: 26,
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{
         position: 'absolute', right: -70, top: -70, width: 220, height: 220,
-        borderRadius: '50%', background: `oklch(0.92 0.045 ${h})`, opacity: 0.45, pointerEvents: 'none',
+        borderRadius: '50%', background: bgColor, opacity: 0.6, pointerEvents: 'none',
       }} />
 
       <div style={{ position: 'relative' }}>
@@ -367,7 +334,7 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
         </div>
 
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          <BusinessThumb shopId={apt.shop_id} size={96} radius={18} />
+          <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={96} radius={18} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: '0 0 3px', fontSize: 22, fontWeight: 700, color: '#0f172a', letterSpacing: -0.4, lineHeight: 1.2 }}>
@@ -459,7 +426,7 @@ function StatsCard({ completedCount, upcomingCount, totalSpent, favId, favName, 
 
       {favId && favName && (
         <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <BusinessThumb shopId={favId} size={42} radius={10} />
+          <BusinessThumb shopId={favId} shopName={favName} size={42} radius={10} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Favorin</div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{favName}</div>
@@ -517,7 +484,7 @@ function AptCard({ apt, kind, localRating, onCancel, onRate }: {
         </div>
       </div>
 
-      <BusinessThumb shopId={apt.shop_id} size={60} radius={12} />
+      <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={60} radius={12} />
 
       {/* Main info */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -670,7 +637,7 @@ function RateModal({ apt, onClose, onSubmit }: {
       <ModalHeader title="Deneyimini puanla" subtitle="Geri bildirimin başka müşterilere yardımcı olur." onClose={onClose} />
 
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: 12, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <BusinessThumb shopId={apt.shop_id} size={44} radius={10} />
+        <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={44} radius={10} />
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{apt.shops?.name ?? 'İşletme'}</div>
           <div style={{ fontSize: 12, color: '#64748b' }}>{apt.service_name}</div>

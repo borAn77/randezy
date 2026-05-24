@@ -286,6 +286,7 @@ export default function ShopDetail() {
   const [serviceStaffFilter, setServiceStaffFilter] = useState<any>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
   const [nearbyShops, setNearbyShops] = useState<any[]>([]);
   const [nearbyAvailability, setNearbyAvailability] = useState<Record<number, boolean>>({});
   const [nearbyFillRate, setNearbyFillRate] = useState<Record<number, number>>({});
@@ -408,13 +409,16 @@ export default function ShopDetail() {
       supabase.from('services').select('*').eq('shop_id', shopId),
       supabase.from('shop_hours').select('*').eq('shop_id', shopId),
       supabase.from('staff').select('*').eq('shop_id', shopId).order('created_at', { ascending: true }),
-    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }, { data: staffData }]) => {
+      supabase.from('campaigns').select('*').eq('shop_id', shopId).eq('is_active', true),
+    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }, { data: staffData }, { data: campData }]) => {
       if (!shopData) { setNotFound(true); return; }
       setShop(shopData);
       setGallery(shopData.gallery_urls || []);
       setServices(servicesData || []);
       setShopHours(hoursData || []);
       setStaff(staffData || []);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      setActiveCampaigns((campData || []).filter((c: any) => c.start_date <= todayStr && c.end_date >= todayStr));
     });
     fetchReviews();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -661,6 +665,25 @@ export default function ShopDetail() {
                 </div>
               )}
             </div>
+
+            {/* Active campaigns banner */}
+            {activeCampaigns.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {activeCampaigns.map((c: any) => {
+                  const label = c.type === 'percentage' ? `%${c.discount_value} İndirim` : c.type === 'fixed' ? `₺${c.discount_value} İndirim` : c.type === 'today_special' ? 'Bugüne Özel Fiyat' : 'Son Dakika Fırsatı';
+                  return (
+                    <div key={c.id} className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                      <span className="text-2xl">🏷️</span>
+                      <div>
+                        <p className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">{label}</p>
+                        <p className="text-[13px] font-semibold text-amber-900">{c.title}</p>
+                      </div>
+                      <span className="ml-auto text-[10px] text-amber-500 font-mono">{c.end_date} tarihine kadar</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Gallery */}
             {gallery.length > 0 && (
