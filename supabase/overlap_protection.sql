@@ -54,13 +54,13 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Python-backend table (English enum values; completed is blocking)
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_biz_apts_no_exact_double
+CREATE UNIQUE INDEX IF NOT EXISTS idx_biz_apts_no_exact_double
   ON biz_appointments (staff_id, start_time)
   WHERE staff_id IS NOT NULL
     AND status NOT IN ('cancelled', 'no_show');
 
 -- Supabase-direct dashboard table (Turkish status strings; Tamamlandı is blocking)
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_appointments_no_exact_double
+CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_no_exact_double
   ON appointments (shop_id, staff_id, appointment_date, appointment_time)
   WHERE staff_id IS NOT NULL
     AND status IN ('Beklemede', 'Onaylandı', 'Tamamlandı');
