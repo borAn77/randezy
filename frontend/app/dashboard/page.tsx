@@ -137,7 +137,7 @@ export default function Dashboard() {
       .select('appointment_time, service_id, service_name')
       .eq('shop_id', shop.id)
       .eq('appointment_date', newAptForm.date)
-      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı']);
+      .in('status', ['Beklemede', 'Onaylandı']);
 
     if (staffId) {
       aptQuery = aptQuery.eq('staff_id', staffId);

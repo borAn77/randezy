@@ -17,7 +17,7 @@ from app.models import Appointment, AppointmentStatus, Business, Service, Staff,
 from app.schemas import AppointmentCreate, AppointmentDetail, AppointmentOut
 
 BUFFER = timedelta(minutes=5)
-_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show]
+_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show, AppointmentStatus.completed]
 
 router = APIRouter(tags=["appointments"])
 

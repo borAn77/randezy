@@ -26,7 +26,7 @@ router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 SLOT_INTERVAL = timedelta(minutes=30)
 BUFFER = timedelta(minutes=5)
-_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show]
+_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show, AppointmentStatus.completed]
 
 
 def _slots_for(
