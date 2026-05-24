@@ -504,7 +504,7 @@ export default function Dashboard() {
   // Real metrics
   const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı');
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
-  const uniqueCustomers = new Set(appointments.map(a => a.user_id)).size;
+  const uniqueCustomers = new Set(appointments.map(a => a.user_id).filter(Boolean)).size;
   const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
   const pendingAppointments = appointments.filter(a => a.status === 'Beklemede');
   const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
@@ -951,14 +951,14 @@ export default function Dashboard() {
                 {/* Hızlı İşlemler */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
                   {[
-                    { label: 'Randevu Ekle', icon: <Plus size={18}/>, tab: 'appointments', dark: true },
-                    { label: 'Müşteriler', icon: <Users size={18}/>, tab: 'customers', dark: false },
-                    { label: 'Hizmetler', icon: <Package size={18}/>, tab: 'services', dark: false },
-                    { label: 'Kampanya', icon: <Tag size={18}/>, tab: 'campaigns', dark: false },
+                    { label: 'Randevu Ekle', icon: <Plus size={18}/>, tab: 'appointments', dark: true, openModal: true },
+                    { label: 'Müşteriler', icon: <Users size={18}/>, tab: 'customers', dark: false, openModal: false },
+                    { label: 'Hizmetler', icon: <Package size={18}/>, tab: 'services', dark: false, openModal: false },
+                    { label: 'Kampanya', icon: <Tag size={18}/>, tab: 'campaigns', dark: false, openModal: false },
                   ].map((btn) => (
                     <button
                       key={btn.tab}
-                      onClick={() => setActiveTab(btn.tab)}
+                      onClick={() => { if (btn.openModal) { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); } else { setActiveTab(btn.tab); } }}
                       className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all text-left group ${
                         btn.dark
                           ? 'bg-[#0c0c0d] text-white border-transparent hover:bg-[#14b8a6] hover:text-[#04221d]'
@@ -1002,7 +1002,7 @@ export default function Dashboard() {
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
                                 <div>
                                   <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.profiles?.full_name || a.customer_name || 'Müşteri'}</p>
-                                  <p className="text-[10px] text-[#7a7a7e] uppercase tracking-wide">{a.services?.name || '—'} {a.staff ? '· ' + a.staff.first_name : ''}</p>
+                                  <p className="text-[10px] text-[#7a7a7e] uppercase tracking-wide">{a.service_name || '—'} {a.staff ? '· ' + a.staff.first_name : ''}</p>
                                 </div>
                               </div>
                               <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${(statusColors[a.status] || 'bg-gray-50 text-gray-500')}`}>{a.status}</span>
@@ -1021,9 +1021,13 @@ export default function Dashboard() {
                     <p className="text-[28px] font-bold leading-none text-[#14b8a6]">₺{todayRevenue.toLocaleString('tr-TR')}</p>
                     <p className="text-[10px] font-mono uppercase tracking-wide text-white/30 mt-2">Bugün onaylanan randevular</p>
                     <div className="flex items-end gap-0.5 mt-3 h-7">
-                      {[40,55,70,85,60,90,95].map((h,i) => (
-                        <div key={i} className="flex-1 bg-[#14b8a6] rounded-t-sm" style={{height:h+'%', opacity:i===6?1:0.5}}/>
-                      ))}
+                      {(() => {
+                        const last7 = dailyRevChart.slice(-7);
+                        const maxVal = Math.max(1, ...last7.map(d => d.value));
+                        return last7.map((d, i) => (
+                          <div key={i} className="flex-1 bg-[#14b8a6] rounded-t-sm" style={{height: Math.max(8, (d.value / maxVal) * 100) + '%', opacity: i === 6 ? 1 : 0.5}}/>
+                        ));
+                      })()}
                     </div>
                   </div>
                   <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
@@ -1036,7 +1040,7 @@ export default function Dashboard() {
                     <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Benzersiz Müşteri</p>
                     <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{uniqueCustomers}</p>
                     <p className={`text-[10px] font-mono mt-2 ${newCust > 0 ? 'text-[#15803d]' : 'text-[#7a7a7e]'}`}>{newCust > 0 ? `↗ +${newCust} yeni` : 'Yeni müşteri yok'}</p>
-                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Bu ay toplam</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Tüm zamanlar</p>
                   </div>
                   <div className="bg-white border border-[#ececea] p-5 rounded-2xl">
                     <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Bekleyen Randevu</p>
