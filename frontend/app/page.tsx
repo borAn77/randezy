@@ -435,7 +435,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-12">
             {filteredShops.map((shop: any) => {
-              const todayStr = new Date().toISOString().slice(0, 10);
+              const _td = new Date(); const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
               const activeCampaign = (shop.campaigns || []).find((c: any) =>
                 c.is_active && c.start_date <= todayStr && c.end_date >= todayStr
               );

@@ -24,7 +24,7 @@ export default function BusinessDetailPage() {
     api.getBusiness(slug)
       .then(async (b) => {
         setBiz(b);
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const _td = new Date(); const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
         const [{ data: revData }, { data: campData }] = await Promise.all([
           supabase.from('reviews').select('*, profiles(full_name), owner_reply, owner_reply_at').eq('shop_id', b.id).order('created_at', { ascending: false }),
           supabase.from('campaigns').select('*').eq('shop_id', b.id).eq('is_active', true).lte('start_date', todayStr).gte('end_date', todayStr),
