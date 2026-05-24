@@ -26,7 +26,15 @@ router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 SLOT_INTERVAL = timedelta(minutes=30)
 BUFFER = timedelta(minutes=5)
-_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show, AppointmentStatus.completed]
+# Non-blocking: slot is freed for rebooking.
+# cancelled / no_show → never happened or customer no-showed, time is reclaimable.
+# completed is intentionally NOT here: staff physically worked that slot;
+#   the time range is permanently occupied for historical accuracy and
+#   retroactive-booking prevention.
+# TECH DEBT: biz_appointments (Python backend) and appointments (Supabase-direct
+#   dashboard) are two separate tables. They must be unified into one source of
+#   truth after beta to eliminate duplicate overlap logic and split availability.
+_NON_BLOCKING = [AppointmentStatus.cancelled, AppointmentStatus.no_show]
 
 
 def _slots_for(
