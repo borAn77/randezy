@@ -567,14 +567,19 @@ export default function Dashboard() {
   }).sort((a: any, b: any) => b.revenue - a.revenue);
 
   const servicePerf = services.map((s: any) => {
-    const appts = confirmedAppointments.filter((a: any) => a.service_name === s.name);
+    // Match by service_id first (stable), fall back to name for pre-fix legacy rows
+    const appts = confirmedAppointments.filter((a: any) =>
+      (a.service_id != null && String(a.service_id) === String(s.id)) ||
+      (a.service_id == null && a.service_name === s.name)
+    );
     const totalRev = appts.reduce((sum: number, a: any) => sum + (parseFloat(a.price) || 0), 0);
     const svcNet = totalRev * 0.75;
-    return { ...s, salesCount: appts.length, totalRevenue: totalRev, svcNet, margin: totalRev > 0 ? 75 : 0 };
-  }).sort((a: any, b: any) => b.svcNet - a.svcNet);
+    return { ...s, salesCount: appts.length, totalRevenue: totalRev, svcNet };
+  }).sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
 
+  // Only confirmed/completed appointments count as real occupancy in the heatmap
   const heatmapData: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-  appointments.forEach((a: any) => {
+  confirmedAppointments.forEach((a: any) => {
     if (!a.appointment_date || !a.appointment_time) return;
     const d = new Date(a.appointment_date + 'T12:00:00');
     const dayIdx = d.getDay(); const hour = parseInt(a.appointment_time.split(':')[0]);
@@ -585,9 +590,15 @@ export default function Dashboard() {
 
   const totalCancellations = cancelledAll.length;
   const cancellationRate = appointments.length > 0 ? (totalCancellations / appointments.length * 100) : 0;
+  const thisMonthTotal = appointments.filter((a: any) => a.appointment_date?.startsWith(currentMonth)).length;
+  const cancellationRateMonth = thisMonthTotal > 0 ? (cancelledThisMonth.length / thisMonthTotal * 100) : 0;
 
+  // Loyalty: count only confirmed/completed appointments, using full uid (includes walk-ins)
   const custCounts: Record<string, number> = {};
-  appointments.forEach((a: any) => { if (a.user_id) custCounts[a.user_id] = (custCounts[a.user_id] || 0) + 1; });
+  confirmedAppointments.forEach((a: any) => {
+    const uid = a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id);
+    custCounts[uid] = (custCounts[uid] || 0) + 1;
+  });
   const totalCust = Object.keys(custCounts).length;
   const returningCust = Object.values(custCounts).filter(c => c > 1).length;
   const newCust = totalCust - returningCust;
@@ -598,7 +609,7 @@ export default function Dashboard() {
   let lbDay = -1, lbHour = 9, lbVal = Infinity;
   for (let d = 1; d <= 5; d++) { for (let h = 9; h <= 17; h++) { if (heatmapData[d][h] < lbVal) { lbVal = heatmapData[d][h]; lbDay = d; lbHour = h; } } }
   if (appointments.length > 0 && lbDay > -1) smartSuggestions.push(`${fDayNames[lbDay]} ${lbHour}:00–${lbHour + 1}:00 arası düşük yoğunluk var. Bu saatler için kampanya önerilir.`);
-  if (servicePerf.length > 0 && servicePerf[0].totalRevenue > 0) smartSuggestions.push(`"${servicePerf[0].name}" en yüksek kâr marjına sahip hizmet (%${servicePerf[0].margin.toFixed(0)}).`);
+  if (servicePerf.length > 0 && servicePerf[0].totalRevenue > 0) smartSuggestions.push(`"${servicePerf[0].name}" en yüksek ciro getiren hizmet (₺${servicePerf[0].totalRevenue.toLocaleString('tr-TR')} · ${servicePerf[0].salesCount} satış).`);
   if (cancellationRate > 10) smartSuggestions.push(`İptal oranı %${cancellationRate.toFixed(1)} — müşterilere hatırlatma mesajı gönderilmesi önerilir.`);
   if (staffPerf.length > 0 && staffPerf[0].revenue > 0) smartSuggestions.push(`En çok ciro getiren personel: ${staffPerf[0].first_name} ${staffPerf[0].last_name} (₺${staffPerf[0].revenue.toLocaleString('tr-TR')}).`);
   const satTotal = heatmapData[6].reduce((a: number, b: number) => a + b, 0);
@@ -1065,7 +1076,7 @@ export default function Dashboard() {
                     <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Bekleyen Randevu</p>
                     <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{pendingCount}</p>
                     <p className={`text-[10px] font-mono mt-2 ${pendingCount > 0 ? 'text-[#c2410c]' : 'text-[#15803d]'}`}>{pendingCount > 0 ? 'Onay bekliyor' : 'Tümü onaylı'}</p>
-                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Toplam {appointments.filter((a:any)=>a.status==='Onaylandı').length} onaylı</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Toplam {confirmedAppointments.length} onaylı</p>
                   </div>
                 </div>
               </div>
@@ -2305,7 +2316,8 @@ export default function Dashboard() {
                 {/* PERSONEL + HİZMET */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
-                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Personel Performansı</h3>
+                    <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-1">Personel Performansı</h3>
+                    <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Tüm Zamanlar</p>
                     {staffPerf.length === 0 ? (
                       <p className="text-[13px] text-[#7a7a7e] py-10 text-center">Personel verisi yok</p>
                     ) : (
@@ -2411,11 +2423,12 @@ export default function Dashboard() {
                 {/* İPTAL + MÜŞTERİ + ÖNERİLER */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
-                    <h3 className="text-[12px] font-mono uppercase tracking-widest mb-5 text-[#c2410c]">İptal Analizi</h3>
+                    <h3 className="text-[12px] font-mono uppercase tracking-widest mb-1 text-[#c2410c]">İptal Analizi</h3>
+                    <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Bu Ay</p>
                     <div className="space-y-5">
                       <div>
-                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Toplam İptal</p>
-                        <p className="text-[28px] font-bold text-[#0c0c0d] leading-none">{totalCancellations}</p>
+                        <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Bu Ay İptal</p>
+                        <p className="text-[28px] font-bold text-[#0c0c0d] leading-none">{cancelledThisMonth.length}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-1">Kaybedilen Gelir</p>
@@ -2425,9 +2438,9 @@ export default function Dashboard() {
                         <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-2">İptal Oranı</p>
                         <div className="flex items-center gap-3">
                           <div className="flex-1 h-1.5 bg-[#f0f0ee] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#c2410c] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, cancellationRate)}%` }} />
+                            <div className="h-full bg-[#c2410c] rounded-full transition-all duration-700" style={{ width: `${Math.min(100, cancellationRateMonth)}%` }} />
                           </div>
-                          <span className="text-[11px] font-mono text-[#c2410c] flex-shrink-0">%{cancellationRate.toFixed(1)}</span>
+                          <span className="text-[11px] font-mono text-[#c2410c] flex-shrink-0">%{cancellationRateMonth.toFixed(1)}</span>
                         </div>
                       </div>
                     </div>
@@ -2509,7 +2522,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { label: 'Geri Dönüş Oranı', value: `%${loyaltyRate.toFixed(1)}`, delta: returningCust + ' müşteri 2+ kez geldi', up: loyaltyRate > 50 },
-                    { label: 'Müşteri Başına Ort.', value: `₺${avgBasket.toLocaleString('tr-TR', {maximumFractionDigits:0})}`, delta: 'sepet ortalaması', up: true },
+                    { label: 'Ort. Randevu Tutarı', value: `₺${avgBasket.toLocaleString('tr-TR', {maximumFractionDigits:0})}`, delta: 'bu ay randevu başına', up: true },
                     { label: 'İptal Oranı', value: `%${cancellationRate.toFixed(1)}`, delta: cancellationRate < 5 ? 'Hedef altında ✓' : 'Hedef: <%5', up: cancellationRate < 5 },
                     { label: 'Toplam Müşteri', value: totalCust.toString(), delta: newCust + ' yeni bu dönemde', up: newCust > 0 },
                   ].map((k, i) => (
@@ -2687,10 +2700,9 @@ export default function Dashboard() {
                     ].map((tpl, ti) => (
                       <button key={ti}
                         onClick={() => {
-                          const now = new Date();
                           const end = new Date(); end.setDate(end.getDate() + 30);
                           setEditingCampaign(null);
-                          setCampaignForm({ title: tpl.label, type: tpl.type as any, discount_value: tpl.val, start_date: now.toISOString().slice(0,10), end_date: end.toISOString().slice(0,10), service_ids: [], is_active: true });
+                          setCampaignForm({ title: tpl.label, type: tpl.type as any, discount_value: tpl.val, start_date: today, end_date: toLocalDateStr(end), service_ids: [], is_active: true });
                           setIsCampaignModalOpen(true);
                         }}
                         className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-4 text-left transition-all group"
@@ -2712,9 +2724,8 @@ export default function Dashboard() {
                 ) : (
                   <div className="space-y-3">
                     {campaigns.map((c) => {
-                      const todayStr = new Date().toISOString().slice(0, 10);
-                      const isActive = c.is_active && c.start_date <= todayStr && c.end_date >= todayStr;
-                      const isUpcoming = c.start_date > todayStr;
+                      const isActive = c.is_active && c.start_date <= today && c.end_date >= today;
+                      const isUpcoming = c.start_date > today;
                       const typeLabel = c.type === 'percentage' ? `%${c.discount_value} İndirim`
                         : c.type === 'fixed' ? `₺${c.discount_value} İndirim`
                         : c.type === 'today_special' ? 'Bugüne Özel'
