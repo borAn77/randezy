@@ -68,7 +68,7 @@ interface CartItemBase { service: any; date: Date; time: string; staff: any | nu
 interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
-  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired
+  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, allServices
 }: {
   service: any;
   shopHours: any[];
@@ -77,7 +77,24 @@ function InlineBookingPanel({
   currentUserId: string | null;
   onAdd: (item: CartItemBase) => void;
   onAuthRequired: () => void;
+  allServices: any[];
 }) {
+  const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+  const BUFFER_MIN = 5;
+  const aptDuration = (apt: any): number => {
+    const svc = allServices.find((s: any) => String(s.id) === String(apt.service_id));
+    return svc?.duration ?? 30;
+  };
+  const isBlocked = (slotStart: string, newDur: number, apts: any[]): boolean => {
+    const ns = toMin(slotStart);
+    const ne = ns + newDur;
+    return apts.some(a => {
+      if (!a.appointment_time) return false;
+      const es = toMin(a.appointment_time.slice(0, 5));
+      const ee = es + aptDuration(a) + BUFFER_MIN;
+      return ns < ee && ne > es;
+    });
+  };
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -96,10 +113,10 @@ function InlineBookingPanel({
   useEffect(() => {
     const dateStrs = days.map(d => localDateStr(d));
     supabase.from('appointments')
-      .select('appointment_time, staff_id, appointment_date')
+      .select('appointment_time, staff_id, appointment_date, service_id')
       .eq('shop_id', shopId)
       .in('appointment_date', dateStrs)
-      .neq('status', 'İptal Edildi')
+      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı'])
       .then(({ data: booked }) => {
         const counts: Record<string, number> = {};
         const now = new Date();
@@ -114,19 +131,12 @@ function InlineBookingPanel({
           const dayBooked = (booked || []).filter((a: any) => a.appointment_date === dateStr);
           let available: string[];
           if (selectedStaff) {
-            const bookedTimes = new Set(dayBooked.filter((a: any) => a.staff_id === selectedStaff.id).map((a: any) => a.appointment_time.slice(0, 5)));
-            available = allSlots.filter(s => !bookedTimes.has(s));
+            const staffApts = dayBooked.filter((a: any) => a.staff_id === selectedStaff.id);
+            available = allSlots.filter(s => !isBlocked(s, service.duration, staffApts));
           } else if (staff.length > 0) {
-            const bookedByTime: Record<string, Set<string>> = {};
-            dayBooked.forEach((a: any) => {
-              const t = a.appointment_time.slice(0, 5);
-              if (!bookedByTime[t]) bookedByTime[t] = new Set();
-              if (a.staff_id) bookedByTime[t].add(a.staff_id);
-            });
-            available = allSlots.filter(s => (bookedByTime[s]?.size || 0) < staff.length);
+            available = allSlots.filter(s => staff.some(sm => !isBlocked(s, service.duration, dayBooked.filter((a: any) => a.staff_id === sm.id))));
           } else {
-            const bookedTimes = new Set(dayBooked.map((a: any) => a.appointment_time.slice(0, 5)));
-            available = allSlots.filter(s => !bookedTimes.has(s));
+            available = allSlots.filter(s => !isBlocked(s, service.duration, dayBooked));
           }
           if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
           counts[dateStr] = available.length;
@@ -145,29 +155,22 @@ function InlineBookingPanel({
     setIsClosedDay(false);
     const slots = generateTimeSlots(dayHours.open_time, dayHours.close_time, service.duration);
     supabase.from('appointments')
-      .select('appointment_time, staff_id')
+      .select('appointment_time, staff_id, service_id')
       .eq('shop_id', shopId)
       .eq('appointment_date', localDateStr(selectedDay))
-      .neq('status', 'İptal Edildi')
+      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı'])
       .then(({ data: booked }) => {
         const now = new Date();
         const isToday = selectedDay.toDateString() === now.toDateString();
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
         let available: string[];
         if (selectedStaff) {
-          const bookedTimes = new Set((booked || []).filter((a: any) => a.staff_id === selectedStaff.id).map((a: any) => a.appointment_time.slice(0, 5)));
-          available = slots.filter(s => !bookedTimes.has(s));
+          const staffApts = (booked || []).filter((a: any) => a.staff_id === selectedStaff.id);
+          available = slots.filter(s => !isBlocked(s, service.duration, staffApts));
         } else if (staff.length > 0) {
-          const bookedByTime: Record<string, Set<string>> = {};
-          (booked || []).forEach((a: any) => {
-            const t = a.appointment_time.slice(0, 5);
-            if (!bookedByTime[t]) bookedByTime[t] = new Set();
-            if (a.staff_id) bookedByTime[t].add(a.staff_id);
-          });
-          available = slots.filter(s => (bookedByTime[s]?.size || 0) < staff.length);
+          available = slots.filter(s => staff.some(sm => !isBlocked(s, service.duration, (booked || []).filter((a: any) => a.staff_id === sm.id))));
         } else {
-          const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
-          available = slots.filter(s => !bookedTimes.has(s));
+          available = slots.filter(s => !isBlocked(s, service.duration, booked || []));
         }
         if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
         setAvailableSlots(available);
@@ -496,6 +499,34 @@ export default function ShopDetail() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); setIsAuthOpen(true); return; }
+
+    const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+    const _BUF = 5;
+
+    // Pre-insert overlap check: verify each cart item against existing DB appointments
+    for (const item of cart) {
+      const dateStr = localDateStr(item.date);
+      const staffId = item.staff?.id || null;
+      const ns = _toMin(item.time);
+      const ne = ns + item.service.duration;
+      let q = supabase.from('appointments').select('appointment_time, service_id')
+        .eq('shop_id', shopId).eq('appointment_date', dateStr)
+        .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı']);
+      if (staffId) q = q.eq('staff_id', staffId);
+      const { data: existing } = await q;
+      for (const apt of (existing || [])) {
+        if (!apt.appointment_time) continue;
+        const es = _toMin(apt.appointment_time.slice(0, 5));
+        const existSvc = services.find((s: any) => String(s.id) === String(apt.service_id));
+        const ee = es + (existSvc?.duration ?? 30) + _BUF;
+        if (ns < ee && ne > es) {
+          setToast(`${item.service.name} için ${item.time} saati dolmuş. Sepeti güncelleyin.`);
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     await supabase.from('profiles').upsert({ id: session.user.id, email: session.user.email }, { onConflict: 'id' });
     const inserts = cart.map(item => ({
       user_id: session.user.id,
@@ -523,7 +554,7 @@ export default function ShopDetail() {
       setExpandedServiceId(null);
       setShowSuccess(true);
     } else {
-      alert("Hata: " + error.message);
+      setToast("Rezervasyon hatası: " + error.message);
     }
     setLoading(false);
   };
@@ -844,7 +875,21 @@ export default function ShopDetail() {
                                 staff={serviceStaffFilter ? [serviceStaffFilter] : staff}
                                 shopId={shopId}
                                 currentUserId={currentUserId}
+                                allServices={services}
                                 onAdd={(item) => {
+                  const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+                  const _BUFFER = 5;
+                  const ns = _toMin(item.time);
+                  const ne = ns + item.service.duration;
+                  const nd = localDateStr(item.date);
+                  const conflict = cart.some(ex => {
+                    if (localDateStr(ex.date) !== nd) return false;
+                    if (item.staff?.id && ex.staff?.id && item.staff.id !== ex.staff.id) return false;
+                    const es = _toMin(ex.time);
+                    const ee = es + ex.service.duration + _BUFFER;
+                    return ns < ee && ne > es;
+                  });
+                  if (conflict) { setToast('Bu saatte sepette çakışan randevu var. Farklı saat seçin.'); return; }
                   const { discounted, campaign } = calcDiscountedPrice(item.service, activeCampaigns);
                   setCart(prev => [...prev, { ...item, discountedPrice: discounted, campaign }]);
                   setToast(`${item.service.name} sepete eklendi`);
