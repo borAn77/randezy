@@ -857,7 +857,7 @@ export default function Dashboard() {
                 </button>
               </>
             )}
-            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
               <Plus size={14}/> Randevu Ekle
             </button>
             <div className="relative">
@@ -1000,7 +1000,7 @@ export default function Dashboard() {
                   ].map((btn) => (
                     <button
                       key={btn.tab}
-                      onClick={() => { if (btn.openModal) { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); } else { setActiveTab(btn.tab); } }}
+                      onClick={() => { if (btn.openModal) { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); } else { setActiveTab(btn.tab); } }}
                       className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all text-left group ${
                         btn.dark
                           ? 'bg-[#0c0c0d] text-white border-transparent hover:bg-[#14b8a6] hover:text-[#04221d]'
@@ -1576,7 +1576,7 @@ export default function Dashboard() {
                           <div className="flex sticky top-0 z-20 bg-white border-b border-gray-100 shadow-sm">
                             <div style={{ width: '64px', flexShrink: 0 }} />
                             {calWeekDays.map((day, i) => {
-                              const ds = day.toISOString().split('T')[0];
+                              const ds = toLocalDateStr(day);
                               const isToday = ds === today;
                               const cnt = appointments.filter((a: any) => a.appointment_date === ds).length;
                               return (
@@ -1600,7 +1600,7 @@ export default function Dashboard() {
                               ))}
                             </div>
                             {calWeekDays.map((day, di) => {
-                              const ds = day.toISOString().split('T')[0];
+                              const ds = toLocalDateStr(day);
                               const isToday = ds === today;
                               let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
                               if (calFilterStaff) dayApts = calFilterStaff === '__unassigned' ? dayApts.filter((a: any) => !a.staff_id) : dayApts.filter((a: any) => a.staff_id === calFilterStaff);
@@ -1662,7 +1662,7 @@ export default function Dashboard() {
                           </div>
                           <div className="grid grid-cols-7">
                             {cells.map((day, i) => {
-                              const ds = day.toISOString().split('T')[0];
+                              const ds = toLocalDateStr(day);
                               const isThisMonth = day.getMonth() === mStart.getMonth();
                               const isTodayCell = ds === today;
                               let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
@@ -1703,8 +1703,8 @@ export default function Dashboard() {
                         </div>
                       ))}
                       {(() => {
-                        const decided = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı' || a.status === 'İptal Edildi').length;
-                        const approved = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı').length;
+                        const decided = calCurrentDayApts.filter((a: any) => a.status !== 'Beklemede').length;
+                        const approved = calCurrentDayApts.filter((a: any) => a.status === 'Onaylandı' || a.status === 'Tamamlandı').length;
                         if (!decided) return null;
                         return (
                           <div className="flex items-center gap-1.5 ml-auto">
@@ -1911,7 +1911,7 @@ export default function Dashboard() {
                               <p className="text-[11px] font-mono tracking-widest uppercase mt-1 opacity-60">{activeCust.phone || activeCust.email || 'İletişim yok'}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => { setNewAptForm({ customerName: activeCust.name, phone: activeCust.phone, serviceId: '', staffId: '', date: new Date().toISOString().slice(0,10), time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
+                              <button onClick={() => { setNewAptForm({ customerName: activeCust.name, phone: activeCust.phone, serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
                               {activeCust.phone && (
                                 <>
                                   <a href={`tel:${activeCust.phone}`} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></a>
@@ -2134,7 +2134,7 @@ export default function Dashboard() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     {staff.map((s) => {
-                      const staffAppts = appointments.filter((a: any) => a.staff_id === s.id && a.status === 'Onaylandı');
+                      const staffAppts = appointments.filter((a: any) => a.staff_id === s.id && (a.status === 'Onaylandı' || a.status === 'Tamamlandı'));
                       const thisWeekStart = new Date();
                       const dow = thisWeekStart.getDay();
                       thisWeekStart.setDate(thisWeekStart.getDate() - (dow === 0 ? 6 : dow - 1));
