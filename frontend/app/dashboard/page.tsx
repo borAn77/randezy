@@ -66,6 +66,46 @@ export default function Dashboard() {
   const [custFilter, setCustFilter] = useState<'all'|'vip'|'new'|'risk'>('all');
   const [custSearch, setCustSearch] = useState('');
   const [selectedCustId, setSelectedCustId] = useState<string|null>(null);
+  const [toasts, setToasts] = useState<{id:number; msg:string; type:'ok'|'err'}[]>([]);
+  const [replyingReviewId, setReplyingReviewId] = useState<string|null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [savingReply, setSavingReply] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const showToast = (msg: string, type: 'ok'|'err' = 'ok') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  };
+
+  const handleReviewReply = async (reviewId: string) => {
+    if (!replyText.trim()) return;
+    setSavingReply(true);
+    const { error } = await supabase.from('reviews').update({ owner_reply: replyText.trim(), owner_reply_at: new Date().toISOString() }).eq('id', reviewId);
+    if (error) { showToast('Yanıt kaydedilemedi: ' + error.message, 'err'); }
+    else {
+      showToast('Yanıt kaydedildi.');
+      setReplyingReviewId(null);
+      setReplyText('');
+      fetchInitialData();
+    }
+    setSavingReply(false);
+  };
+
+  const handleReviewReplyDelete = async (reviewId: string) => {
+    const { error } = await supabase.from('reviews').update({ owner_reply: null, owner_reply_at: null }).eq('id', reviewId);
+    if (error) { showToast('Yanıt silinemedi.', 'err'); }
+    else { showToast('Yanıt silindi.'); fetchInitialData(); }
+  };
+
+  const copyBookingLink = () => {
+    if (!shop?.id) return;
+    const url = `${window.location.origin}/shop/${shop.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
 
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
@@ -149,7 +189,7 @@ export default function Dashboard() {
       const { data } = supabase.storage.from('randezy_images').getPublicUrl(filePath);
       return data.publicUrl;
     } catch (err: any) {
-      alert("Hata: " + err.message);
+      showToast('Yükleme hatası: ' + err.message, 'err');
       return null;
     }
   };
@@ -305,7 +345,7 @@ export default function Dashboard() {
       shop_phone: fd.get('phone') as string,
       email: fd.get('email') as string,
       instagram: fd.get('instagram') as string,
-      description: fd.get('bio') as string,
+      description: fd.get('description') as string,
       iban: fd.get('iban') as string,
       city: fd.get('city') as string,
       district: fd.get('district') as string,
@@ -320,8 +360,8 @@ export default function Dashboard() {
       deposit_info: fd.get('deposit_info') as string,
     });
 
-    if (!error) { alert("Ayarlar kaydedildi!"); fetchInitialData(); setActiveTab("overview"); }
-    else { alert("Hata: " + error.message); }
+    if (!error) { showToast('Ayarlar kaydedildi.'); fetchInitialData(); }
+    else { showToast('Hata: ' + error.message, 'err'); }
   };
 
   const handleDeleteShop = async () => {
@@ -338,7 +378,7 @@ export default function Dashboard() {
       if (user) await supabase.from('profiles').update({ role: 'customer' }).eq('id', user.id);
       router.replace('/');
     } catch {
-      alert("Silme işlemi başarısız oldu.");
+      showToast('Silme işlemi başarısız oldu.', 'err');
       setDeletingShop(false);
     }
   };
@@ -388,8 +428,8 @@ export default function Dashboard() {
     }));
     const { error } = await supabase.from('shop_hours').upsert(hoursToUpsert, { onConflict: 'shop_id,day_of_week' });
     setSavingHours(false);
-    if (error) { alert("Hata: " + error.message); }
-    else { alert("Çalışma saatleri kaydedildi!"); fetchInitialData(); }
+    if (error) { showToast('Hata: ' + error.message, 'err'); }
+    else { showToast('Çalışma saatleri kaydedildi.'); fetchInitialData(); }
   };
 
   const updateHour = (index: number, field: string, value: any) => {
@@ -410,7 +450,7 @@ export default function Dashboard() {
     const { error } = editingStaff
       ? await supabase.from('staff').update(payload).eq('id', editingStaff.id)
       : await supabase.from('staff').insert([payload]);
-    if (error) { alert("Hata: " + error.message); }
+    if (error) { showToast('Hata: ' + error.message, 'err'); }
     else {
       setIsStaffModalOpen(false);
       setEditingStaff(null);
@@ -538,7 +578,7 @@ export default function Dashboard() {
     const c = customerMap[uid];
     if (a.status !== 'İptal Edildi') {
       c.visits++;
-      c.totalSpent += Number(a.services?.price || 0);
+      c.totalSpent += Number(a.price || 0);
     }
     const d = a.appointment_date as string;
     if (d) {
@@ -726,17 +766,30 @@ export default function Dashboard() {
         {/* TOPBAR */}
         <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between px-8 py-3.5">
           <div className="text-sm font-semibold text-[#0c0c0d]">{shop?.name || 'İşletme Paneli'}</div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {shop?.id && (
+              <>
+                <a href={`/shop/${shop.id}`} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
+                  <ArrowUpRight size={13}/> Sayfamı Gör
+                </a>
+                <button onClick={copyBookingLink}
+                  className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] transition-all text-[#7a7a7e] hover:text-[#14b8a6]">
+                  {linkCopied ? <CheckCircle2 size={13} className="text-[#15803d]"/> : <Tag size={13}/>}
+                  {linkCopied ? 'Kopyalandı!' : 'Link Kopyala'}
+                </button>
+              </>
+            )}
             <button onClick={() => setActiveTab('appointments')} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
               <Plus size={14}/> Randevu Ekle
             </button>
             <div className="relative">
-              <button className="w-9 h-9 bg-white border border-[#ececea] rounded-xl flex items-center justify-center text-[#0c0c0d] hover:bg-[#f7f5f0] transition-all">
+              <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white border border-[#ececea] rounded-xl flex items-center justify-center text-[#0c0c0d] hover:bg-[#f7f5f0] transition-all">
                 <Calendar size={16}/>
               </button>
               {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#14b8a6] text-[#04221d] text-[9px] font-bold rounded-full flex items-center justify-center">{pendingCount}</span>}
             </div>
-            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-3 py-1.5 cursor-pointer hover:bg-[#f7f5f0] transition-all">
+            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-3 py-1.5">
               <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center">
                 {shop?.profiles?.avatar_url ? <img src={shop.profiles.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[#14b8a6] font-bold text-[11px]">{shop?.name?.charAt(0) || 'R'}</span>}
               </div>
@@ -1615,20 +1668,67 @@ export default function Dashboard() {
                       })}
                     </div>
                     {reviews.map((r) => (
-                      <div key={r.id} className="bg-white border border-[#ececea] rounded-2xl p-5 grid gap-4" style={{gridTemplateColumns:'44px 1fr'}}>
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[13px] font-bold flex items-center justify-center">
-                          {(r.profiles?.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-[14px] text-[#0c0c0d]">{r.profiles?.full_name || "Anonim"}</p>
-                          <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mt-0.5">
-                            {new Date(r.created_at).toLocaleDateString('tr-TR')} · ✓ Doğrulanmış
-                          </p>
-                          <div className="flex gap-0.5 mt-2 text-[#14b8a6]">
-                            {'★'.repeat(r.rating)}{'☆'.repeat(5-r.rating)}
+                      <div key={r.id} className="bg-white border border-[#ececea] rounded-2xl p-5">
+                        <div className="grid gap-4" style={{gridTemplateColumns:'44px 1fr'}}>
+                          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[13px] font-bold flex items-center justify-center">
+                            {(r.profiles?.full_name||'?').split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)}
                           </div>
-                          {r.comment && <p className="text-[13px] text-[#3a3a3d] mt-2 leading-relaxed">{r.comment}</p>}
+                          <div>
+                            <p className="font-semibold text-[14px] text-[#0c0c0d]">{r.profiles?.full_name || "Anonim"}</p>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.06em] text-[#7a7a7e] mt-0.5">
+                              {new Date(r.created_at).toLocaleDateString('tr-TR')} · Doğrulanmış
+                            </p>
+                            <div className="flex gap-0.5 mt-2 text-[#14b8a6]">
+                              {'★'.repeat(r.rating)}{'☆'.repeat(5-r.rating)}
+                            </div>
+                            {r.comment && <p className="text-[13px] text-[#3a3a3d] mt-2 leading-relaxed">{r.comment}</p>}
+                          </div>
                         </div>
+                        {/* Owner reply */}
+                        {r.owner_reply && replyingReviewId !== r.id && (
+                          <div className="mt-4 ml-[60px] bg-[#fafaf8] border border-[#ececea] rounded-xl p-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] font-mono uppercase tracking-widest text-[#14b8a6] mb-1">İşletme Yanıtı</p>
+                                <p className="text-[13px] text-[#3a3a3d] leading-relaxed">{r.owner_reply}</p>
+                                {r.owner_reply_at && <p className="text-[10px] font-mono text-[#7a7a7e] mt-1">{new Date(r.owner_reply_at).toLocaleDateString('tr-TR')}</p>}
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0">
+                                <button onClick={() => { setReplyingReviewId(r.id); setReplyText(r.owner_reply || ''); }} className="p-1.5 text-[#7a7a7e] hover:text-[#14b8a6] transition-colors"><Edit3 size={13}/></button>
+                                <button onClick={() => handleReviewReplyDelete(r.id)} className="p-1.5 text-[#7a7a7e] hover:text-[#dc2626] transition-colors"><Trash2 size={13}/></button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {replyingReviewId === r.id ? (
+                          <div className="mt-4 ml-[60px] space-y-2">
+                            <textarea
+                              className="w-full p-3 bg-[#fafaf8] border border-[#ececea] rounded-xl text-[13px] text-[#0c0c0d] resize-none outline-none focus:border-[#14b8a6] transition-colors"
+                              rows={3}
+                              placeholder="Yanıtınızı yazın..."
+                              value={replyText}
+                              onChange={e => setReplyText(e.target.value)}
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => handleReviewReply(r.id)} disabled={savingReply || !replyText.trim()}
+                                className="px-4 py-2 bg-[#0c0c0d] text-white rounded-lg text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all disabled:opacity-40">
+                                {savingReply ? 'Kaydediliyor...' : 'Yanıtla'}
+                              </button>
+                              <button onClick={() => { setReplyingReviewId(null); setReplyText(''); }}
+                                className="px-4 py-2 border border-[#ececea] text-[#7a7a7e] rounded-lg text-[11px] font-mono uppercase tracking-widest hover:border-[#0c0c0d] transition-all">
+                                İptal
+                              </button>
+                            </div>
+                          </div>
+                        ) : !r.owner_reply ? (
+                          <div className="mt-3 ml-[60px]">
+                            <button onClick={() => { setReplyingReviewId(r.id); setReplyText(''); }}
+                              className="text-[11px] font-mono uppercase tracking-widest text-[#7a7a7e] hover:text-[#14b8a6] transition-colors">
+                              + Yanıt yaz
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -1644,7 +1744,11 @@ export default function Dashboard() {
                     <h1 className="text-3xl font-bold text-[#0c0c0d] tracking-tight uppercase">Müşteriler</h1>
                     <p className="text-[11px] text-[#7a7a7e] font-mono uppercase tracking-widest mt-1">{customerList.length} müşteri · {newCustCount} yeni · {vipCount} VIP</p>
                   </div>
-                  <button className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                  <button onClick={() => {
+                    const rows = [['İsim','Telefon','E-posta','Ziyaret','Harcama','Son Ziyaret','Etiket'],...customerList.map((c:any)=>[c.name,c.phone,c.email,c.visits,c.totalSpent,c.lastVisit||'',c.tagLabel])];
+                    const csv = rows.map(r=>r.map((v:any)=>String(v).replace(/,/g,';')).join(',')).join('\n');
+                    const a = document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download='musteriler.csv'; a.click();
+                  }} className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
                     <Download size={14}/> CSV İndir
                   </button>
                 </div>
@@ -1719,8 +1823,13 @@ export default function Dashboard() {
                               <p className="text-[11px] font-mono tracking-widest uppercase mt-1 opacity-60">{activeCust.phone || activeCust.email || 'İletişim yok'}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white/10 backdrop-blur border-none rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
-                              <button onClick={() => activeCust.phone && window.open('tel:' + activeCust.phone)} className="w-9 h-9 bg-white/10 backdrop-blur border-none rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></button>
+                              <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
+                              {activeCust.phone && (
+                                <>
+                                  <a href={`tel:${activeCust.phone}`} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></a>
+                                  <a href={`https://wa.me/${(activeCust.phone as string).replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="w-9 h-9 bg-[#25D366]/20 rounded-xl text-white hover:bg-[#25D366]/40 transition-all flex items-center justify-center" title="WhatsApp"><MessageSquare size={15}/></a>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1753,10 +1862,10 @@ export default function Dashboard() {
                                 <div key={a.id} className="grid items-center px-6 py-3.5 hover:bg-[#fafaf8] cursor-pointer transition-colors" style={{gridTemplateColumns: '100px 1fr 70px'}} onClick={() => setSelectedApt(a)}>
                                   <p className="text-[11px] font-mono text-[#7a7a7e] uppercase tracking-wide">{new Date(a.appointment_date).toLocaleDateString('tr-TR', {day: 'numeric', month: 'short', year: 'numeric'})}</p>
                                   <div>
-                                    <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.services?.name || 'Hizmet'}</p>
+                                    <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.service_name || 'Hizmet'}</p>
                                     <p className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-wide">{a.staff ? a.staff.first_name + ' ' + a.staff.last_name : '—'} · {a.status}</p>
                                   </div>
-                                  <p className="text-[15px] font-bold text-[#0c0c0d] text-right">₺{Number(a.services?.price || 0).toLocaleString('tr-TR')}</p>
+                                  <p className="text-[15px] font-bold text-[#0c0c0d] text-right">₺{Number(a.price || 0).toLocaleString('tr-TR')}</p>
                                 </div>
                               ))}
                             </div>
@@ -1940,10 +2049,10 @@ export default function Dashboard() {
                       const staffAppts = appointments.filter((a: any) => a.staff_id === s.id);
                       const thisWeekStart = new Date(); thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
                       const weekAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= thisWeekStart);
-                      const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (a.service_price || 0), 0);
+                      const weekRevenue = weekAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
                       const monthStart = new Date(); monthStart.setDate(1);
                       const monthAppts = staffAppts.filter((a: any) => new Date(a.start_time) >= monthStart);
-                      const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (a.service_price || 0), 0);
+                      const monthRevenue = monthAppts.reduce((sum: number, a: any) => sum + (a.price || 0), 0);
                       const initials = `${s.first_name?.charAt(0) || ''}${s.last_name?.charAt(0) || ''}`;
                       return (
                         <div key={s.id} className="bg-white border border-[#ececea] rounded-2xl p-[22px] hover:shadow-md transition-all">
@@ -1982,23 +2091,18 @@ export default function Dashboard() {
                           {/* Actions */}
                           <div className="grid grid-cols-4 gap-1.5">
                             {[
-                              { label: 'Vardiya', icon: <Clock size={13}/> },
-                              { label: 'İzin', icon: <Calendar size={13}/> },
-                              { label: 'Kazanç', icon: <TrendingUp size={13}/> },
+                              { label: 'Takvim', icon: <Clock size={13}/>, action: () => setActiveTab('appointments') },
+                              { label: 'Kazanç', icon: <TrendingUp size={13}/>, action: () => setActiveTab('finance') },
                               { label: 'Düzenle', icon: <Edit3 size={13}/>, action: () => openStaffEdit(s) },
+                              { label: 'Sil', icon: <Trash2 size={13}/>, action: async () => { if(confirm('Personel silinsin mi?')) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }, danger: true },
                             ].map((btn, bi) => (
-                              <button key={bi} onClick={btn.action || (() => {})}
-                                className="flex flex-col items-center gap-1 py-2 rounded-lg bg-[#fafaf8] hover:bg-[#e6f7f4] text-[#7a7a7e] hover:text-[#14b8a6] transition-all">
+                              <button key={bi} onClick={btn.action}
+                                className={`flex flex-col items-center gap-1 py-2 rounded-lg transition-all ${(btn as any).danger ? 'bg-[#fafaf8] text-[#dc2626]/40 hover:bg-red-50 hover:text-[#dc2626]' : 'bg-[#fafaf8] hover:bg-[#e6f7f4] text-[#7a7a7e] hover:text-[#14b8a6]'}`}>
                                 {btn.icon}
                                 <span className="text-[8px] font-mono uppercase tracking-widest">{btn.label}</span>
                               </button>
                             ))}
                           </div>
-                          {/* Delete */}
-                          <button onClick={async () => { if(confirm("Personel silinsin mi?")) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }}
-                            className="w-full mt-2 py-1.5 rounded-lg text-[9px] font-mono uppercase tracking-widest text-[#dc2626]/40 hover:text-[#dc2626] hover:bg-red-50 transition-all">
-                            Sil
-                          </button>
                         </div>
                       );
                     })}
@@ -2308,17 +2412,17 @@ export default function Dashboard() {
                 <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                   <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-5">Raporlar</h3>
                   <div className="flex flex-wrap gap-3">
-                    <button onClick={() => alert('PDF raporu yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#0c0c0d] text-white rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#14b8a6] transition-all">
+                    <button disabled className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#7a7a7e] rounded-xl text-[11px] font-mono uppercase tracking-widest border border-[#ececea] cursor-not-allowed opacity-60">
                       <Download size={14} /> PDF İndir
                     </button>
-                    <button onClick={() => alert('Excel raporu yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#0c0c0d] rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#f0f0ee] transition-all border border-[#ececea]">
+                    <button disabled className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#7a7a7e] rounded-xl text-[11px] font-mono uppercase tracking-widest border border-[#ececea] cursor-not-allowed opacity-60">
                       <Download size={14} /> Excel İndir
                     </button>
-                    <button onClick={() => alert('Muhasebeci paylaşımı yakında aktif olacak.')} className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#0c0c0d] rounded-xl text-[11px] font-mono uppercase tracking-widest hover:bg-[#f0f0ee] transition-all border border-[#ececea]">
+                    <button disabled className="flex items-center gap-2 px-5 py-3 bg-[#fafaf8] text-[#7a7a7e] rounded-xl text-[11px] font-mono uppercase tracking-widest border border-[#ececea] cursor-not-allowed opacity-60">
                       <Mail size={14} /> Muhasebeciye Gönder
                     </button>
                   </div>
-                  <p className="text-[10px] font-mono text-[#7a7a7e] mt-4">Rapor indirme özelliği yakında aktif olacak.</p>
+                  <p className="text-[10px] font-mono text-[#7a7a7e] mt-4">Rapor dışa aktarma özelliği geliştirme aşamasında.</p>
                 </div>
               </div>
             )}
@@ -2618,6 +2722,11 @@ export default function Dashboard() {
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">IBAN</label><input name="iban" defaultValue={shop?.iban} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">E-posta</label><input name="email" type="email" defaultValue={shop?.email} placeholder="info@isletme.com" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Instagram</label><input name="instagram" defaultValue={shop?.instagram} placeholder="@kullaniciadi" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İşletme Açıklaması</label>
+                  <textarea name="description" rows={3} defaultValue={shop?.description} placeholder="İşletmenizi kısaca tanıtın. Müşteriler profilinizde bu metni okur." className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d] resize-none" />
+                  <p className="text-[10px] font-mono text-[#7a7a7e]">Müşteriler işletme profilinizde bu metni görür.</p>
                 </div>
 
                 {/* ADRES */}
@@ -3049,6 +3158,16 @@ export default function Dashboard() {
           </>
         );
       })()}
+      {/* TOAST BİLDİRİMLER */}
+      <div className="fixed bottom-6 right-6 z-[500] flex flex-col gap-2 pointer-events-none">
+        {toasts.map(t => (
+          <div key={t.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-[13px] font-semibold animate-in slide-in-from-bottom-4 duration-200 pointer-events-auto ${t.type === 'ok' ? 'bg-[#0c0c0d] text-white' : 'bg-[#dc2626] text-white'}`}>
+            {t.type === 'ok' ? <CheckCircle2 size={15} className="text-[#14b8a6] flex-shrink-0"/> : <AlertCircle size={15} className="text-white flex-shrink-0"/>}
+            {t.msg}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

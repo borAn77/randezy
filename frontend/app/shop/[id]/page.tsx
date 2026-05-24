@@ -397,7 +397,7 @@ export default function ShopDetail() {
   }, [shop]);
 
   const fetchReviews = async () => {
-    const { data } = await supabase.from('reviews').select('*, profiles(full_name)').eq('shop_id', shopId).order('created_at', { ascending: false });
+    const { data } = await supabase.from('reviews').select('*, profiles(full_name), owner_reply, owner_reply_at').eq('shop_id', shopId).order('created_at', { ascending: false });
     setReviews(data || []);
   };
 
@@ -834,6 +834,12 @@ export default function ShopDetail() {
                           <div className="text-[13px] tracking-[2px] mb-1" style={{ color: '#14b8a6' }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
                           <div className="font-mono text-[11px] text-gray-400 uppercase tracking-wider mb-2">{new Date(r.created_at).toLocaleDateString('tr-TR')}</div>
                           {r.comment && <div className="text-sm text-gray-500 leading-relaxed">{r.comment}</div>}
+                          {r.owner_reply && (
+                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                              <p className="text-[10px] font-semibold text-[#14b8a6] uppercase tracking-widest mb-1">İşletme Yanıtı</p>
+                              <p className="text-[13px] text-gray-600 leading-relaxed">{r.owner_reply}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
