@@ -114,7 +114,7 @@ export default function Dashboard() {
   const handleCreateAppointment = async () => {
     if (!shop?.id || !newAptForm.customerName.trim() || !newAptForm.date || !newAptForm.time) return;
     setSavingNewApt(true);
-    const svc = services.find((s: any) => s.id === newAptForm.serviceId);
+    const svc = services.find((s: any) => String(s.id) === String(newAptForm.serviceId));
     const payload: any = {
       shop_id: shop.id,
       customer_name: newAptForm.customerName.trim(),
@@ -338,7 +338,8 @@ export default function Dashboard() {
   const handleDetailDelete = async () => {
     if (!selectedApt) return;
     if (!confirm('Bu randevuyu kalıcı olarak silmek istediğinize emin misiniz?')) return;
-    await supabase.from('appointments').delete().eq('id', selectedApt.id);
+    const { error } = await supabase.from('appointments').delete().eq('id', selectedApt.id);
+    if (error) { showToast('Silme hatası: ' + error.message, 'err'); return; }
     setSelectedApt(null);
     fetchInitialData();
   };
@@ -511,8 +512,10 @@ export default function Dashboard() {
     setIsStaffModalOpen(true);
   };
 
+  const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
   // Real metrics
-  const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı');
+  const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı' || a.status === 'Tamamlandı');
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
   const uniqueCustomers = new Set(appointments.map(a => a.user_id).filter(Boolean)).size;
   const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
@@ -520,9 +523,10 @@ export default function Dashboard() {
   const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
 
   // Finance computed values
-  const today = new Date().toISOString().split('T')[0];
+  const today = toLocalDateStr(new Date());
   const currentMonth = today.slice(0, 7);
-  const fPrevMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
+  const fPrevMonthDate = new Date(); fPrevMonthDate.setMonth(fPrevMonthDate.getMonth() - 1);
+  const fPrevMonth = toLocalDateStr(fPrevMonthDate).slice(0, 7);
   const cancelledAll = appointments.filter((a: any) => a.status === 'İptal Edildi');
   const confirmedThisMonth = confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(currentMonth));
   const confirmedPrevMonth = confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(fPrevMonth));
@@ -538,7 +542,7 @@ export default function Dashboard() {
 
   const dailyRevChart = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (13 - i));
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = toLocalDateStr(d);
     return { date: dateStr, label: d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), value: confirmedAppointments.filter((a: any) => a.appointment_date === dateStr).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
   });
 
@@ -546,13 +550,13 @@ export default function Dashboard() {
     const now = new Date();
     const monday = new Date(now); monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1) - 7 * (7 - i));
     const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const startStr = monday.toISOString().split('T')[0], endStr = sunday.toISOString().split('T')[0];
+    const startStr = toLocalDateStr(monday), endStr = toLocalDateStr(sunday);
     return { label: `H${i + 1}`, value: confirmedAppointments.filter((a: any) => a.appointment_date >= startStr && a.appointment_date <= endStr).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
   });
 
   const monthlyRevChart = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(); d.setMonth(d.getMonth() - (5 - i));
-    const mStr = d.toISOString().slice(0, 7);
+    const mStr = toLocalDateStr(d).slice(0, 7);
     return { label: d.toLocaleDateString('tr-TR', { month: 'short' }), value: confirmedAppointments.filter((a: any) => a.appointment_date?.startsWith(mStr)).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0) };
   });
 
@@ -622,7 +626,7 @@ export default function Dashboard() {
       };
     }
     const c = customerMap[uid];
-    if (a.status !== 'İptal Edildi') {
+    if (a.status === 'Onaylandı' || a.status === 'Tamamlandı') {
       c.visits++;
       c.totalSpent += Number(a.price || 0);
       const d = a.appointment_date as string;
@@ -634,8 +638,8 @@ export default function Dashboard() {
       if (svcName) c._svcCount[svcName] = (c._svcCount[svcName] || 0) + 1;
     }
   });
-  const thirtyDaysAgoStr = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
-  const sixtyDaysAgoStr = new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0];
+  const thirtyDaysAgoStr = toLocalDateStr(new Date(Date.now() - 30 * 86400000));
+  const sixtyDaysAgoStr = toLocalDateStr(new Date(Date.now() - 60 * 86400000));
   const customerList: any[] = Object.values(customerMap).map((c: any) => {
     const topSvc = Object.entries(c._svcCount as Record<string, number>).sort((a, b) => b[1] - a[1])[0];
     const initials = (c.name as string).split(' ').filter(Boolean).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
@@ -722,7 +726,7 @@ export default function Dashboard() {
     d.setHours(0, 0, 0, 0);
     return d;
   })();
-  const calCurrentDayStr = calCurrentDay.toISOString().split('T')[0];
+  const calCurrentDayStr = toLocalDateStr(calCurrentDay);
   const calCurrentDayApts = appointments.filter((a: any) => a.appointment_date === calCurrentDayStr);
   const isCurrentDayToday = calCurrentDayStr === today;
   const _now = new Date();
