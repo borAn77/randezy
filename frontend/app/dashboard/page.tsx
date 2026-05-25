@@ -297,10 +297,11 @@ export default function Dashboard() {
       fetchInitialData();
       if (newStatus === 'Onaylandı') {
         const apt = appointments.find(a => a.id === id);
+        const { data: { session: notifySession } } = await supabase.auth.getSession();
         if (apt) {
           fetch('/api/notify', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
             body: JSON.stringify({
               type: 'appointment_confirmed',
               appointmentId: apt.id,
@@ -329,10 +330,11 @@ export default function Dashboard() {
     setRejectReason("");
     setRejectError("");
     fetchInitialData();
+    const { data: { session: notifySession } } = await supabase.auth.getSession();
     if (apt) {
       fetch('/api/notify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
         body: JSON.stringify({
           type: 'appointment_rejected',
           appointmentId: apt.id,
@@ -368,9 +370,10 @@ export default function Dashboard() {
     setDetailRejectReason('');
     setDetailRejectError('');
     fetchInitialData();
+    const { data: { session: notifySession } } = await supabase.auth.getSession();
     fetch('/api/notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
       body: JSON.stringify({
         type: 'appointment_rejected',
         appointmentId: apt.id,

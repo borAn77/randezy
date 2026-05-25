@@ -591,7 +591,7 @@ export default function ShopDetail() {
       cart.forEach(item => {
         fetch('/api/notify', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify({ type: 'new_appointment', shopId, ownerId: shop.owner_id, customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri', serviceName: item.service.name, appointmentDate: localDateStr(item.date), appointmentTime: item.time, price: item.discountedPrice }),
         }).catch(() => {});
       });

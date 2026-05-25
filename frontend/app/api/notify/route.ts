@@ -8,13 +8,47 @@ const resend = process.env.RESEND_API_KEY
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: NextRequest) {
-  console.log("[notify] resend configured:", !!resend);
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ ok: false, reason: "config_error" }, { status: 500 });
+  }
+
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+  const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+  if (!user) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
-  const { type } = body;
+  const { type, appointmentId } = body;
+
+  if (appointmentId) {
+    const { data: apt } = await supabaseAdmin
+      .from("appointments")
+      .select("user_id, shop_id")
+      .eq("id", appointmentId)
+      .single();
+    if (!apt) {
+      return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
+    }
+    const isCustomer = apt.user_id === user.id;
+    const { data: shopRow } = await supabaseAdmin
+      .from("shops")
+      .select("owner_id")
+      .eq("id", apt.shop_id)
+      .single();
+    const isOwner = shopRow?.owner_id === user.id;
+    if (!isCustomer && !isOwner) {
+      return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
+  }
+
   console.log("[notify] type:", type, "| body keys:", Object.keys(body).join(","));
 
   try {
