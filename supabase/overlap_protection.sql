@@ -59,38 +59,69 @@ ALTER TABLE biz_appointments ADD CONSTRAINT no_biz_apt_staff_overlap
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- LAYER 2B — appointments overlap trigger
--- ✅ Deploy edildi.
+-- LAYER 2B — appointments overlap trigger + duration_snapshot
+-- ✅ Deploy edildi (2026-05-25).
 -- CREATE OR REPLACE olduğu için tekrar çalıştırmak güvenli.
 -- Kapsam: staff-assigned → staff-level, staff=NULL → shop-level kontrol.
+-- duration_snapshot: booking anında dondurulur (price gibi). services.duration
+--   sonradan değişse bile historical overlap hesabı bozulmaz.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- duration_snapshot kolonu (pozitif olmalı)
+ALTER TABLE appointments
+  ADD COLUMN IF NOT EXISTS duration_snapshot INTEGER;
+
+ALTER TABLE appointments
+  ADD CONSTRAINT appointments_duration_snapshot_positive
+  CHECK (duration_snapshot IS NULL OR duration_snapshot > 0);
+
+-- Mevcut kayıtları doldur
+UPDATE appointments a
+SET duration_snapshot = COALESCE(s.duration, 30)
+FROM services s
+WHERE s.id = a.service_id
+  AND a.duration_snapshot IS NULL;
+
+UPDATE appointments
+SET duration_snapshot = 30
+WHERE duration_snapshot IS NULL;
+
+-- Trigger fonksiyonu
 CREATE OR REPLACE FUNCTION fn_check_appointment_overlap()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
   v_duration  INTEGER;
   v_conflicts INTEGER;
 BEGIN
+  -- Her zaman önce snapshot doldur (historical integrity — iptal olsa bile)
+  IF NEW.duration_snapshot IS NULL THEN
+    SELECT COALESCE(duration, 30) INTO v_duration
+    FROM services WHERE id = NEW.service_id;
+    NEW.duration_snapshot := COALESCE(v_duration, 30);
+  END IF;
+
+  IF NEW.duration_snapshot < 1 THEN
+    NEW.duration_snapshot := 30;
+  END IF;
+
+  -- Sadece blocking status'lar için overlap kontrolü
   IF NEW.status NOT IN ('Beklemede', 'Onaylandı', 'Tamamlandı') THEN
     RETURN NEW;
   END IF;
 
-  SELECT COALESCE(duration, 30) INTO v_duration
-  FROM services WHERE id = NEW.service_id;
-  v_duration := COALESCE(v_duration, 30);
+  v_duration := NEW.duration_snapshot;
 
   IF NEW.staff_id IS NOT NULL THEN
     SELECT COUNT(*) INTO v_conflicts
     FROM appointments a
-    JOIN services s ON s.id = a.service_id
-    WHERE a.id             != NEW.id
-      AND a.shop_id         = NEW.shop_id
-      AND a.staff_id        = NEW.staff_id
+    WHERE a.id              != NEW.id
+      AND a.shop_id          = NEW.shop_id
+      AND a.staff_id         = NEW.staff_id
       AND a.appointment_date = NEW.appointment_date
       AND a.status IN ('Beklemede', 'Onaylandı', 'Tamamlandı')
       AND NEW.appointment_time::time
             < a.appointment_time::time
-              + (COALESCE(s.duration, 30) + 5) * INTERVAL '1 minute'
+              + (COALESCE(a.duration_snapshot, 30) + 5) * INTERVAL '1 minute'
       AND NEW.appointment_time::time
             + (v_duration + 5) * INTERVAL '1 minute'
             > a.appointment_time::time;
@@ -103,15 +134,14 @@ BEGIN
   ELSE
     SELECT COUNT(*) INTO v_conflicts
     FROM appointments a
-    JOIN services s ON s.id = a.service_id
-    WHERE a.id             != NEW.id
-      AND a.shop_id         = NEW.shop_id
-      AND a.staff_id        IS NULL
+    WHERE a.id              != NEW.id
+      AND a.shop_id          = NEW.shop_id
+      AND a.staff_id         IS NULL
       AND a.appointment_date = NEW.appointment_date
       AND a.status IN ('Beklemede', 'Onaylandı', 'Tamamlandı')
       AND NEW.appointment_time::time
             < a.appointment_time::time
-              + (COALESCE(s.duration, 30) + 5) * INTERVAL '1 minute'
+              + (COALESCE(a.duration_snapshot, 30) + 5) * INTERVAL '1 minute'
       AND NEW.appointment_time::time
             + (v_duration + 5) * INTERVAL '1 minute'
             > a.appointment_time::time;

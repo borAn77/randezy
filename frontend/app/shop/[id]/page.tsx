@@ -582,6 +582,7 @@ export default function ShopDetail() {
       appointment_time: item.time,
       status: 'Beklemede',
       staff_id: item.staff?.id || null,
+      duration_snapshot: item.service.duration,
     }));
     const { error } = await supabase.from('appointments').insert(inserts);
     if (!error) {
