@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { type, appointmentId } = body;
 
-  if (type === "new_appointment" && !appointmentId) {
+  if (!appointmentId) {
     return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
   }
 
@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
     if (type === "new_appointment") {
       await handleNewAppointment(appointmentId);
     } else if (type === "appointment_confirmed") {
-      await handleStatusChange(body, "confirmed");
+      await handleStatusChange(appointmentId, "confirmed", body.reason);
     } else if (type === "appointment_rejected") {
-      await handleStatusChange(body, "rejected");
+      await handleStatusChange(appointmentId, "rejected", body.reason);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -150,54 +150,59 @@ async function handleNewAppointment(appointmentId: string) {
 }
 
 async function handleStatusChange(
-  body: {
-    customerEmail?: string;
-    customerName: string;
-    shopName: string;
-    serviceName: string;
-    appointmentDate: string;
-    appointmentTime: string;
-    appointmentId?: string;
-    reason?: string;
-  },
-  status: "confirmed" | "rejected"
+  appointmentId: string,
+  status: "confirmed" | "rejected",
+  reason?: string
 ) {
-  let email = body.customerEmail;
+  const { data: apt } = await supabaseAdmin
+    .from("appointments")
+    .select("user_id, shop_id, service_name, appointment_date, appointment_time, customer_name")
+    .eq("id", appointmentId)
+    .single();
+  if (!apt) { console.log("[notify] appointment not found:", appointmentId); return; }
 
-  // profiles join null döndüyse appointment'tan auth.users üzerinden email al
-  if (!email && body.appointmentId) {
-    const { data: apt } = await supabaseAdmin
-      .from("appointments")
-      .select("user_id")
-      .eq("id", body.appointmentId)
-      .single();
-    if (apt?.user_id) {
-      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(apt.user_id);
-      email = authUser?.user?.email;
-    }
+  const { data: shop } = await supabaseAdmin
+    .from("shops")
+    .select("name")
+    .eq("id", apt.shop_id)
+    .single();
+
+  const { data: customerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", apt.user_id)
+    .single();
+
+  let email = customerProfile?.email;
+  if (!email) {
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(apt.user_id);
+    email = authUser?.user?.email;
   }
 
   console.log("[notify] customer email:", email ?? "null");
   if (!email) { console.log("[notify] no customer email, aborting"); return; }
 
-  const dateStr = formatDate(body.appointmentDate);
+  const customerName = customerProfile?.full_name || apt.customer_name || "Müşteri";
+  const shopName = shop?.name || "";
+  const safeReason = reason ? String(reason).trim().slice(0, 500) : undefined;
+  const dateStr = formatDate(apt.appointment_date);
   const isConfirmed = status === "confirmed";
 
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to: email,
     subject: isConfirmed
-      ? `Randevunuz Onaylandı — ${body.shopName}`
-      : `Randevunuz İptal Edildi — ${body.shopName}`,
+      ? `Randevunuz Onaylandı — ${shopName}`
+      : `Randevunuz İptal Edildi — ${shopName}`,
     html: emailTemplate({
       title: isConfirmed ? "Randevunuz Onaylandı!" : "Randevunuz İptal Edildi",
       color: isConfirmed ? "#00A3AD" : "#ef4444",
       lines: [
-        `<b>İşletme:</b> ${body.shopName}`,
-        `<b>Hizmet:</b> ${body.serviceName}`,
+        `<b>İşletme:</b> ${shopName}`,
+        `<b>Hizmet:</b> ${apt.service_name}`,
         `<b>Tarih:</b> ${dateStr}`,
-        `<b>Saat:</b> ${body.appointmentTime}`,
-        ...(body.reason ? [`<b>Sebep:</b> ${body.reason}`] : []),
+        `<b>Saat:</b> ${apt.appointment_time?.slice(0, 5)}`,
+        ...(safeReason ? [`<b>Sebep:</b> ${safeReason}`] : []),
       ],
       note: isConfirmed
         ? "Randevunuzu iptal etmek isterseniz hesabınızdan yapabilirsiniz."
