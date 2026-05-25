@@ -104,6 +104,16 @@ function InlineBookingPanel({
         return true;
       })
       .map(c => ({ appointment_time: c.time, duration_snapshot: c.service.duration, staff_id: c.staff?.id || null }));
+  const isInCart = (slotTime: string): boolean => {
+    if (!selectedDay) return false;
+    const dateStr = localDateStr(selectedDay);
+    return cartItems.some(c =>
+      localDateStr(c.date) === dateStr &&
+      String(c.service.id) === String(service.id) &&
+      c.time === slotTime &&
+      (c.staff?.id || null) === (selectedStaff?.id || null)
+    );
+  };
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -276,22 +286,26 @@ function InlineBookingPanel({
             <p className="text-sm text-gray-400">Bu gün müsait saat yok.</p>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-              {availableSlots.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTime(t)}
-                  className={`relative py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${
-                    selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' :
-                    t === suggestedSlot ? 'border-amber-400 bg-amber-50 text-[#0c0c0d] hover:border-amber-500' :
-                    'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'
-                  }`}
-                >
-                  {t === suggestedSlot && (
-                    <span className="absolute -top-1.5 -right-1 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[7px] font-black text-black leading-none">★</span>
-                  )}
-                  {t}
-                </button>
-              ))}
+              {availableSlots.map(t => {
+                const inCart = isInCart(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => { if (!inCart) setSelectedTime(t); }}
+                    className={`relative py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${
+                      inCart ? 'opacity-60 border-[#14b8a6]/50 bg-[#14b8a6]/10 text-[#0d9488] cursor-default' :
+                      selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' :
+                      t === suggestedSlot ? 'border-amber-400 bg-amber-50 text-[#0c0c0d] hover:border-amber-500' :
+                      'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'
+                    }`}
+                  >
+                    {!inCart && t === suggestedSlot && (
+                      <span className="absolute -top-1.5 -right-1 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[7px] font-black text-black leading-none">★</span>
+                    )}
+                    {inCart ? <span className="text-[9px] leading-tight block">✓<br/>Sepette</span> : t}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -914,6 +928,13 @@ export default function ShopDetail() {
                   const ns = _toMin(item.time);
                   const ne = ns + item.service.duration;
                   const nd = localDateStr(item.date);
+                  const duplicate = cart.some(ex =>
+                    localDateStr(ex.date) === nd &&
+                    String(ex.service.id) === String(item.service.id) &&
+                    ex.time === item.time &&
+                    (ex.staff?.id || null) === (item.staff?.id || null)
+                  );
+                  if (duplicate) { setToast('Bu randevu zaten sepette.'); return; }
                   const conflict = cart.some(ex => {
                     if (localDateStr(ex.date) !== nd) return false;
                     if (item.staff?.id && ex.staff?.id && item.staff.id !== ex.staff.id) return false;
