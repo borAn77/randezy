@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS campaigns CASCADE;
 
 CREATE TABLE campaigns (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  shop_id       UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  shop_id       INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
   title         TEXT NOT NULL,
   type          TEXT NOT NULL CHECK (type IN ('percentage', 'fixed', 'today_special', 'last_minute')),
   discount_value NUMERIC,
