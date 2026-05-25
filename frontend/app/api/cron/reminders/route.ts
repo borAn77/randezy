@@ -8,7 +8,7 @@ const resend = process.env.RESEND_API_KEY
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
 );
 
 export async function GET(req: NextRequest) {
