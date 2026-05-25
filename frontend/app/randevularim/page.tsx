@@ -186,7 +186,9 @@ export default function Randevularim() {
   const handleCancel = async (id: string, reason: string) => {
     const update: any = { status: 'İptal Edildi' };
     if (reason.trim()) update.cancel_reason = reason.trim();
-    const { error } = await supabase.from('appointments').update(update).eq('id', id);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('appointments').update(update).eq('id', id).eq('user_id', user.id);
     if (error) { alert('İptal başarısız: ' + error.message); return; }
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'İptal Edildi' } : a));
     setCancelTarget(null);
@@ -201,11 +203,7 @@ export default function Randevularim() {
       { shop_id: apt.shop_id, user_id: user.id, rating, comment: review.trim() || null },
       { onConflict: 'shop_id,user_id' }
     );
-    const { data: allReviews } = await supabase.from('reviews').select('rating').eq('shop_id', apt.shop_id);
-    if (allReviews && allReviews.length > 0) {
-      const avg = allReviews.reduce((s: number, r: any) => s + r.rating, 0) / allReviews.length;
-      await supabase.from('shops').update({ score: Math.round(avg * 10) / 10 }).eq('id', apt.shop_id);
-    }
+    // shops.score otomatik olarak DB trigger (trg_reviews_score) tarafından güncellenir
     setLocalRatings(prev => ({ ...prev, [id]: rating }));
     setRateTarget(null);
   };

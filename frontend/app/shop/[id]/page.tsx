@@ -82,10 +82,7 @@ function InlineBookingPanel({
 }) {
   const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
   const BUFFER_MIN = 5;
-  const aptDuration = (apt: any): number => {
-    const svc = allServices.find((s: any) => String(s.id) === String(apt.service_id));
-    return svc?.duration ?? 30;
-  };
+  const aptDuration = (apt: any): number => apt.duration_snapshot ?? 30;
   // Buffer is two-sided: both new and existing appointments need 5 min gap between them
   const isBlocked = (slotStart: string, newDur: number, apts: any[]): boolean => {
     const ns = toMin(slotStart);
@@ -106,7 +103,7 @@ function InlineBookingPanel({
         if (forStaffId !== null) return !c.staff?.id || c.staff.id === forStaffId;
         return true;
       })
-      .map(c => ({ appointment_time: c.time, service_id: c.service.id, staff_id: c.staff?.id || null }));
+      .map(c => ({ appointment_time: c.time, duration_snapshot: c.service.duration, staff_id: c.staff?.id || null }));
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -124,11 +121,7 @@ function InlineBookingPanel({
   // Pre-load slot counts for 7 days
   useEffect(() => {
     const dateStrs = days.map(d => localDateStr(d));
-    supabase.from('appointments')
-      .select('appointment_time, staff_id, appointment_date, service_id')
-      .eq('shop_id', shopId)
-      .in('appointment_date', dateStrs)
-      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı'])
+    supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: dateStrs })
       .then(({ data: booked }) => {
         const counts: Record<string, number> = {};
         const now = new Date();
@@ -170,11 +163,7 @@ function InlineBookingPanel({
     if (!dayHours || dayHours.is_closed) { setIsClosedDay(true); setAvailableSlots([]); return; }
     setIsClosedDay(false);
     const slots = generateTimeSlots(dayHours.open_time, dayHours.close_time, service.duration);
-    supabase.from('appointments')
-      .select('appointment_time, staff_id, service_id')
-      .eq('shop_id', shopId)
-      .eq('appointment_date', localDateStr(selectedDay))
-      .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı'])
+    supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: [localDateStr(selectedDay)] })
       .then(({ data: booked }) => {
         const now = new Date();
         const isToday = selectedDay.toDateString() === now.toDateString();
@@ -552,16 +541,14 @@ export default function ShopDetail() {
       const staffId = item.staff?.id || null;
       const ns = _toMin(item.time);
       const ne = ns + item.service.duration;
-      let q = supabase.from('appointments').select('appointment_time, service_id')
-        .eq('shop_id', shopId).eq('appointment_date', dateStr)
-        .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı']);
-      if (staffId) q = q.eq('staff_id', staffId);
-      const { data: existing } = await q;
-      for (const apt of (existing || [])) {
+      const { data: allSlots } = await supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: [dateStr] });
+      const existing = staffId
+        ? (allSlots || []).filter((a: any) => a.staff_id === staffId)
+        : (allSlots || []).filter((a: any) => !a.staff_id);
+      for (const apt of existing) {
         if (!apt.appointment_time) continue;
         const es = _toMin(apt.appointment_time.slice(0, 5));
-        const existSvc = services.find((s: any) => String(s.id) === String(apt.service_id));
-        const ee = es + (existSvc?.duration ?? 30) + _BUF;
+        const ee = es + (apt.duration_snapshot ?? 30) + _BUF;
         if (ns < ee && ne > es) {
           setToast(`${item.service.name} için ${item.time} saati dolmuş. Sepeti güncelleyin.`);
           setLoading(false);
