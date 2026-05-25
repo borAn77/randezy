@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { type, appointmentId } = body;
 
+  if (type === "new_appointment" && !appointmentId) {
+    return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
+  }
+
   if (appointmentId) {
     const { data: apt } = await supabaseAdmin
       .from("appointments")
@@ -53,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (type === "new_appointment") {
-      await handleNewAppointment(body);
+      await handleNewAppointment(appointmentId);
     } else if (type === "appointment_confirmed") {
       await handleStatusChange(body, "confirmed");
     } else if (type === "appointment_rejected") {
@@ -78,23 +82,21 @@ async function sendExpoPush(token: string, title: string, body: string, data?: o
   }
 }
 
-async function handleNewAppointment(body: {
-  shopId: string;
-  ownerId?: string;
-  customerName: string;
-  serviceName: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  price: number;
-}) {
-  // resolve owner_id: prefer client-passed, fallback to shops table
-  let ownerId = body.ownerId;
-  if (!ownerId) {
-    const { data: shop } = await supabaseAdmin.from("shops").select("owner_id").eq("id", body.shopId).single();
-    ownerId = shop?.owner_id;
-    console.log("[notify] resolved owner_id from shops:", ownerId ?? "null");
-  }
-  if (!ownerId) { console.log("[notify] no owner_id, aborting"); return; }
+async function handleNewAppointment(appointmentId: string) {
+  const { data: apt } = await supabaseAdmin
+    .from("appointments")
+    .select("shop_id, user_id, customer_name, service_name, appointment_date, appointment_time, price")
+    .eq("id", appointmentId)
+    .single();
+  if (!apt) { console.log("[notify] appointment not found:", appointmentId); return; }
+
+  const { data: shop } = await supabaseAdmin
+    .from("shops")
+    .select("owner_id")
+    .eq("id", apt.shop_id)
+    .single();
+  const ownerId = shop?.owner_id;
+  if (!ownerId) { console.log("[notify] no owner_id for shop:", apt.shop_id); return; }
 
   const { data: ownerProfile } = await supabaseAdmin
     .from("profiles")
@@ -112,13 +114,14 @@ async function handleNewAppointment(body: {
 
   if (!ownerEmail && !ownerProfile?.expo_push_token) { console.log("[notify] no contact info, aborting"); return; }
 
-  const dateStr = formatDate(body.appointmentDate);
+  const customerName = apt.customer_name || "Müşteri";
+  const dateStr = formatDate(apt.appointment_date);
 
   if (ownerProfile?.expo_push_token) {
     await sendExpoPush(
       ownerProfile.expo_push_token,
       "Yeni Randevu!",
-      `${body.customerName} — ${body.serviceName} — ${dateStr} ${body.appointmentTime}`,
+      `${customerName} — ${apt.service_name} — ${dateStr} ${apt.appointment_time?.slice(0, 5)}`,
       { type: "new_appointment" }
     );
   }
@@ -128,16 +131,16 @@ async function handleNewAppointment(body: {
   await resend.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to: ownerEmail,
-    subject: `Yeni Randevu — ${body.serviceName}`,
+    subject: `Yeni Randevu — ${apt.service_name}`,
     html: emailTemplate({
       title: "Yeni Randevu Geldi!",
       color: "#00A3AD",
       lines: [
-        `<b>Hizmet:</b> ${body.serviceName}`,
-        `<b>Müşteri:</b> ${body.customerName}`,
+        `<b>Hizmet:</b> ${apt.service_name}`,
+        `<b>Müşteri:</b> ${customerName}`,
         `<b>Tarih:</b> ${dateStr}`,
-        `<b>Saat:</b> ${body.appointmentTime}`,
-        `<b>Ücret:</b> ₺${body.price}`,
+        `<b>Saat:</b> ${apt.appointment_time?.slice(0, 5)}`,
+        `<b>Ücret:</b> ₺${apt.price}`,
       ],
       note: "Randevuyu onaylamak veya reddetmek için dashboard'ınıza giriş yapın.",
       ctaText: "Dashboard'a Git",

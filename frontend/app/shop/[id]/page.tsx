@@ -585,14 +585,16 @@ export default function ShopDetail() {
       staff_id: item.staff?.id || null,
       duration_snapshot: item.service.duration,
     }));
-    const { error } = await supabase.from('appointments').insert(inserts);
+    const { data: insertedApts, error } = await supabase.from('appointments').insert(inserts).select('id');
     if (!error) {
       setLastConfirmed(cart[0]);
-      cart.forEach(item => {
+      cart.forEach((_item, idx) => {
+        const appointmentId = insertedApts?.[idx]?.id;
+        if (!appointmentId) return;
         fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ type: 'new_appointment', shopId, ownerId: shop.owner_id, customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri', serviceName: item.service.name, appointmentDate: localDateStr(item.date), appointmentTime: item.time, price: item.discountedPrice }),
+          body: JSON.stringify({ type: 'new_appointment', appointmentId }),
         }).catch(() => {});
       });
       setCart([]);
