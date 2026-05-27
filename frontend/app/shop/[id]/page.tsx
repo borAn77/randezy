@@ -376,7 +376,6 @@ export default function ShopDetail() {
   const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [galleryTab, setGalleryTab] = useState<'isler' | 'mekan'>('isler');
   const [lastConfirmed, setLastConfirmed] = useState<CartItem | null>(null);
 
   const heroRef = useRef<HTMLDivElement>(null);
@@ -817,10 +816,6 @@ export default function ShopDetail() {
                 <div className="flex items-end justify-between mb-6">
                   <h2 className="text-[28px] font-bold tracking-tight inline-block" style={{ borderBottom: '3px solid #14b8a6', paddingBottom: '6px' }}>Galeri</h2>
                   <div className="font-mono text-[11px] text-gray-400 uppercase tracking-widest">{gallery.length} fotoğraf</div>
-                </div>
-                <div className="flex gap-1.5 mb-5 p-1 rounded-xl w-fit" style={{ background: '#fafaf8' }}>
-                  <button onClick={() => setGalleryTab('isler')} className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${galleryTab === 'isler' ? 'bg-white text-[#0c0c0d] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>İşler</button>
-                  <button onClick={() => setGalleryTab('mekan')} className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${galleryTab === 'mekan' ? 'bg-white text-[#0c0c0d] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Mekan</button>
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   {gallery.map((url, i) => (
