@@ -41,7 +41,7 @@ type DbApt = {
   service_name: string;
   status: string;
   price: number | null;
-  duration_minutes: number | null;
+  duration_snapshot: number | null;
   profiles?: { full_name?: string | null; phone?: string | null } | null;
 };
 type DispStatus = 'done' | 'now' | 'confirmed' | 'pending';
@@ -59,7 +59,7 @@ function computeDispStatus(apt: DbApt): DispStatus {
   const now = new Date();
   const [h, m] = apt.appointment_time.split(':').map(Number);
   const start = new Date(); start.setHours(h, m, 0, 0);
-  const end   = new Date(start.getTime() + (apt.duration_minutes || 30) * 60000);
+  const end   = new Date(start.getTime() + (apt.duration_snapshot || 30) * 60000);
   if (now >= start && now <= end) return 'now';
   if (now > end) return 'done';
   if (apt.status === 'Beklemede') return 'pending';
@@ -157,7 +157,7 @@ function NextUpCard({ apt, onComplete, onGoCalendar }: { apt: AptDisplay; onComp
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNow ? OK : PRIMARY }} />
             <Text style={{ fontSize: 11, fontWeight: '700', color: isNow ? OK : PRIMARY, letterSpacing: 0.2 }}>{isNow ? 'ŞİMDİ' : 'SIRADAKİ'}</Text>
           </View>
-          <Text style={{ fontSize: 12, color: MUTED, fontWeight: '600' }}>{apt.appointment_time.slice(0, 5)} · {apt.duration_minutes || 30} dk</Text>
+          <Text style={{ fontSize: 12, color: MUTED, fontWeight: '600' }}>{apt.appointment_time.slice(0, 5)} · {apt.duration_snapshot || 30} dk</Text>
         </View>
         <Text style={{ fontSize: 14, fontWeight: '700', color: INK }}>{fmtTL(apt.price ?? 0)}</Text>
       </View>
@@ -247,7 +247,7 @@ function ScheduleTimeline({ items, onPress }: { items: AptDisplay[]; onPress?: (
           <TouchableOpacity key={a.id} onPress={onPress} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
             <View style={{ width: 46, alignItems: 'flex-start', paddingTop: 4 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: INK, letterSpacing: -0.2 }}>{a.appointment_time.slice(0, 5)}</Text>
-              <Text style={{ fontSize: 11, color: MUTED, fontWeight: '500', marginTop: 1 }}>{a.duration_minutes || 30}dk</Text>
+              <Text style={{ fontSize: 11, color: MUTED, fontWeight: '500', marginTop: 1 }}>{a.duration_snapshot || 30}dk</Text>
             </View>
             <View style={{ width: 4, borderRadius: 4, backgroundColor: meta.c, flexShrink: 0, alignSelf: 'stretch' }} />
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>

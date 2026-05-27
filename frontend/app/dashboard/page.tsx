@@ -125,7 +125,7 @@ export default function Dashboard() {
     setSavingNewApt(true);
 
     const svc = services.find((s: any) => String(s.id) === String(newAptForm.serviceId));
-    const newDuration = svc?.duration_minutes ?? 30;
+    const newDuration = svc?.duration ?? 30;
     const BUFFER_MIN = 5;
     const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
     const newStart = toMin(newAptForm.time);
@@ -156,7 +156,7 @@ export default function Dashboard() {
       const existSvc = apt.service_id
         ? services.find((s: any) => String(s.id) === String(apt.service_id))
         : services.find((s: any) => s.name === apt.service_name);
-      const existDuration = existSvc?.duration_minutes ?? 30;
+      const existDuration = existSvc?.duration ?? 30;
       const existEnd = existStart + existDuration + BUFFER_MIN;
       if (newStart < existEnd && newEnd > existStart) {
         showToast('Bu personel bu saat aralığında dolu. Lütfen başka bir saat seçin.', 'err');
@@ -3340,7 +3340,7 @@ export default function Dashboard() {
                   { label: 'Hizmet', value: selectedApt.service_name },
                   { label: 'Personel', value: selectedApt.staff ? `${selectedApt.staff.first_name} ${selectedApt.staff.last_name}` : 'Atanmadı' },
                   { label: 'Fiyat', value: `₺${selectedApt.price || 0}` },
-                  { label: 'Süre', value: selectedApt.duration_minutes ? `${selectedApt.duration_minutes} dk` : '—' },
+                  { label: 'Süre', value: selectedApt.duration_snapshot ? `${selectedApt.duration_snapshot} dk` : '—' },
                 ] as { label: string; value: string }[]).map(({ label, value }) => (
                   <div key={label} className="bg-gray-50 rounded-2xl px-4 py-3">
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
