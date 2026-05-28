@@ -21,6 +21,9 @@ export default function HesabimPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     const getInitialData = async () => {
@@ -110,13 +113,29 @@ export default function HesabimPage() {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmDelete = confirm("HESABINI SİLMEK İSTEDİĞİNE EMİN MİSİN? Bu işlem geri alınamaz.");
-    if (confirmDelete) {
-      setLoading(true);
-      await supabase.from('profiles').delete().eq('id', user.id);
-      await supabase.auth.signOut();
-      window.location.href = "/";
+    setDeletingAccount(true);
+    setDeleteError(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setDeletingAccount(false); return; }
+
+    const res = await fetch('/api/delete-account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (res.status === 409) {
+      setDeleteError('Aktif randevularınız var. Hesabınızı silmeden önce randevuları iptal edin veya tamamlayın.');
+      setDeletingAccount(false);
+      return;
     }
+    if (!res.ok) {
+      setDeleteError('Bir hata oluştu. Lütfen tekrar deneyin.');
+      setDeletingAccount(false);
+      return;
+    }
+
+    await supabase.auth.signOut();
+    window.location.href = '/';
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center font-black uppercase tracking-widest text-gray-400 italic animate-pulse">Yükleniyor...</div>;
@@ -211,7 +230,7 @@ export default function HesabimPage() {
             </button>
           </nav>
 
-          <button onClick={handleDeleteAccount} className="w-full flex items-center gap-4 px-8 py-5 text-red-400 hover:bg-red-50 rounded-[2.5rem] transition-all group">
+          <button onClick={() => { setDeleteError(null); setShowDeleteModal(true); }} className="w-full flex items-center gap-4 px-8 py-5 text-red-400 hover:bg-red-50 rounded-[2.5rem] transition-all group">
             <Trash2 size={18} />
             <span className="text-[11px] font-black uppercase tracking-widest text-left">Hesabı Sil</span>
           </button>
@@ -394,6 +413,37 @@ export default function HesabimPage() {
 
         </section>
       </div>
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl">
+            <h2 className="text-xl font-black uppercase tracking-tighter text-black mb-3">Hesabı Sil</h2>
+            <p className="text-sm text-gray-500 mb-2">
+              {isOwner
+                ? 'Hesabınız, işletmeniz, tüm hizmetleriniz ve geçmiş verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz.'
+                : 'Hesabınız ve kişisel verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz.'}
+            </p>
+            {deleteError && (
+              <p className="text-sm font-bold text-red-500 bg-red-50 rounded-2xl px-4 py-3 mt-4">{deleteError}</p>
+            )}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+                className="flex-1 bg-red-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 transition-all disabled:opacity-50"
+              >
+                {deletingAccount ? 'Siliniyor...' : 'Evet, Hesabımı Sil'}
+              </button>
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteError(null); }}
+                disabled={deletingAccount}
+                className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
