@@ -68,7 +68,7 @@ interface CartItemBase { service: any; date: Date; time: string; staff: any | nu
 interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
-  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, allServices, cartItems
+  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, onError, allServices, cartItems
 }: {
   service: any;
   shopHours: any[];
@@ -77,6 +77,7 @@ function InlineBookingPanel({
   currentUserId: string | null;
   onAdd: (item: CartItemBase) => void;
   onAuthRequired: () => void;
+  onError: (msg: string) => void;
   allServices: any[];
   cartItems: CartItem[];
 }) {
@@ -323,6 +324,7 @@ function InlineBookingPanel({
           disabled={!canAdd}
           onClick={() => {
             if (!currentUserId) { onAuthRequired(); return; }
+            if (!availableSlots.includes(selectedTime)) { onError("Bu saat artık müsait değil."); return; }
             onAdd({ service, date: selectedDay!, time: selectedTime, staff: selectedStaff });
           }}
           className="flex-shrink-0 bg-[#0c0c0d] text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-[#14b8a6] hover:text-[#04221d] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -563,7 +565,13 @@ export default function ShopDetail() {
         const es = _toMin(apt.appointment_time.slice(0, 5));
         const ee = es + (apt.duration_snapshot ?? 30) + _BUF;
         if (ns < ee && ne > es) {
-          setToast(`${item.service.name} için ${item.time} saati dolmuş. Sepeti güncelleyin.`);
+          setCart(prev => prev.filter(c => !(
+            String(c.service.id) === String(item.service.id) &&
+            c.time === item.time &&
+            localDateStr(c.date) === dateStr &&
+            (c.staff?.id || null) === staffId
+          )));
+          setToast(`${item.time} saati az önce doldu. ${item.service.name} sepetten kaldırıldı.`);
           setLoading(false);
           return;
         }
@@ -919,6 +927,7 @@ export default function ShopDetail() {
                                 currentUserId={currentUserId}
                                 allServices={services}
                                 cartItems={cart}
+                                onError={setToast}
                                 onAdd={(item) => {
                   const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
                   const _BUFFER = 5;
