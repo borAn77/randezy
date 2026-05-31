@@ -34,7 +34,9 @@ export default function Dashboard() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<any>(null);
-  const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "", image_url: "" });
+  const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 });
+  const [serviceModalMode, setServiceModalMode] = useState<'catalog' | 'manual'>('catalog');
+  const [activeCatalogTab, setActiveCatalogTab] = useState('Popüler');
   const [savingHours, setSavingHours] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -284,11 +286,30 @@ export default function Dashboard() {
   const handleServiceSubmit = async (e: any) => {
     e.preventDefault();
     if (!shop?.id) return;
-    const payload = { shop_id: shop.id, name: serviceForm.name, price: parseFloat(serviceForm.price), duration: parseInt(serviceForm.duration), image_url: serviceForm.image_url };
+    const payload = {
+      shop_id:       shop.id,
+      name:          serviceForm.name,
+      price:         parseFloat(serviceForm.price),
+      duration:      parseInt(serviceForm.duration),
+      image_url:     serviceForm.image_url,
+      category:      serviceForm.category || 'Diğer',
+      canonical_key: serviceForm.canonical_key || null,
+      is_custom:     serviceForm.is_custom,
+      description:   serviceForm.description || null,
+      sort_order:    serviceForm.sort_order ?? 999,
+    };
     const { error } = editingService
       ? await supabase.from('services').update(payload).eq('id', editingService.id)
       : await supabase.from('services').insert([payload]);
-    if (error) { showToast('Hata: ' + error.message, 'err'); } else { setIsServiceModalOpen(false); setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); fetchInitialData(); }
+    if (error) {
+      if (error.code === '23505') { showToast('Bu hizmet zaten eklenmiş.', 'err'); }
+      else { showToast('Hata: ' + error.message, 'err'); }
+    } else {
+      setIsServiceModalOpen(false);
+      setEditingService(null);
+      setServiceForm({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 });
+      fetchInitialData();
+    }
   };
 
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
@@ -2031,7 +2052,7 @@ export default function Dashboard() {
                     <h1 className="text-[32px] font-bold uppercase tracking-tight text-[#0c0c0d]">Hizmetler</h1>
                     <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mt-1">{services.length} aktif hizmet</p>
                   </div>
-                  <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "" }); setIsServiceModalOpen(true); }}
+                  <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 }); setServiceModalMode(shop?.category === 'BERBER' ? 'catalog' : 'manual'); setActiveCatalogTab('Popüler'); setIsServiceModalOpen(true); }}
                     className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
                     <Plus size={14}/> Yeni Hizmet
                   </button>
@@ -2041,7 +2062,7 @@ export default function Dashboard() {
                     <div className="w-12 h-12 bg-[#e6f7f4] rounded-full flex items-center justify-center mx-auto mb-4"><Package size={20} className="text-[#14b8a6]"/></div>
                     <h3 className="text-lg font-semibold text-[#0c0c0d] mb-2">Henüz hizmet eklemediniz</h3>
                     <p className="text-[13px] text-[#7a7a7e] max-w-xs mx-auto mb-6">Hizmet olmadan randevu alınamaz. İlk hizmetini ekle.</p>
-                    <button onClick={() => { setEditingService(null); setServiceForm({ name:"",price:"",duration:"",image_url:"" }); setIsServiceModalOpen(true); }}
+                    <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 }); setServiceModalMode(shop?.category === 'BERBER' ? 'catalog' : 'manual'); setActiveCatalogTab('Popüler'); setIsServiceModalOpen(true); }}
                       className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0c0c0d] text-white text-[13px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
                       <Plus size={14}/> İlk Hizmetini Ekle
                     </button>
@@ -2072,7 +2093,7 @@ export default function Dashboard() {
                             <p className="text-[18px] font-bold text-[#0d9488] mt-2">₺{Number(s.price).toLocaleString('tr-TR')}</p>
                           </div>
                           <div className="flex gap-1.5 px-4 pb-4">
-                            <button onClick={() => { setEditingService(s); setServiceForm({ name:s.name, price:s.price.toString(), duration:s.duration.toString(), image_url:s.image_url }); setIsServiceModalOpen(true); }}
+                            <button onClick={() => { setEditingService(s); setServiceForm({ name: s.name, price: s.price.toString(), duration: s.duration.toString(), image_url: s.image_url || "", category: s.category || 'Diğer', canonical_key: s.canonical_key || "", is_custom: s.is_custom ?? true, description: s.description || "", sort_order: s.sort_order ?? 999 }); setServiceModalMode('manual'); setIsServiceModalOpen(true); }}
                               className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#7a7a7e] transition-all flex items-center justify-center gap-1">
                               <Edit3 size={12}/> Düzenle
                             </button>
@@ -3182,27 +3203,179 @@ export default function Dashboard() {
       )}
 
       {/* SERVİS MODALI */}
-      {isServiceModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
-          <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 relative animate-in zoom-in duration-300 text-black">
-            <button onClick={() => setIsServiceModalOpen(false)} className="absolute top-10 right-10 text-gray-300 hover:text-black transition-colors"><X size={32}/></button>
-            <h3 className="text-3xl font-black uppercase tracking-tighter mb-10">{editingService ? "Hizmeti Düzenle" : "Hizmet Ekle"}</h3>
-            <form onSubmit={handleServiceSubmit} className="space-y-6">
-              <div className="mb-4">
-                {serviceForm.image_url ? <img src={serviceForm.image_url} className="h-40 w-full object-cover rounded-3xl" onError={() => setServiceForm(f => ({ ...f, image_url: '' }))} /> : (
-                  <label className="flex flex-col items-center justify-center h-40 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl cursor-pointer hover:border-[#00A3AD] transition-all"><UploadCloud className="text-gray-300 mb-2" size={32} /><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Fotoğraf Yükle</span><input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if(!file) return; const url = await handleFileUpload(file, 'service-portfolios'); if(url) setServiceForm({...serviceForm, image_url: url}); }} /></label>
-                )}
-              </div>
-              <input required placeholder="Hizmet Adı" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.name} onChange={e => setServiceForm({...serviceForm, name: e.target.value})} />
-              <div className="grid grid-cols-2 gap-6">
-                <input required type="number" min="0" placeholder="Fiyat (₺)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.price} onChange={e => setServiceForm({...serviceForm, price: e.target.value})} />
-                <input required type="number" min="1" placeholder="Süre (DK)" className="w-full p-6 bg-gray-50 rounded-3xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black" value={serviceForm.duration} onChange={e => setServiceForm({...serviceForm, duration: e.target.value})} />
-              </div>
-              <button className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">YAYINLA</button>
-            </form>
+      {isServiceModalOpen && (() => {
+        const BERBER_CATALOG: Record<string, Array<{ name: string; category: string; duration: number; canonical_key: string }>> = {
+          'Popüler': [
+            { name: 'Erkek Saç Kesimi',     category: 'Saç',         duration: 20, canonical_key: 'erkek_sac_kesimi' },
+            { name: 'Saç + Sakal',          category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
+            { name: 'Sakal Tıraşı',         category: 'Sakal',       duration: 20, canonical_key: 'sakal_tirasi' },
+            { name: 'Skin Fade',            category: 'Saç',         duration: 25, canonical_key: 'skin_fade' },
+            { name: 'Fade / Sadece Yanlar', category: 'Saç',         duration: 15, canonical_key: 'fade_yanlar' },
+            { name: 'Buzz Cut',             category: 'Saç',         duration: 15, canonical_key: 'buzz_cut' },
+          ],
+          'Saç': [
+            { name: 'Erkek Saç Kesimi',         category: 'Saç', duration: 20, canonical_key: 'erkek_sac_kesimi' },
+            { name: 'Klasik Saç Kesimi',        category: 'Saç', duration: 20, canonical_key: 'klasik_sac_kesimi' },
+            { name: 'Skin Fade',                category: 'Saç', duration: 25, canonical_key: 'skin_fade' },
+            { name: 'Fade Kesim',               category: 'Saç', duration: 20, canonical_key: 'fade_kesim' },
+            { name: 'Sadece Yanlar',            category: 'Saç', duration: 15, canonical_key: 'sadece_yanlar' },
+            { name: 'Buzz Cut / Makine Tıraşı', category: 'Saç', duration: 15, canonical_key: 'buzz_cut' },
+            { name: 'Makas Kesimi',             category: 'Saç', duration: 30, canonical_key: 'makas_kesimi' },
+            { name: 'Uzun Saç Kesimi',          category: 'Saç', duration: 30, canonical_key: 'uzun_sac_kesimi' },
+            { name: 'Çocuk Tıraşı',            category: 'Saç', duration: 20, canonical_key: 'cocuk_tirasi' },
+            { name: 'Öğrenci Saç Kesimi',       category: 'Saç', duration: 20, canonical_key: 'ogrenci_sac_kesimi' },
+            { name: 'Yan Desen',                category: 'Saç', duration: 10, canonical_key: 'yan_desen' },
+          ],
+          'Sakal': [
+            { name: 'Sakal Tıraşı',               category: 'Sakal', duration: 20, canonical_key: 'sakal_tirasi' },
+            { name: 'Sakal Kesimi',               category: 'Sakal', duration: 20, canonical_key: 'sakal_kesimi' },
+            { name: 'Sakal Şekillendirme',        category: 'Sakal', duration: 20, canonical_key: 'sakal_sekillendirme' },
+            { name: 'Sakal Kontür',              category: 'Sakal', duration: 15, canonical_key: 'sakal_kontur' },
+            { name: 'Hot Shave',                  category: 'Sakal', duration: 30, canonical_key: 'hot_shave' },
+            { name: 'Sıcak Havlulu Sakal Tıraşı', category: 'Sakal', duration: 30, canonical_key: 'sicak_havlulu_sakal' },
+          ],
+          'Saç + Sakal': [
+            { name: 'Saç + Sakal',                  category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
+            { name: 'Skin Fade + Sakal',            category: 'Saç + Sakal', duration: 45, canonical_key: 'skin_fade_sakal' },
+            { name: 'Uzun Saç + Sakal',            category: 'Saç + Sakal', duration: 50, canonical_key: 'uzun_sac_sakal' },
+            { name: 'Saç + Sakal + Sıcak Havlu',   category: 'Saç + Sakal', duration: 55, canonical_key: 'sac_sakal_sicak' },
+            { name: 'Saç + Sakal + Hot Shave',     category: 'Saç + Sakal', duration: 60, canonical_key: 'sac_sakal_hotshave' },
+            { name: 'Kafa Makine + Sakal',         category: 'Saç + Sakal', duration: 35, canonical_key: 'kafa_makine_sakal' },
+          ],
+          'Kafa Tıraşı': [
+            { name: 'Kafa Sıfır Tıraşı',               category: 'Kafa Tıraşı', duration: 20, canonical_key: 'kafa_sifir' },
+            { name: 'Kafa Makine Tıraşı',              category: 'Kafa Tıraşı', duration: 15, canonical_key: 'kafa_makine' },
+            { name: 'Ustura Kafa Tıraşı',              category: 'Kafa Tıraşı', duration: 25, canonical_key: 'ustura_kafa' },
+            { name: 'Ustura Kafa Tıraşı + Sıcak Havlu', category: 'Kafa Tıraşı', duration: 35, canonical_key: 'ustura_kafa_sicak' },
+          ],
+          'Boya / Kamuflaj': [
+            { name: 'Saç Boyama',               category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_boyama' },
+            { name: 'Sakal Boyama',             category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_boyama' },
+            { name: 'Saç Beyaz Kapama',        category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_beyaz_kapama' },
+            { name: 'Sakal Beyaz Kapama',      category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_beyaz_kapama' },
+            { name: 'Saç + Sakal Beyaz Kapama', category: 'Boya / Kamuflaj', duration: 60, canonical_key: 'sac_sakal_beyaz' },
+            { name: 'Koyu Renk Boyama',        category: 'Boya / Kamuflaj', duration: 40, canonical_key: 'koyu_renk_boyama' },
+          ],
+          'Ek Hizmetler': [
+            { name: 'Burun Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'burun_agda' },
+            { name: 'Kulak Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'kulak_agda' },
+            { name: 'Sıcak Havlu', category: 'Ek Hizmetler', duration:  5, canonical_key: 'sicak_havlu' },
+            { name: 'Saç Yıkama',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'sac_yikama' },
+            { name: 'Saç Bakımı',  category: 'Ek Hizmetler', duration: 20, canonical_key: 'sac_bakimi' },
+          ],
+        };
+
+        const addedKeys = new Set(services.map((s: any) => s.canonical_key).filter(Boolean));
+
+        const handleCatalogSelect = (item: typeof BERBER_CATALOG['Popüler'][0]) => {
+          setServiceForm({ name: item.name, price: '', duration: String(item.duration), image_url: '', category: item.category, canonical_key: item.canonical_key, is_custom: false, description: '', sort_order: 999 });
+          setServiceModalMode('manual');
+        };
+
+        const SERVICE_CATEGORY_OPTIONS = ['Saç', 'Sakal', 'Saç + Sakal', 'Kafa Tıraşı', 'Boya / Kamuflaj', 'Ek Hizmetler', 'Diğer'];
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
+            <div className={`bg-white w-full relative animate-in zoom-in duration-300 text-black overflow-y-auto ${serviceModalMode === 'catalog' ? 'max-w-2xl rounded-[3rem] p-10 max-h-[90vh]' : 'max-w-lg rounded-[4rem] p-12 max-h-[90vh]'}`}>
+              <button onClick={() => { setIsServiceModalOpen(false); setEditingService(null); }} className="absolute top-8 right-8 text-gray-300 hover:text-black transition-colors z-10"><X size={28}/></button>
+
+              {serviceModalMode === 'catalog' ? (
+                <>
+                  <h3 className="text-2xl font-black uppercase tracking-tighter mb-1">Hizmet Seç</h3>
+                  <p className="text-[11px] text-gray-400 font-medium mb-6">Hazır listeden seç — fiyatı siz belirleyin</p>
+
+                  {/* Tab bar */}
+                  <div className="flex gap-2 flex-wrap mb-6">
+                    {Object.keys(BERBER_CATALOG).map(tab => (
+                      <button key={tab} onClick={() => setActiveCatalogTab(tab)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeCatalogTab === tab ? 'bg-black text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Hizmet grid */}
+                  <div className="grid grid-cols-2 gap-2.5 mb-6">
+                    {BERBER_CATALOG[activeCatalogTab]?.map(item => {
+                      const alreadyAdded = addedKeys.has(item.canonical_key);
+                      return (
+                        <button key={item.canonical_key} disabled={alreadyAdded} onClick={() => handleCatalogSelect(item)}
+                          className={`text-left p-4 rounded-2xl border-2 transition-all ${alreadyAdded ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed' : 'border-gray-100 hover:border-[#00A3AD] hover:bg-[#E6F6F7] cursor-pointer'}`}>
+                          <p className="font-black text-[13px] text-black leading-tight">{item.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium mt-1">{item.duration} dk</p>
+                          {alreadyAdded && <p className="text-[9px] text-[#00A3AD] font-black uppercase tracking-wider mt-1">Eklendi</p>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Manuel fallback */}
+                  <button onClick={() => { setServiceForm({ name: '', price: '', duration: '', image_url: '', category: 'Diğer', canonical_key: '', is_custom: true, description: '', sort_order: 999 }); setServiceModalMode('manual'); }}
+                    className="w-full py-3 rounded-2xl border-2 border-dashed border-gray-200 text-[11px] font-black text-gray-400 uppercase tracking-widest hover:border-gray-400 hover:text-gray-600 transition-all">
+                    İstediğim hizmet burada yok
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-8">
+                    {!editingService && shop?.category === 'BERBER' && (
+                      <button onClick={() => setServiceModalMode('catalog')} className="text-gray-400 hover:text-black transition-colors">
+                        <ChevronLeft size={22}/>
+                      </button>
+                    )}
+                    <h3 className="text-2xl font-black uppercase tracking-tighter">
+                      {editingService ? 'Hizmeti Düzenle' : (serviceForm.name ? serviceForm.name : 'Özel Hizmet Ekle')}
+                    </h3>
+                  </div>
+
+                  <form onSubmit={handleServiceSubmit} className="space-y-5">
+                    {/* Foto */}
+                    <div>
+                      {serviceForm.image_url
+                        ? <img src={serviceForm.image_url} className="h-36 w-full object-cover rounded-3xl" onError={() => setServiceForm(f => ({ ...f, image_url: '' }))} />
+                        : <label className="flex flex-col items-center justify-center h-36 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl cursor-pointer hover:border-[#00A3AD] transition-all">
+                            <UploadCloud className="text-gray-300 mb-2" size={28}/>
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Fotoğraf Yükle (isteğe bağlı)</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; const url = await handleFileUpload(file, 'service-portfolios'); if (url) setServiceForm({ ...serviceForm, image_url: url }); }} />
+                          </label>
+                      }
+                    </div>
+
+                    {/* Ad */}
+                    <input required placeholder="Hizmet Adı *"
+                      className="w-full p-5 bg-gray-50 rounded-2xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                      value={serviceForm.name} onChange={e => setServiceForm({ ...serviceForm, name: e.target.value })} />
+
+                    {/* Kategori */}
+                    <div className="relative">
+                      <select required value={serviceForm.category}
+                        onChange={e => setServiceForm({ ...serviceForm, category: e.target.value })}
+                        className="w-full p-5 bg-gray-50 rounded-2xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black appearance-none">
+                        {SERVICE_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
+                    </div>
+
+                    {/* Fiyat + Süre */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <input required type="number" min="0" placeholder="Fiyat (₺) *"
+                        className="w-full p-5 bg-gray-50 rounded-2xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                        value={serviceForm.price} onChange={e => setServiceForm({ ...serviceForm, price: e.target.value })} />
+                      <input required type="number" min="1" placeholder="Süre (DK) *"
+                        className="w-full p-5 bg-gray-50 rounded-2xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black"
+                        value={serviceForm.duration} onChange={e => setServiceForm({ ...serviceForm, duration: e.target.value })} />
+                    </div>
+
+                    <button type="submit" className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase text-xs shadow-xl tracking-widest hover:bg-black transition-all">
+                      {editingService ? 'Kaydet' : 'Hizmeti Ekle'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* YENİ RANDEVU MODALI */}
       {isNewAptModalOpen && (

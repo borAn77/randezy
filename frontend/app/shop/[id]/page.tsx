@@ -488,7 +488,7 @@ export default function ShopDetail() {
     if (isNaN(shopId)) { setNotFound(true); return; }
     Promise.all([
       supabase.from('shops').select('*').eq('id', shopId).single(),
-      supabase.from('services').select('*').eq('shop_id', shopId),
+      supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
       supabase.from('shop_hours').select('*').eq('shop_id', shopId),
       supabase.from('staff').select('*').eq('shop_id', shopId).order('created_at', { ascending: true }),
       supabase.from('campaigns').select('*').eq('shop_id', shopId).eq('is_active', true),
@@ -613,7 +613,7 @@ export default function ShopDetail() {
     setLoading(false);
   };
 
-  const SERVICE_CATEGORIES = ['Saç', 'Sakal', 'Masaj', 'Tırnak', 'Kaş/Kirpik', 'Diğer'];
+  const SERVICE_CATEGORIES = ['Saç', 'Sakal', 'Saç + Sakal', 'Kafa Tıraşı', 'Boya / Kamuflaj', 'Ek Hizmetler', 'Masaj', 'Tırnak', 'Kaş/Kirpik', 'Diğer'];
   const filteredServices = useMemo(() => {
     let result = services;
     if (serviceStaffFilter) result = result.filter((s: any) => !s.staff_id || s.staff_id === serviceStaffFilter.id || (Array.isArray(s.staff_ids) && s.staff_ids.includes(serviceStaffFilter.id)));
