@@ -8,16 +8,17 @@ const resend = process.env.RESEND_API_KEY
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
 );
 
 export async function GET(req: NextRequest) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.CRON_SECRET) {
+    return NextResponse.json({ ok: false, reason: "config_error" }, { status: 500 });
+  }
+
   const authHeader = req.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return NextResponse.json({ ok: false, reason: "Unauthorized" }, { status: 401 });
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
   }
 
   if (!resend) {

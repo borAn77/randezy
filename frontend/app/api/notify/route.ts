@@ -8,22 +8,60 @@ const resend = process.env.RESEND_API_KEY
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
 );
 
 export async function POST(req: NextRequest) {
-  console.log("[notify] resend configured:", !!resend);
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ ok: false, reason: "config_error" }, { status: 500 });
+  }
+
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+  const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+  if (!user) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
-  const { type } = body;
+  const { type, appointmentId } = body;
+
+  if (!appointmentId) {
+    return NextResponse.json({ ok: false, reason: "bad_request" }, { status: 400 });
+  }
+
+  if (appointmentId) {
+    const { data: apt } = await supabaseAdmin
+      .from("appointments")
+      .select("user_id, shop_id")
+      .eq("id", appointmentId)
+      .single();
+    if (!apt) {
+      return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404 });
+    }
+    const isCustomer = apt.user_id === user.id;
+    const { data: shopRow } = await supabaseAdmin
+      .from("shops")
+      .select("owner_id")
+      .eq("id", apt.shop_id)
+      .single();
+    const isOwner = shopRow?.owner_id === user.id;
+    if (!isCustomer && !isOwner) {
+      return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+    }
+  }
+
   console.log("[notify] type:", type, "| body keys:", Object.keys(body).join(","));
 
   try {
     if (type === "new_appointment") {
-      await handleNewAppointment(body);
+      await handleNewAppointment(appointmentId);
     } else if (type === "appointment_confirmed") {
-      await handleStatusChange(body, "confirmed");
+      await handleStatusChange(appointmentId, "confirmed", body.reason);
     } else if (type === "appointment_rejected") {
-      await handleStatusChange(body, "rejected");
+      await handleStatusChange(appointmentId, "rejected", body.reason);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -44,23 +82,21 @@ async function sendExpoPush(token: string, title: string, body: string, data?: o
   }
 }
 
-async function handleNewAppointment(body: {
-  shopId: string;
-  ownerId?: string;
-  customerName: string;
-  serviceName: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  price: number;
-}) {
-  // resolve owner_id: prefer client-passed, fallback to shops table
-  let ownerId = body.ownerId;
-  if (!ownerId) {
-    const { data: shop } = await supabaseAdmin.from("shops").select("owner_id").eq("id", body.shopId).single();
-    ownerId = shop?.owner_id;
-    console.log("[notify] resolved owner_id from shops:", ownerId ?? "null");
-  }
-  if (!ownerId) { console.log("[notify] no owner_id, aborting"); return; }
+async function handleNewAppointment(appointmentId: string) {
+  const { data: apt } = await supabaseAdmin
+    .from("appointments")
+    .select("shop_id, user_id, customer_name, service_name, appointment_date, appointment_time, price")
+    .eq("id", appointmentId)
+    .single();
+  if (!apt) { console.log("[notify] appointment not found:", appointmentId); return; }
+
+  const { data: shop } = await supabaseAdmin
+    .from("shops")
+    .select("owner_id")
+    .eq("id", apt.shop_id)
+    .single();
+  const ownerId = shop?.owner_id;
+  if (!ownerId) { console.log("[notify] no owner_id for shop:", apt.shop_id); return; }
 
   const { data: ownerProfile } = await supabaseAdmin
     .from("profiles")
@@ -78,13 +114,14 @@ async function handleNewAppointment(body: {
 
   if (!ownerEmail && !ownerProfile?.expo_push_token) { console.log("[notify] no contact info, aborting"); return; }
 
-  const dateStr = formatDate(body.appointmentDate);
+  const customerName = apt.customer_name || "Müşteri";
+  const dateStr = formatDate(apt.appointment_date);
 
   if (ownerProfile?.expo_push_token) {
     await sendExpoPush(
       ownerProfile.expo_push_token,
       "Yeni Randevu!",
-      `${body.customerName} — ${body.serviceName} — ${dateStr} ${body.appointmentTime}`,
+      `${customerName} — ${apt.service_name} — ${dateStr} ${apt.appointment_time?.slice(0, 5)}`,
       { type: "new_appointment" }
     );
   }
@@ -94,16 +131,16 @@ async function handleNewAppointment(body: {
   await resend.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to: ownerEmail,
-    subject: `Yeni Randevu — ${body.serviceName}`,
+    subject: `Yeni Randevu — ${apt.service_name}`,
     html: emailTemplate({
       title: "Yeni Randevu Geldi!",
       color: "#00A3AD",
       lines: [
-        `<b>Hizmet:</b> ${body.serviceName}`,
-        `<b>Müşteri:</b> ${body.customerName}`,
+        `<b>Hizmet:</b> ${apt.service_name}`,
+        `<b>Müşteri:</b> ${customerName}`,
         `<b>Tarih:</b> ${dateStr}`,
-        `<b>Saat:</b> ${body.appointmentTime}`,
-        `<b>Ücret:</b> ₺${body.price}`,
+        `<b>Saat:</b> ${apt.appointment_time?.slice(0, 5)}`,
+        `<b>Ücret:</b> ₺${apt.price}`,
       ],
       note: "Randevuyu onaylamak veya reddetmek için dashboard'ınıza giriş yapın.",
       ctaText: "Dashboard'a Git",
@@ -113,54 +150,59 @@ async function handleNewAppointment(body: {
 }
 
 async function handleStatusChange(
-  body: {
-    customerEmail?: string;
-    customerName: string;
-    shopName: string;
-    serviceName: string;
-    appointmentDate: string;
-    appointmentTime: string;
-    appointmentId?: string;
-    reason?: string;
-  },
-  status: "confirmed" | "rejected"
+  appointmentId: string,
+  status: "confirmed" | "rejected",
+  reason?: string
 ) {
-  let email = body.customerEmail;
+  const { data: apt } = await supabaseAdmin
+    .from("appointments")
+    .select("user_id, shop_id, service_name, appointment_date, appointment_time, customer_name")
+    .eq("id", appointmentId)
+    .single();
+  if (!apt) { console.log("[notify] appointment not found:", appointmentId); return; }
 
-  // profiles join null döndüyse appointment'tan auth.users üzerinden email al
-  if (!email && body.appointmentId) {
-    const { data: apt } = await supabaseAdmin
-      .from("appointments")
-      .select("user_id")
-      .eq("id", body.appointmentId)
-      .single();
-    if (apt?.user_id) {
-      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(apt.user_id);
-      email = authUser?.user?.email;
-    }
+  const { data: shop } = await supabaseAdmin
+    .from("shops")
+    .select("name")
+    .eq("id", apt.shop_id)
+    .single();
+
+  const { data: customerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", apt.user_id)
+    .single();
+
+  let email = customerProfile?.email;
+  if (!email) {
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(apt.user_id);
+    email = authUser?.user?.email;
   }
 
   console.log("[notify] customer email:", email ?? "null");
   if (!email) { console.log("[notify] no customer email, aborting"); return; }
 
-  const dateStr = formatDate(body.appointmentDate);
+  const customerName = customerProfile?.full_name || apt.customer_name || "Müşteri";
+  const shopName = shop?.name || "";
+  const safeReason = reason ? String(reason).trim().slice(0, 500) : undefined;
+  const dateStr = formatDate(apt.appointment_date);
   const isConfirmed = status === "confirmed";
 
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to: email,
     subject: isConfirmed
-      ? `Randevunuz Onaylandı — ${body.shopName}`
-      : `Randevunuz İptal Edildi — ${body.shopName}`,
+      ? `Randevunuz Onaylandı — ${shopName}`
+      : `Randevunuz İptal Edildi — ${shopName}`,
     html: emailTemplate({
       title: isConfirmed ? "Randevunuz Onaylandı!" : "Randevunuz İptal Edildi",
       color: isConfirmed ? "#00A3AD" : "#ef4444",
       lines: [
-        `<b>İşletme:</b> ${body.shopName}`,
-        `<b>Hizmet:</b> ${body.serviceName}`,
+        `<b>İşletme:</b> ${shopName}`,
+        `<b>Hizmet:</b> ${apt.service_name}`,
         `<b>Tarih:</b> ${dateStr}`,
-        `<b>Saat:</b> ${body.appointmentTime}`,
-        ...(body.reason ? [`<b>Sebep:</b> ${body.reason}`] : []),
+        `<b>Saat:</b> ${apt.appointment_time?.slice(0, 5)}`,
+        ...(safeReason ? [`<b>Sebep:</b> ${safeReason}`] : []),
       ],
       note: isConfirmed
         ? "Randevunuzu iptal etmek isterseniz hesabınızdan yapabilirsiniz."

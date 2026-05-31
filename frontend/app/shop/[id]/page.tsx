@@ -32,20 +32,89 @@ const MONTHS_SHORT = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','E
 const MONTHS_LONG = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const DAY_NAMES_SHORT = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
 
+// ---------- Campaign price helper ----------
+function calcDiscountedPrice(service: any, campaigns: any[]): { original: number; discounted: number; campaign: any | null; pct: number } {
+  const original = Number(service.price) || 0;
+  const sid = String(service.id);
+  // Filter to campaigns that apply to this specific service
+  const applicable = campaigns.filter(c =>
+    !c.service_ids?.length || c.service_ids.map(String).includes(sid)
+  );
+  if (!applicable.length) return { original, discounted: original, campaign: null, pct: 0 };
+  // Pick campaign with highest savings (anti-stacking: only one applies)
+  let bestCampaign: any = null;
+  let bestDiscounted = original;
+  let bestPct = 0;
+  for (const c of applicable) {
+    const val = Number(c.discount_value) || 0;
+    let disc = original;
+    let pct = 0;
+    if ((c.type === 'percentage' || c.type === 'today_special' || c.type === 'last_minute') && val) {
+      pct = Math.min(100, val);
+      disc = Math.max(0, Math.round(original * (1 - pct / 100)));
+    } else if (c.type === 'fixed' && val) {
+      disc = Math.max(0, Math.round(original - val));
+      pct = original > 0 ? Math.round(((original - disc) / original) * 100) : 0;
+    }
+    if (disc < bestDiscounted) { bestDiscounted = disc; bestPct = pct; bestCampaign = c; }
+  }
+  // Return null campaign when no actual price change occurs
+  if (bestDiscounted >= original) return { original, discounted: original, campaign: null, pct: 0 };
+  return { original, discounted: bestDiscounted, campaign: bestCampaign, pct: bestPct };
+}
+
 // ---------- Inline Booking Panel ----------
-interface CartItem { service: any; date: Date; time: string; staff: any | null; }
+interface CartItemBase { service: any; date: Date; time: string; staff: any | null; }
+interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
-  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired
+  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, onError, allServices, cartItems
 }: {
   service: any;
   shopHours: any[];
   staff: any[];
   shopId: number;
   currentUserId: string | null;
-  onAdd: (item: CartItem) => void;
+  onAdd: (item: CartItemBase) => void;
   onAuthRequired: () => void;
+  onError: (msg: string) => void;
+  allServices: any[];
+  cartItems: CartItem[];
 }) {
+  const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+  const BUFFER_MIN = 5;
+  const aptDuration = (apt: any): number => apt.duration_snapshot ?? 30;
+  // Buffer is two-sided: both new and existing appointments need 5 min gap between them
+  const isBlocked = (slotStart: string, newDur: number, apts: any[]): boolean => {
+    const ns = toMin(slotStart);
+    const ne = ns + newDur;
+    return apts.some(a => {
+      if (!a.appointment_time) return false;
+      const es = toMin(a.appointment_time.slice(0, 5));
+      const ee = es + aptDuration(a) + BUFFER_MIN;
+      return ns < ee && ne + BUFFER_MIN > es;
+    });
+  };
+  // Convert current cart items into appointment-like objects so they block slots
+  const cartAsApts = (dateStr: string, forStaffId: string | null): any[] =>
+    cartItems
+      .filter(c => {
+        if (localDateStr(c.date) !== dateStr) return false;
+        // forStaffId=null means no-staff shop — include all cart items for the date
+        if (forStaffId !== null) return !c.staff?.id || c.staff.id === forStaffId;
+        return true;
+      })
+      .map(c => ({ appointment_time: c.time, duration_snapshot: c.service.duration, staff_id: c.staff?.id || null }));
+  const isInCart = (slotTime: string): boolean => {
+    if (!selectedDay) return false;
+    const dateStr = localDateStr(selectedDay);
+    return cartItems.some(c =>
+      localDateStr(c.date) === dateStr &&
+      String(c.service.id) === String(service.id) &&
+      c.time === slotTime &&
+      (c.staff?.id || null) === (selectedStaff?.id || null)
+    );
+  };
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -63,11 +132,7 @@ function InlineBookingPanel({
   // Pre-load slot counts for 7 days
   useEffect(() => {
     const dateStrs = days.map(d => localDateStr(d));
-    supabase.from('appointments')
-      .select('appointment_time, staff_id, appointment_date')
-      .eq('shop_id', shopId)
-      .in('appointment_date', dateStrs)
-      .neq('status', 'İptal Edildi')
+    supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: dateStrs })
       .then(({ data: booked }) => {
         const counts: Record<string, number> = {};
         const now = new Date();
@@ -82,26 +147,23 @@ function InlineBookingPanel({
           const dayBooked = (booked || []).filter((a: any) => a.appointment_date === dateStr);
           let available: string[];
           if (selectedStaff) {
-            const bookedTimes = new Set(dayBooked.filter((a: any) => a.staff_id === selectedStaff.id).map((a: any) => a.appointment_time.slice(0, 5)));
-            available = allSlots.filter(s => !bookedTimes.has(s));
+            const apts = [...dayBooked.filter((a: any) => a.staff_id === selectedStaff.id), ...cartAsApts(dateStr, selectedStaff.id)];
+            available = allSlots.filter(s => !isBlocked(s, service.duration, apts));
           } else if (staff.length > 0) {
-            const bookedByTime: Record<string, Set<string>> = {};
-            dayBooked.forEach((a: any) => {
-              const t = a.appointment_time.slice(0, 5);
-              if (!bookedByTime[t]) bookedByTime[t] = new Set();
-              if (a.staff_id) bookedByTime[t].add(a.staff_id);
-            });
-            available = allSlots.filter(s => (bookedByTime[s]?.size || 0) < staff.length);
+            available = allSlots.filter(s => staff.some(sm => {
+              const apts = [...dayBooked.filter((a: any) => a.staff_id === sm.id), ...cartAsApts(dateStr, sm.id)];
+              return !isBlocked(s, service.duration, apts);
+            }));
           } else {
-            const bookedTimes = new Set(dayBooked.map((a: any) => a.appointment_time.slice(0, 5)));
-            available = allSlots.filter(s => !bookedTimes.has(s));
+            const apts = [...dayBooked, ...cartAsApts(dateStr, null)];
+            available = allSlots.filter(s => !isBlocked(s, service.duration, apts));
           }
           if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
           counts[dateStr] = available.length;
         });
         setSlotCounts(counts);
       });
-  }, [service.duration, shopHours, shopId, selectedStaff, staff.length]);
+  }, [service.duration, shopHours, shopId, selectedStaff, staff.length, cartItems]);
 
   // Load slots when day selected
   useEffect(() => {
@@ -112,37 +174,46 @@ function InlineBookingPanel({
     if (!dayHours || dayHours.is_closed) { setIsClosedDay(true); setAvailableSlots([]); return; }
     setIsClosedDay(false);
     const slots = generateTimeSlots(dayHours.open_time, dayHours.close_time, service.duration);
-    supabase.from('appointments')
-      .select('appointment_time, staff_id')
-      .eq('shop_id', shopId)
-      .eq('appointment_date', localDateStr(selectedDay))
-      .neq('status', 'İptal Edildi')
+    supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: [localDateStr(selectedDay)] })
       .then(({ data: booked }) => {
         const now = new Date();
         const isToday = selectedDay.toDateString() === now.toDateString();
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        const dateStr = localDateStr(selectedDay);
         let available: string[];
         if (selectedStaff) {
-          const bookedTimes = new Set((booked || []).filter((a: any) => a.staff_id === selectedStaff.id).map((a: any) => a.appointment_time.slice(0, 5)));
-          available = slots.filter(s => !bookedTimes.has(s));
+          const apts = [...(booked || []).filter((a: any) => a.staff_id === selectedStaff.id), ...cartAsApts(dateStr, selectedStaff.id)];
+          available = slots.filter(s => !isBlocked(s, service.duration, apts));
         } else if (staff.length > 0) {
-          const bookedByTime: Record<string, Set<string>> = {};
-          (booked || []).forEach((a: any) => {
-            const t = a.appointment_time.slice(0, 5);
-            if (!bookedByTime[t]) bookedByTime[t] = new Set();
-            if (a.staff_id) bookedByTime[t].add(a.staff_id);
-          });
-          available = slots.filter(s => (bookedByTime[s]?.size || 0) < staff.length);
+          available = slots.filter(s => staff.some(sm => {
+            const apts = [...(booked || []).filter((a: any) => a.staff_id === sm.id), ...cartAsApts(dateStr, sm.id)];
+            return !isBlocked(s, service.duration, apts);
+          }));
         } else {
-          const bookedTimes = new Set((booked || []).map((a: any) => a.appointment_time.slice(0, 5)));
-          available = slots.filter(s => !bookedTimes.has(s));
+          const apts = [...(booked || []), ...cartAsApts(dateStr, null)];
+          available = slots.filter(s => !isBlocked(s, service.duration, apts));
         }
         if (isToday) available = available.filter(s => { const [h, m] = s.split(':').map(Number); return (h * 60 + m) > nowMinutes; });
         setAvailableSlots(available);
       });
-  }, [selectedDay, selectedStaff]);
+  }, [selectedDay, selectedStaff, cartItems]);
 
   const canAdd = !!(selectedDay && selectedTime);
+
+  // First available slot that follows all current cart items for the same day/staff
+  const suggestedSlot = (() => {
+    if (!selectedDay || cartItems.length === 0) return null;
+    const dateStr = localDateStr(selectedDay);
+    const staffId = selectedStaff?.id || null;
+    const dayCart = cartItems.filter(c => {
+      if (localDateStr(c.date) !== dateStr) return false;
+      if (staffId !== null && c.staff?.id && c.staff.id !== staffId) return false;
+      return true;
+    });
+    if (dayCart.length === 0) return null;
+    const latestEnd = dayCart.reduce((max, c) => Math.max(max, toMin(c.time) + c.service.duration + BUFFER_MIN), 0);
+    return availableSlots.find(s => toMin(s) >= latestEnd) || null;
+  })();
 
   return (
     <div className="border-t border-gray-100 p-5 bg-[#fafaf8]">
@@ -216,15 +287,26 @@ function InlineBookingPanel({
             <p className="text-sm text-gray-400">Bu gün müsait saat yok.</p>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-              {availableSlots.map(t => (
-                <button
-                  key={t}
-                  onClick={() => setSelectedTime(t)}
-                  className={`py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' : 'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'}`}
-                >
-                  {t}
-                </button>
-              ))}
+              {availableSlots.map(t => {
+                const inCart = isInCart(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => { if (!inCart) setSelectedTime(t); }}
+                    className={`relative py-2.5 rounded-xl border font-mono text-sm font-semibold text-center transition-all ${
+                      inCart ? 'opacity-60 border-[#14b8a6]/50 bg-[#14b8a6]/10 text-[#0d9488] cursor-default' :
+                      selectedTime === t ? 'bg-[#14b8a6] border-[#14b8a6] text-[#04221d]' :
+                      t === suggestedSlot ? 'border-amber-400 bg-amber-50 text-[#0c0c0d] hover:border-amber-500' :
+                      'border-gray-200 bg-white text-gray-600 hover:border-[#14b8a6]'
+                    }`}
+                  >
+                    {!inCart && t === suggestedSlot && (
+                      <span className="absolute -top-1.5 -right-1 w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center text-[7px] font-black text-black leading-none">★</span>
+                    )}
+                    {inCart ? <span className="text-[9px] leading-tight block">✓<br/>Sepette</span> : t}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -242,6 +324,7 @@ function InlineBookingPanel({
           disabled={!canAdd}
           onClick={() => {
             if (!currentUserId) { onAuthRequired(); return; }
+            if (!availableSlots.includes(selectedTime)) { onError("Bu saat artık müsait değil."); return; }
             onAdd({ service, date: selectedDay!, time: selectedTime, staff: selectedStaff });
           }}
           className="flex-shrink-0 bg-[#0c0c0d] text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-[#14b8a6] hover:text-[#04221d] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -286,6 +369,7 @@ export default function ShopDetail() {
   const [serviceStaffFilter, setServiceStaffFilter] = useState<any>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
   const [nearbyShops, setNearbyShops] = useState<any[]>([]);
   const [nearbyAvailability, setNearbyAvailability] = useState<Record<number, boolean>>({});
   const [nearbyFillRate, setNearbyFillRate] = useState<Record<number, number>>({});
@@ -294,7 +378,6 @@ export default function ShopDetail() {
   const [expandedServiceId, setExpandedServiceId] = useState<number | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [galleryTab, setGalleryTab] = useState<'isler' | 'mekan'>('isler');
   const [lastConfirmed, setLastConfirmed] = useState<CartItem | null>(null);
 
   const heroRef = useRef<HTMLDivElement>(null);
@@ -397,7 +480,7 @@ export default function ShopDetail() {
   }, [shop]);
 
   const fetchReviews = async () => {
-    const { data } = await supabase.from('reviews').select('*, profiles(full_name)').eq('shop_id', shopId).order('created_at', { ascending: false });
+    const { data } = await supabase.from('reviews').select('*, profiles(full_name), owner_reply, owner_reply_at').eq('shop_id', shopId).order('created_at', { ascending: false });
     setReviews(data || []);
   };
 
@@ -408,13 +491,16 @@ export default function ShopDetail() {
       supabase.from('services').select('*').eq('shop_id', shopId),
       supabase.from('shop_hours').select('*').eq('shop_id', shopId),
       supabase.from('staff').select('*').eq('shop_id', shopId).order('created_at', { ascending: true }),
-    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }, { data: staffData }]) => {
+      supabase.from('campaigns').select('*').eq('shop_id', shopId).eq('is_active', true),
+    ]).then(([{ data: shopData }, { data: servicesData }, { data: hoursData }, { data: staffData }, { data: campData }]) => {
       if (!shopData) { setNotFound(true); return; }
       setShop(shopData);
       setGallery(shopData.gallery_urls || []);
       setServices(servicesData || []);
       setShopHours(hoursData || []);
       setStaff(staffData || []);
+      const todayLocal = localDateStr(new Date());
+      setActiveCampaigns((campData || []).filter((c: any) => c.start_date <= todayLocal && c.end_date >= todayLocal));
     });
     fetchReviews();
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -439,7 +525,7 @@ export default function ShopDetail() {
     if (!currentUserId) { alert("Yorum yazmak için giriş yapmalısınız."); return; }
     if (reviewRating === 0) { alert("Lütfen bir puan seçin."); return; }
     setSubmittingReview(true);
-    const { error } = await supabase.from('reviews').insert([{ shop_id: shopId, user_id: currentUserId, rating: reviewRating, comment: reviewComment }]);
+    const { error } = await supabase.from('reviews').upsert([{ shop_id: shopId, user_id: currentUserId, rating: reviewRating, comment: reviewComment }], { onConflict: 'shop_id,user_id' });
     if (error) {
       alert("Hata: " + error.message);
     } else {
@@ -460,32 +546,69 @@ export default function ShopDetail() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); setIsAuthOpen(true); return; }
+
+    const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+    const _BUF = 5;
+
+    // Pre-insert overlap check: verify each cart item against existing DB appointments
+    for (const item of cart) {
+      const dateStr = localDateStr(item.date);
+      const staffId = item.staff?.id || null;
+      const ns = _toMin(item.time);
+      const ne = ns + item.service.duration;
+      const { data: allSlots } = await supabase.rpc('get_shop_slots', { p_shop_id: shopId, p_dates: [dateStr] });
+      const existing = staffId
+        ? (allSlots || []).filter((a: any) => a.staff_id === staffId)
+        : (allSlots || []).filter((a: any) => !a.staff_id);
+      for (const apt of existing) {
+        if (!apt.appointment_time) continue;
+        const es = _toMin(apt.appointment_time.slice(0, 5));
+        const ee = es + (apt.duration_snapshot ?? 30) + _BUF;
+        if (ns < ee && ne > es) {
+          setCart(prev => prev.filter(c => !(
+            String(c.service.id) === String(item.service.id) &&
+            c.time === item.time &&
+            localDateStr(c.date) === dateStr &&
+            (c.staff?.id || null) === staffId
+          )));
+          setToast(`${item.time} saati az önce doldu. ${item.service.name} sepetten kaldırıldı.`);
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     await supabase.from('profiles').upsert({ id: session.user.id, email: session.user.email }, { onConflict: 'id' });
     const inserts = cart.map(item => ({
       user_id: session.user.id,
       shop_id: shopId,
+      customer_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
+      service_id: item.service.id,
       service_name: item.service.name,
-      price: item.service.price,
+      price: item.discountedPrice,
       appointment_date: localDateStr(item.date),
       appointment_time: item.time,
       status: 'Beklemede',
       staff_id: item.staff?.id || null,
+      duration_snapshot: item.service.duration,
     }));
-    const { error } = await supabase.from('appointments').insert(inserts);
+    const { data: insertedApts, error } = await supabase.from('appointments').insert(inserts).select('id');
     if (!error) {
       setLastConfirmed(cart[0]);
-      cart.forEach(item => {
+      cart.forEach((_item, idx) => {
+        const appointmentId = insertedApts?.[idx]?.id;
+        if (!appointmentId) return;
         fetch('/api/notify', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'new_appointment', shopId, ownerId: shop.owner_id, customerName: session.user.user_metadata?.full_name || session.user.email || 'Müşteri', serviceName: item.service.name, appointmentDate: localDateStr(item.date), appointmentTime: item.time, price: item.service.price }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ type: 'new_appointment', appointmentId }),
         }).catch(() => {});
       });
       setCart([]);
       setExpandedServiceId(null);
       setShowSuccess(true);
     } else {
-      alert("Hata: " + error.message);
+      setToast("Rezervasyon hatası: " + error.message);
     }
     setLoading(false);
   };
@@ -537,7 +660,9 @@ export default function ShopDetail() {
   const mapQuery = [streetPart, shop.neighborhood, shop.district, shop.city].filter(Boolean).join(', ') || [shop.district, shop.city].filter(Boolean).join(', ');
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`;
 
-  const cartTotal = cart.reduce((a, c) => a + c.service.price, 0);
+  const cartOriginalTotal = cart.reduce((a, c) => a + (Number(c.service.price) || 0), 0);
+  const cartTotal = cart.reduce((a, c) => a + c.discountedPrice, 0);
+  const cartDiscount = cartOriginalTotal - cartTotal;
   const cartDuration = cart.reduce((a, c) => a + c.service.duration, 0);
 
   // Success screen
@@ -573,6 +698,18 @@ export default function ShopDetail() {
               <div className="pt-4 border-t border-gray-50">
                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><MapPin size={10} /> Konum</p>
                 <p className="font-bold text-xs text-gray-500 uppercase tracking-widest">{shop.district}, {shop.city}</p>
+              </div>
+              <div className="pt-4 border-t border-gray-50 flex flex-col items-center gap-1">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tutar</p>
+                {lastConfirmed.campaign && lastConfirmed.discountedPrice < Number(lastConfirmed.service.price) ? (
+                  <div className="flex items-center gap-2">
+                    <span className="line-through text-gray-300 font-mono text-sm">₺{lastConfirmed.service.price}</span>
+                    <span className="font-black text-[#14b8a6] text-lg">₺{lastConfirmed.discountedPrice}</span>
+                    <span className="bg-amber-400 text-black text-[9px] font-black px-2 py-0.5 rounded-lg uppercase">🏷 {lastConfirmed.campaign.title}</span>
+                  </div>
+                ) : (
+                  <p className="font-black text-[#0c0c0d] text-lg">₺{lastConfirmed.discountedPrice}</p>
+                )}
               </div>
             </div>
             <button onClick={() => router.push('/')} className="bg-[#0c0c0d] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-[#14b8a6] transition-all text-sm">
@@ -662,16 +799,31 @@ export default function ShopDetail() {
               )}
             </div>
 
+            {/* Active campaigns banner */}
+            {activeCampaigns.length > 0 && (
+              <div className="mt-6 space-y-3">
+                {activeCampaigns.map((c: any) => {
+                  const label = c.type === 'percentage' ? `%${c.discount_value} İndirim` : c.type === 'fixed' ? `₺${c.discount_value} İndirim` : c.type === 'today_special' ? 'Bugüne Özel Fiyat' : 'Son Dakika Fırsatı';
+                  return (
+                    <div key={c.id} className="flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                      <span className="text-2xl">🏷️</span>
+                      <div>
+                        <p className="text-[11px] font-bold text-amber-700 uppercase tracking-widest">{label}</p>
+                        <p className="text-[13px] font-semibold text-amber-900">{c.title}</p>
+                      </div>
+                      <span className="ml-auto text-[10px] text-amber-500 font-mono">{c.end_date} tarihine kadar</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Gallery */}
             {gallery.length > 0 && (
               <div className="mt-14">
                 <div className="flex items-end justify-between mb-6">
                   <h2 className="text-[28px] font-bold tracking-tight inline-block" style={{ borderBottom: '3px solid #14b8a6', paddingBottom: '6px' }}>Galeri</h2>
                   <div className="font-mono text-[11px] text-gray-400 uppercase tracking-widest">{gallery.length} fotoğraf</div>
-                </div>
-                <div className="flex gap-1.5 mb-5 p-1 rounded-xl w-fit" style={{ background: '#fafaf8' }}>
-                  <button onClick={() => setGalleryTab('isler')} className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${galleryTab === 'isler' ? 'bg-white text-[#0c0c0d] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>İşler</button>
-                  <button onClick={() => setGalleryTab('mekan')} className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-all ${galleryTab === 'mekan' ? 'bg-white text-[#0c0c0d] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Mekan</button>
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   {gallery.map((url, i) => (
@@ -744,13 +896,27 @@ export default function ShopDetail() {
                                   {staff.length > 0 && <span>✦ {serviceStaffFilter ? serviceStaffFilter.first_name : 'Tüm Personel'}</span>}
                                 </div>
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-[22px] font-bold tracking-tight">{service.price} ₺</div>
-                                <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-gray-400'}`}>
-                                  {isExpanded ? 'Kapat' : 'Saat seç'}
-                                  <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-                              </div>
+                              {(() => {
+                                const { original, discounted, pct } = calcDiscountedPrice(service, activeCampaigns);
+                                const hasDiscount = discounted < original;
+                                return (
+                                  <div className="text-right flex-shrink-0">
+                                    {hasDiscount ? (
+                                      <>
+                                        <div className="text-[13px] line-through text-gray-300 font-mono leading-tight">{original} ₺</div>
+                                        <div className="text-[22px] font-bold tracking-tight text-[#14b8a6] leading-tight">{discounted} ₺</div>
+                                        <div className="inline-block bg-amber-400 text-black px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wide mt-1">-%{pct}</div>
+                                      </>
+                                    ) : (
+                                      <div className="text-[22px] font-bold tracking-tight">{original} ₺</div>
+                                    )}
+                                    <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-gray-400'}`}>
+                                      {isExpanded ? 'Kapat' : 'Saat seç'}
+                                      <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             {isExpanded && (
                               <InlineBookingPanel
@@ -759,7 +925,35 @@ export default function ShopDetail() {
                                 staff={serviceStaffFilter ? [serviceStaffFilter] : staff}
                                 shopId={shopId}
                                 currentUserId={currentUserId}
-                                onAdd={(item) => { setCart(prev => [...prev, item]); setToast(`${item.service.name} sepete eklendi`); setExpandedServiceId(null); }}
+                                allServices={services}
+                                cartItems={cart}
+                                onError={setToast}
+                                onAdd={(item) => {
+                  const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+                  const _BUFFER = 5;
+                  const ns = _toMin(item.time);
+                  const ne = ns + item.service.duration;
+                  const nd = localDateStr(item.date);
+                  const duplicate = cart.some(ex =>
+                    localDateStr(ex.date) === nd &&
+                    String(ex.service.id) === String(item.service.id) &&
+                    ex.time === item.time &&
+                    (ex.staff?.id || null) === (item.staff?.id || null)
+                  );
+                  if (duplicate) { setToast('Bu randevu zaten sepette.'); return; }
+                  const conflict = cart.some(ex => {
+                    if (localDateStr(ex.date) !== nd) return false;
+                    if (item.staff?.id && ex.staff?.id && item.staff.id !== ex.staff.id) return false;
+                    const es = _toMin(ex.time);
+                    const ee = es + ex.service.duration + _BUFFER;
+                    return ns < ee && ne > es;
+                  });
+                  if (conflict) { setToast('Bu saatte sepette çakışan randevu var. Farklı saat seçin.'); return; }
+                  const { discounted, campaign } = calcDiscountedPrice(item.service, activeCampaigns);
+                  setCart(prev => [...prev, { ...item, discountedPrice: discounted, campaign }]);
+                  setToast(`${item.service.name} sepete eklendi`);
+                  setExpandedServiceId(null);
+                }}
                                 onAuthRequired={() => setIsAuthOpen(true)}
                               />
                             )}
@@ -834,6 +1028,12 @@ export default function ShopDetail() {
                           <div className="text-[13px] tracking-[2px] mb-1" style={{ color: '#14b8a6' }}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</div>
                           <div className="font-mono text-[11px] text-gray-400 uppercase tracking-wider mb-2">{new Date(r.created_at).toLocaleDateString('tr-TR')}</div>
                           {r.comment && <div className="text-sm text-gray-500 leading-relaxed">{r.comment}</div>}
+                          {r.owner_reply && (
+                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                              <p className="text-[10px] font-semibold text-[#14b8a6] uppercase tracking-widest mb-1">İşletme Yanıtı</p>
+                              <p className="text-[13px] text-gray-600 leading-relaxed">{r.owner_reply}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1018,20 +1218,33 @@ export default function ShopDetail() {
                 </div>
               ) : (
                 <>
-                  {cart.map((item, i) => (
-                    <div key={i} className="grid items-center py-3 border-t text-sm" style={{ gridTemplateColumns: '1fr auto', gap: '12px', borderColor: 'rgba(255,255,255,0.1)' }}>
-                      <div>
-                        <div className="font-semibold">{item.service.name}</div>
-                        <div className="font-mono text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                          {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
+                  {cart.map((item, i) => {
+                    const hasDiscount = item.discountedPrice < (Number(item.service.price) || 0);
+                    return (
+                      <div key={i} className="grid items-center py-3 border-t text-sm" style={{ gridTemplateColumns: '1fr auto', gap: '12px', borderColor: 'rgba(255,255,255,0.1)' }}>
+                        <div>
+                          <div className="font-semibold">{item.service.name}</div>
+                          {item.campaign && hasDiscount && <div className="text-[9px] font-mono mt-0.5" style={{ color: '#14b8a6' }}>🏷 {item.campaign.title}</div>}
+                          <div className="font-mono text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                            {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            {hasDiscount && <div className="text-[10px] line-through font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>{item.service.price} ₺</div>}
+                            <span className="font-mono font-semibold" style={{ color: hasDiscount ? '#14b8a6' : '#fff' }}>{item.discountedPrice} ₺</span>
+                          </div>
+                          <button onClick={() => setCart(c => c.filter((_, j) => j !== i))} className="border-0 p-0 text-base" style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'}>×</button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold">{item.service.price} ₺</span>
-                        <button onClick={() => setCart(c => c.filter((_, j) => j !== i))} className="border-0 p-0 text-base" style={{ background: 'transparent', color: 'rgba(255,255,255,0.4)' }} onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = '#fff'} onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'}>×</button>
-                      </div>
+                    );
+                  })}
+                  {cartDiscount > 0 && (
+                    <div className="flex justify-between items-baseline pt-2 font-mono text-[11px]" style={{ color: '#14b8a6' }}>
+                      <span>Kampanya İndirimi</span>
+                      <span>-{cartDiscount} ₺</span>
                     </div>
-                  ))}
+                  )}
                   <div className="flex justify-between items-baseline my-3 font-mono text-[13px]">
                     <span style={{ color: 'rgba(255,255,255,0.6)' }}>Toplam · {cartDuration} dk</span>
                     <span className="text-lg font-bold">{cartTotal} ₺</span>

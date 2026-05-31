@@ -13,13 +13,17 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const switchMode = (m: Mode) => { setMode(m); setAuthError(null); };
 
   const handleClose = () => {
     setMode('login');
     setEmail(""); setPassword(""); setConfirmPassword(""); setOtp("");
     setShowPassword(false);
+    setAuthError(null);
     onClose();
   };
 
@@ -28,7 +32,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-    if (error) alert("Google Giriş Hatası: " + error.message);
+    if (error) setAuthError("Google girişi sırasında bir hata oluştu. Tekrar deneyin.");
   };
 
   const handleLogin = async (e: any) => {
@@ -36,27 +40,27 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) alert("Hata: " + error.message);
+    if (error) setAuthError(error.message.includes("Invalid login credentials") ? "E-posta veya şifre hatalı." : "Giriş yapılamadı. Tekrar deneyin.");
     else handleClose();
   };
 
   const handleRegister = async (e: any) => {
     e.preventDefault();
     if (!/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/.test(password)) {
-      alert("Şifre en az 8 karakter, 1 büyük harf ve 1 sembol (!@#$%^&*) içermelidir.");
+      setAuthError("Şifre en az 8 karakter, 1 büyük harf ve 1 sembol (!@#$%^&*) içermelidir.");
       return;
     }
-    if (password !== confirmPassword) { alert("Şifreler eşleşmiyor."); return; }
+    if (password !== confirmPassword) { setAuthError("Şifreler eşleşmiyor."); return; }
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
     if (error) {
       if (error.message.includes("already registered")) {
-        alert("Bu e-posta zaten kayıtlı. Giriş yapın.");
-        setMode('login');
-      } else alert("Hata: " + error.message);
+        setAuthError("Bu e-posta zaten kayıtlı. Giriş yapın.");
+        switchMode('login');
+      } else setAuthError("Kayıt başarısız. Tekrar deneyin.");
     } else {
-      setMode('otp');
+      switchMode('otp');
     }
   };
 
@@ -65,19 +69,19 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     setLoading(true);
     const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
     setLoading(false);
-    if (error) alert("Kod hatalı: " + error.message);
+    if (error) setAuthError("Doğrulama kodu hatalı veya süresi dolmuş.");
     else handleClose();
   };
 
   const handleForgotPassword = async () => {
-    if (!email.includes("@")) { alert("Lütfen e-posta adresinizi girin."); return; }
+    if (!email.includes("@")) { setAuthError("Lütfen e-posta adresinizi girin."); return; }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setLoading(false);
-    if (error) alert("Hata: " + error.message);
-    else setMode('forgotSent');
+    if (error) setAuthError("Sıfırlama linki gönderilemedi. Tekrar deneyin.");
+    else switchMode('forgotSent');
   };
 
   return (
@@ -109,7 +113,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <button type="button" onClick={() => setMode('forgot')} className="text-[10px] font-black text-gray-400 hover:text-[#00A3AD] uppercase tracking-widest transition-colors">
+              <button type="button" onClick={() => switchMode('forgot')} className="text-[10px] font-black text-gray-400 hover:text-[#00A3AD] uppercase tracking-widest transition-colors">
                 Şifremi Unuttum?
               </button>
             </div>
@@ -131,7 +135,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
             <p className="text-center mt-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">
               Hesabın yok mu?{" "}
-              <button type="button" onClick={() => setMode('register')} className="text-[#00A3AD] hover:underline">
+              <button type="button" onClick={() => switchMode('register')} className="text-[#00A3AD] hover:underline">
                 Kayıt Ol
               </button>
             </p>
@@ -189,7 +193,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
             <p className="text-center mt-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">
               Zaten hesabın var mı?{" "}
-              <button type="button" onClick={() => setMode('login')} className="text-[#00A3AD] hover:underline">
+              <button type="button" onClick={() => switchMode('login')} className="text-[#00A3AD] hover:underline">
                 Giriş Yap
               </button>
             </p>
@@ -214,7 +218,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             <button disabled={loading} className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-8 hover:bg-black transition-all">
               {loading ? "Onaylanıyor..." : "Onayla ve Devam Et"}
             </button>
-            <p className="mt-6 text-[10px] font-bold text-gray-300 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => setMode('register')}>
+            <p className="mt-6 text-[10px] font-bold text-gray-300 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => switchMode('register')}>
               Geri dön
             </p>
           </form>
@@ -233,7 +237,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             <button onClick={handleForgotPassword} disabled={loading} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#00A3AD] transition-all mb-4">
               {loading ? "Gönderiliyor..." : "Sıfırlama Linki Gönder"}
             </button>
-            <p className="text-center text-[10px] font-black text-gray-400 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => setMode('login')}>
+            <p className="text-center text-[10px] font-black text-gray-400 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => switchMode('login')}>
               Geri dön
             </p>
           </div>
@@ -249,10 +253,14 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-relaxed">
               {email} adresine şifre sıfırlama linki gönderildi.
             </p>
-            <button onClick={() => setMode('login')} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#00A3AD] transition-all">
+            <button onClick={() => switchMode('login')} className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#00A3AD] transition-all">
               Giriş Yap
             </button>
           </div>
+        )}
+
+        {authError && (
+          <p className="mt-4 text-center text-sm font-bold text-red-500">{authError}</p>
         )}
       </div>
     </div>
