@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
@@ -558,10 +559,34 @@ export default function Dashboard() {
       is_closed: h.is_closed,
       ...(h.id ? { id: h.id } : {}),
     }));
-    const { error } = await supabase.from('shop_hours').upsert(hoursToUpsert, { onConflict: 'shop_id,day_of_week' });
+    await supabase.from('shop_hours').delete().eq('shop_id', shop.id);
+    const { error } = await supabase.from('shop_hours').insert(hoursToUpsert);
+    if (error) {
+      setSavingHours(false);
+      showToast('Hata: ' + error.message, 'err');
+      return;
+    }
+
+    // Backend DB'sindeki business.opening_hours alanını da güncelle
+    // Backend: 1=Pzt...6=Cmt, 7=Paz | Frontend: 1=Pzt...6=Cmt, 0=Paz
+    try {
+      const businesses = await api.myBusinesses();
+      if (businesses.length > 0) {
+        const backendHours = shopHours.map((h: { day_of_week: number; open_time: string; close_time: string; is_closed: boolean }) => ({
+          day_of_week: h.day_of_week === 0 ? 7 : h.day_of_week,
+          open_time: h.open_time,
+          close_time: h.close_time,
+          is_closed: h.is_closed,
+        }));
+        await api.updateBusiness(businesses[0].id, { opening_hours: backendHours } as any);
+      }
+    } catch {
+      // Backend sync hatası sessizce geç, Supabase kaydı başarılıydı
+    }
+
     setSavingHours(false);
-    if (error) { showToast('Hata: ' + error.message, 'err'); }
-    else { showToast('Çalışma saatleri kaydedildi.'); fetchInitialData(); }
+    showToast('Çalışma saatleri kaydedildi.');
+    fetchInitialData();
   };
 
   const updateHour = (index: number, field: string, value: any) => {

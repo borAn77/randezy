@@ -16,6 +16,7 @@ Notifications.setNotificationHandler({
 });
 
 async function getExpoPushToken(): Promise<string | null> {
+  console.log('[push] getExpoPushToken called, isDevice:', Device.isDevice);
   if (!Device.isDevice) return null;
 
   const { status: existing } = await Notifications.getPermissionsAsync();
@@ -26,6 +27,7 @@ async function getExpoPushToken(): Promise<string | null> {
     finalStatus = status;
   }
 
+  console.log('[push] permission status:', finalStatus);
   if (finalStatus !== 'granted') return null;
 
   if (Platform.OS === 'android') {
@@ -59,8 +61,8 @@ async function registerTokenWithSupabase(token: string) {
 
 export function usePushNotifications() {
   useEffect(() => {
-    getExpoPushToken().then(token => {
-      if (token) registerTokenWithSupabase(token);
-    });
+    getExpoPushToken()
+      .then(token => { if (token) registerTokenWithSupabase(token); })
+      .catch(e => console.log('[push] error:', e?.message));
   }, []);
 }
