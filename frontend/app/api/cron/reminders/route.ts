@@ -134,10 +134,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, sent_24h, sent_3h, skipped_no_email, failed });
 }
 
-// Penceredeki unique YYYY-MM-DD tarih listesi
+// UTC Date → Istanbul YYYY-MM-DD (UTC+3 sabit, Türkiye DST yok)
+function toIstanbulDateStr(d: Date): string {
+  const ist = new Date(d.getTime() + 3 * 60 * 60 * 1000);
+  return ist.toISOString().split("T")[0];
+}
+
+// Penceredeki unique Istanbul-tarih listesi
 function uniqueDates(dates: Date[]): string[] {
   const set = new Set<string>();
-  dates.forEach(d => set.add(d.toISOString().split("T")[0]));
+  dates.forEach(d => set.add(toIstanbulDateStr(d)));
   return Array.from(set);
 }
 
