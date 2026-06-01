@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { X, ShieldCheck, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
@@ -14,6 +15,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [kvkkConsent, setKvkkConsent] = useState(false);
+  const [internationalConsent, setInternationalConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   if (!isOpen) return null;
 
@@ -24,10 +28,17 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     setEmail(""); setPassword(""); setConfirmPassword(""); setOtp("");
     setShowPassword(false);
     setAuthError(null);
+    setKvkkConsent(false);
+    setInternationalConsent(false);
+    setMarketingConsent(false);
     onClose();
   };
 
   const handleGoogleLogin = async () => {
+    if (mode === 'register') {
+      sessionStorage.setItem('randezy_legal_consent', 'true');
+      sessionStorage.setItem('randezy_marketing_consent', String(marketingConsent));
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -46,6 +57,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const handleRegister = async (e: any) => {
     e.preventDefault();
+    if (!kvkkConsent || !internationalConsent) {
+      setAuthError("Devam etmek için zorunlu onay kutucuklarını işaretleyin.");
+      return;
+    }
     if (!/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/.test(password)) {
       setAuthError("Şifre en az 8 karakter, 1 büyük harf ve 1 sembol (!@#$%^&*) içermelidir.");
       return;
@@ -69,8 +84,33 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     setLoading(true);
     const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
     setLoading(false);
-    if (error) setAuthError("Doğrulama kodu hatalı veya süresi dolmuş.");
-    else handleClose();
+    if (error) {
+      setAuthError("Doğrulama kodu hatalı veya süresi dolmuş.");
+    } else {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+          if (marketingConsent) documents.push('ticari_ileti_v1');
+          const res = await fetch('/api/legal-consents', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
+          });
+          if (!res.ok) {
+            setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin.");
+            return;
+          }
+        }
+      } catch {
+        setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin.");
+        return;
+      }
+      handleClose();
+    }
   };
 
   const handleForgotPassword = async () => {
@@ -122,22 +162,14 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </button>
 
-            <div className="relative py-5 flex items-center">
-              <div className="flex-grow border-t border-gray-100"></div>
-              <span className="flex-shrink mx-4 text-[9px] font-black text-gray-300 uppercase tracking-widest">Veya</span>
-              <div className="flex-grow border-t border-gray-100"></div>
-            </div>
-
-            <button type="button" onClick={handleGoogleLogin} className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl hover:bg-gray-50 transition-all font-black text-[11px] uppercase text-black">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" className="w-4 h-4" alt="Google" />
-              Google ile giriş yap
-            </button>
-
             <p className="text-center mt-6 text-[11px] font-black text-gray-400 uppercase tracking-widest">
               Hesabın yok mu?{" "}
               <button type="button" onClick={() => switchMode('register')} className="text-[#00A3AD] hover:underline">
                 Kayıt Ol
               </button>
+            </p>
+            <p className="text-center mt-3 text-[10px] text-gray-300 font-medium">
+              Google ile giriş için "Kayıt Ol" sekmesini kullanın.
             </p>
           </form>
         )}
@@ -176,7 +208,49 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               </div>
             </div>
 
-            <button disabled={loading} className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-6 hover:bg-black transition-all">
+            {/* Zorunlu onaylar */}
+            <div className="space-y-3 mt-4">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={kvkkConsent}
+                  onChange={e => setKvkkConsent(e.target.checked)}
+                  className="mt-0.5 flex-shrink-0 accent-[#00A3AD]"
+                />
+                <span className="text-[10px] font-medium text-gray-500 leading-relaxed">
+                  <Link href="/kullanici-sozlesmesi" target="_blank" className="font-black text-[#00A3AD] hover:underline">Kullanıcı Sözleşmesi</Link>'ni kabul ediyorum ve{" "}
+                  <Link href="/kvkk" target="_blank" className="font-black text-[#00A3AD] hover:underline">KVKK Aydınlatma Metni</Link>'ni okudum. <span className="text-red-400">*</span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={internationalConsent}
+                  onChange={e => setInternationalConsent(e.target.checked)}
+                  className="mt-0.5 flex-shrink-0 accent-[#00A3AD]"
+                />
+                <span className="text-[10px] font-medium text-gray-500 leading-relaxed">
+                  Kişisel verilerimin, hizmetin sağlanması amacıyla HM MARKETING SP. Z O.O. ve Randezy'nin kullandığı yurt dışındaki hizmet sağlayıcılarla paylaşılabileceğini okudum ve açık rıza gösteriyorum. <span className="text-red-400">*</span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={marketingConsent}
+                  onChange={e => setMarketingConsent(e.target.checked)}
+                  className="mt-0.5 flex-shrink-0 accent-[#00A3AD]"
+                />
+                <span className="text-[10px] font-medium text-gray-400 leading-relaxed">
+                  Randezy'den kampanya ve duyurular için{" "}
+                  <Link href="/ticari-ileti-izni" target="_blank" className="text-gray-500 hover:underline">ticari elektronik ileti</Link>{" "}
+                  almak istiyorum. (İsteğe bağlı)
+                </span>
+              </label>
+            </div>
+
+            <button disabled={loading || !kvkkConsent || !internationalConsent} className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-5 hover:bg-black transition-all disabled:opacity-40">
               {loading ? "Hesap oluşturuluyor..." : "Kayıt Ol"}
             </button>
 
@@ -186,7 +260,12 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               <div className="flex-grow border-t border-gray-100"></div>
             </div>
 
-            <button type="button" onClick={handleGoogleLogin} className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl hover:bg-gray-50 transition-all font-black text-[11px] uppercase text-black">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={!kvkkConsent || !internationalConsent}
+              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-gray-100 rounded-2xl hover:bg-gray-50 transition-all font-black text-[11px] uppercase text-black disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" className="w-4 h-4" alt="Google" />
               Google ile kayıt ol
             </button>

@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "../../components/layout/Navbar";
 import { ChevronDown, CheckCircle2, ArrowRight, Store, Phone, MapPin } from "lucide-react";
 import { supabase } from "../../lib/supabase";
@@ -31,6 +32,7 @@ export default function IsletmeEkle() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [businessTermsConsent, setBusinessTermsConsent] = useState(false);
 
   const [form, setForm] = useState({
     category: "",
@@ -43,7 +45,7 @@ export default function IsletmeEkle() {
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 
-  const isValid = form.category && form.shopName.trim() && form.city && form.district.trim() && form.street.trim();
+  const isValid = form.category && form.shopName.trim() && form.city && form.district.trim() && form.street.trim() && businessTermsConsent;
 
   const handleSubmit = async () => {
     if (!isValid) return;
@@ -193,6 +195,21 @@ export default function IsletmeEkle() {
                 onChange={e => set('street', e.target.value)}
               />
             </div>
+          </div>
+
+          {/* İşletme sözleşmesi onayı */}
+          <div className="mb-6">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={businessTermsConsent}
+                onChange={e => setBusinessTermsConsent(e.target.checked)}
+                className="mt-0.5 flex-shrink-0 accent-black"
+              />
+              <span className="text-[11px] font-medium text-gray-500 leading-relaxed">
+                <Link href="/isletme-sozlesmesi" target="_blank" className="font-black text-black hover:text-[#00A3AD] transition-colors underline">İşletme Kullanım Sözleşmesi</Link>'ni okudum ve kabul ediyorum. <span className="text-red-400">*</span>
+              </span>
+            </label>
           </div>
 
           {error && (

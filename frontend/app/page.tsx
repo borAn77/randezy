@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { Search, X, MapPin, Image as ImageIcon, ArrowUpDown, Heart } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
+import Footer from "../components/layout/Footer";
 import { supabase } from "../lib/supabase";
 import AuthModal from "../components/layout/AuthModal";
 
@@ -489,6 +490,7 @@ export default function Home() {
       </section>
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <Footer />
     </main>
   );
 }

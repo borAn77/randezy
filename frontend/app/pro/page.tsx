@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AuthModal from "../../components/layout/AuthModal";
+import Footer from "../../components/layout/Footer";
 import { Hero } from "../../components/landing/Hero";
 import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
@@ -77,18 +78,7 @@ export default function ProPage() {
         <Pricing onStart={handleStart} />
       </section>
 
-      {/* Footer */}
-      <footer className="py-16 border-t border-gray-100 bg-white text-center">
-        <p className="text-xl font-black tracking-tighter uppercase mb-8 text-black">
-          randezy<span className="text-[#00A3AD]">.pro</span>
-        </p>
-        <div className="flex justify-center gap-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          <span className="hover:text-black cursor-pointer transition-colors">Gizlilik</span>
-          <span className="hover:text-black cursor-pointer transition-colors">Şartlar</span>
-          <button onClick={() => router.push("/")} className="hover:text-[#00A3AD] cursor-pointer transition-colors">Müşteri Paneli</button>
-        </div>
-      </footer>
-
+      <Footer />
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );

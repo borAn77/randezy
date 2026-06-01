@@ -1259,6 +1259,11 @@ export default function ShopDetail() {
               >
                 {loading ? 'Kaydediliyor...' : cart.length === 0 ? 'Hizmet seç' : 'Randevuyu onayla →'}
               </button>
+              {cart.length > 0 && (
+                <p className="text-[9px] text-center leading-relaxed mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  Randevu oluşturarak ad, iletişim ve randevu bilgilerinizin ilgili işletme ile paylaşılmasını kabul etmiş sayılırsınız.
+                </p>
+              )}
             </div>
           </div>
         </div>
