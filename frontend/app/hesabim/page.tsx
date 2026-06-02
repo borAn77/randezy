@@ -182,34 +182,17 @@ export default function HesabimPage() {
               <ChevronRight size={14} />
             </button>
 
-            {/* SADECE İŞLETME SAHİPLERİNE GÖZÜKEN BUTONLAR */}
-            {isOwner && (
-              <>
-                <button
-                  onClick={() => setActiveTab("isletme-randevular")}
-                  className={`w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 ${activeTab === 'isletme-randevular' ? 'bg-black text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Calendar size={18} />
-                    <span className="text-[11px] font-black uppercase tracking-widest">Gelen Randevular</span>
-                  </div>
-                  <ChevronRight size={14} />
-                </button>
-              </>
-            )}
-
-            {!isOwner && (
-              <button
-                onClick={() => router.push("/randevularim")}
-                className="w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 text-gray-500 hover:bg-gray-50"
-              >
-                <div className="flex items-center gap-4">
-                  <Calendar size={18} />
-                  <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
-                </div>
-                <ChevronRight size={14} />
-              </button>
-            )}
+            {/* Randevularım — tüm kullanıcılar için */}
+            <button
+              onClick={() => router.push("/randevularim")}
+              className="w-full flex items-center justify-between px-6 py-5 rounded-2xl transition-all mt-2 text-gray-500 hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-4">
+                <Calendar size={18} />
+                <span className="text-[11px] font-black uppercase tracking-widest">Randevularım</span>
+              </div>
+              <ChevronRight size={14} />
+            </button>
 
             <button
               onClick={() => setActiveTab("favorilerim")}
@@ -233,6 +216,16 @@ export default function HesabimPage() {
               <ChevronRight size={14} />
             </button>
           </nav>
+
+          {isOwner && (
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="w-full flex items-center gap-4 px-8 py-5 text-[#00A3AD] hover:bg-[#E6F6F7] rounded-[2.5rem] transition-all"
+            >
+              <Store size={18} />
+              <span className="text-[11px] font-black uppercase tracking-widest text-left">İşletme Paneline Geç</span>
+            </button>
+          )}
 
           <button onClick={() => { setDeleteError(null); setShowDeleteModal(true); }} className="w-full flex items-center gap-4 px-8 py-5 text-red-400 hover:bg-red-50 rounded-[2.5rem] transition-all group">
             <Trash2 size={18} />

@@ -117,7 +117,7 @@ export default function Navbar() {
 
           <div className="flex items-center gap-3 sm:gap-6 lg:gap-12">
             {user ? (
-              <UserMenu user={user} isDark={!isScrolled && isHomePage} fullName={userFullName} />
+              <UserMenu user={user} isDark={!isScrolled && isHomePage} fullName={userFullName} userRole={userRole} />
             ) : (
               <button
                 onClick={() => setIsAuthOpen(true)}
