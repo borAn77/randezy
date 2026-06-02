@@ -24,6 +24,12 @@ const cities = [
 
 const daysOfWeek = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
 
+const isValidPersonName = (name: string | null | undefined): boolean => {
+  if (!name || name.trim().length < 2) return false;
+  if (/^\d+$/.test(name.trim())) return false;
+  return true;
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -31,6 +37,7 @@ export default function Dashboard() {
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [customerShopNames, setCustomerShopNames] = useState<Map<string, Set<string>>>(new Map());
   const [shopHours, setShopHours] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -192,6 +199,20 @@ export default function Dashboard() {
     setSavingNewApt(false);
   };
 
+  const getCustomerName = useCallback((apt: any): string => {
+    const userId = apt.user_id;
+    const ownedByUser = customerShopNames.get(userId) || new Set<string>();
+    const currentShopLower = (shop?.name || '').toLowerCase();
+    const isBlocked = (name: string) => {
+      const lower = name.trim().toLowerCase();
+      return lower === currentShopLower || ownedByUser.has(lower);
+    };
+    for (const name of [apt.profiles?.full_name, apt.customer_name]) {
+      if (isValidPersonName(name) && !isBlocked(name!)) return name!.trim();
+    }
+    return 'Müşteri';
+  }, [customerShopNames, shop?.name]);
+
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -223,7 +244,21 @@ export default function Dashboard() {
         supabase.from('staff').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: true }),
       ]);
       setServices(servicesRes.data || []);
-      setAppointments(appointmentsRes.data || []);
+      const apts = appointmentsRes.data || [];
+      setAppointments(apts);
+
+      // Müşteri user_id'lerinin sahip olduğu shop adlarını çek
+      const customerUserIds = [...new Set(apts.map((a: any) => a.user_id).filter(Boolean))] as string[];
+      if (customerUserIds.length > 0) {
+        const { data: custShops } = await supabase.from('shops').select('owner_id, name').in('owner_id', customerUserIds);
+        const map = new Map<string, Set<string>>();
+        custShops?.forEach((s: any) => {
+          if (!map.has(s.owner_id)) map.set(s.owner_id, new Set());
+          map.get(s.owner_id)!.add(s.name.toLowerCase());
+        });
+        setCustomerShopNames(map);
+      }
+
       setReviews(reviewsRes.data || []);
       setStaff(staffRes.data || []);
 
@@ -328,7 +363,7 @@ export default function Dashboard() {
               type: 'appointment_confirmed',
               appointmentId: apt.id,
               customerEmail: apt.profiles?.email,
-              customerName: apt.profiles?.full_name || apt.customer_name || 'Müşteri',
+              customerName: getCustomerName(apt),
               shopName: shop?.name || '',
               serviceName: apt.service_name,
               appointmentDate: apt.appointment_date,
@@ -361,7 +396,7 @@ export default function Dashboard() {
           type: 'appointment_rejected',
           appointmentId: apt.id,
           customerEmail: apt.profiles?.email,
-          customerName: apt.profiles?.full_name || 'Müşteri',
+          customerName: getCustomerName(apt),
           shopName: shop?.name || '',
           serviceName: apt.service_name,
           appointmentDate: apt.appointment_date,
@@ -400,7 +435,7 @@ export default function Dashboard() {
         type: 'appointment_rejected',
         appointmentId: apt.id,
         customerEmail: apt.profiles?.email,
-        customerName: apt.profiles?.full_name || apt.customer_name || 'Müşteri',
+        customerName: getCustomerName(apt),
         shopName: shop?.name || '',
         serviceName: apt.service_name,
         appointmentDate: apt.appointment_date,
@@ -736,7 +771,7 @@ export default function Dashboard() {
     if (!customerMap[uid]) {
       customerMap[uid] = {
         id: uid,
-        name: a.profiles?.full_name || a.customer_name || 'İsimsiz Müşteri',
+        name: getCustomerName(a),
         phone: a.customer_phone || a.profiles?.phone || '',
         email: a.profiles?.email || '',
         visits: 0,
@@ -1135,14 +1170,14 @@ export default function Dashboard() {
                             'Tamamlandı': 'bg-[#e6f7f4] text-[#0d9488]',
                             'İptal Edildi': 'bg-red-50 text-red-600',
                           };
-                          const initials = (a.profiles?.full_name || a.customer_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+                          const initials = getCustomerName(a).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
                           return (
                             <div key={a.id} className="grid items-center border-b border-[#f5f5f3] last:border-0 px-6 py-3.5 hover:bg-[#fafaf8] cursor-pointer transition-colors" style={{gridTemplateColumns: '60px 1fr auto'}} onClick={() => setSelectedApt(a)}>
                               <span className="font-mono text-[13px] font-semibold text-[#0c0c0d]">{(a.appointment_time || '').slice(0,5)}</span>
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#14b8a6] to-[#0d9488] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">{initials}</div>
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">{a.profiles?.full_name || a.customer_name || 'Müşteri'}</p>
+                                  <p className="text-[13px] font-semibold text-[#0c0c0d]">{getCustomerName(a)}</p>
                                   <p className="text-[10px] text-[#7a7a7e] uppercase tracking-wide">{a.service_name || '—'} {a.staff ? '· ' + a.staff.first_name : ''}</p>
                                 </div>
                               </div>
@@ -1481,8 +1516,7 @@ export default function Dashboard() {
                       let filtered = appointments as any[];
                       if (listFilter !== 'all') filtered = filtered.filter((a:any) => a.status === listFilter);
                       if (listSearch.trim()) filtered = filtered.filter((a:any) =>
-                        (a.profiles?.full_name||'').toLowerCase().includes(listSearch.toLowerCase()) ||
-                        (a.customer_name||'').toLowerCase().includes(listSearch.toLowerCase()) ||
+                        getCustomerName(a).toLowerCase().includes(listSearch.toLowerCase()) ||
                         (a.service_name||'').toLowerCase().includes(listSearch.toLowerCase())
                       );
                       if (filtered.length === 0) return (
@@ -1510,7 +1544,7 @@ export default function Dashboard() {
                                   </div>
                                   <div className="w-px h-10 bg-gray-100 flex-shrink-0"/>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
+                                    <p className="text-sm font-black text-black truncate">{getCustomerName(apt)}</p>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                       <span className="text-[11px] font-bold text-gray-500 truncate">{apt.service_name}</span>
                                       {apt.staff && <span className="text-[11px] font-bold text-[#00A3AD] truncate">· {apt.staff.first_name} {apt.staff.last_name}</span>}
@@ -1647,7 +1681,7 @@ export default function Dashboard() {
                                           <p className="text-[9px] font-semibold opacity-60 leading-none mb-1">
                                             {`${String(aH).padStart(2,'0')}:${String(aM).padStart(2,'0')} – ${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`}
                                           </p>
-                                          <p className="text-[11px] font-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
+                                          <p className="text-[11px] font-black truncate">{getCustomerName(apt)}</p>
                                           {heightPx >= 54 && <p className="text-[9px] opacity-70 truncate mt-0.5">{apt.service_name}</p>}
                                         </div>
                                       </div>
@@ -1728,7 +1762,7 @@ export default function Dashboard() {
                                         style={{ top: `${topPx}px`, height: `${heightPx}px` }}
                                         onClick={() => { setSelectedApt(apt); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); }}>
                                         <div className="px-2 py-1.5">
-                                          <p className="text-[10px] font-black truncate">{apt.profiles?.full_name || apt.customer_name || 'Misafir'}</p>
+                                          <p className="text-[10px] font-black truncate">{getCustomerName(apt)}</p>
                                           {heightPx >= 46 && <p className="text-[8px] opacity-70 truncate">{apt.appointment_time?.slice(0,5)} · {apt.service_name}</p>}
                                         </div>
                                       </div>
@@ -1775,7 +1809,7 @@ export default function Dashboard() {
                                     <div key={apt.id}
                                       className={`text-[9px] font-bold text-white px-1.5 py-0.5 rounded-md mb-0.5 truncate ${mColors[apt.status]||'bg-gray-400'}`}
                                       onClick={e=>{e.stopPropagation();setSelectedApt(apt);setDetailRejectMode(false);setDetailRejectReason('');setDetailRejectError('');}}>
-                                      {apt.appointment_time?.slice(0,5)} {(apt.profiles?.full_name || apt.customer_name || 'Misafir').split(' ')[0]}
+                                      {apt.appointment_time?.slice(0,5)} {getCustomerName(apt).split(' ')[0]}
                                     </div>
                                   ))}
                                   {dayApts.length > 3 && <p className="text-[9px] font-bold text-gray-400">+{dayApts.length-3}</p>}
@@ -3471,7 +3505,7 @@ export default function Dashboard() {
       {/* RANDEVU DETAY MODALİ */}
       {selectedApt && (() => {
         const close = () => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); };
-        const nameParts = (selectedApt.profiles?.full_name || selectedApt.customer_name || 'M').split(' ');
+        const nameParts = getCustomerName(selectedApt).split(' ');
         const initials = nameParts.map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
         const aptId = (selectedApt.id as string)?.slice(-8)?.toUpperCase() || '--------';
         const timeline = [
@@ -3506,7 +3540,7 @@ export default function Dashboard() {
                   <span className="text-white font-black text-lg">{initials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-lg font-black text-black truncate">{selectedApt.profiles?.full_name || selectedApt.customer_name || 'Misafir'}</h4>
+                  <h4 className="text-lg font-black text-black truncate">{getCustomerName(selectedApt)}</h4>
                   {selectedApt.profiles?.email && (
                     <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.profiles.email}</p>
                   )}
