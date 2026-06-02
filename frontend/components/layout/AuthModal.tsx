@@ -101,9 +101,6 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     if (password !== confirmPassword) { setAuthError("Şifreler eşleşmiyor."); return; }
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
-    // Eğer Supabase confirm email kapalıysa session otomatik oluşur.
-    // Her halükarda signOut yaparak OTP ekranına temiz geçiyoruz.
-    await supabase.auth.signOut();
     setLoading(false);
     if (error) {
       if (error.message.includes("already registered")) {
@@ -347,10 +344,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               </div>
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-2">Kodu Onayla</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-relaxed px-4">
-                {email} adresine gönderilen 6 haneli kodu girin.
+                {email} adresine gönderilen 8 haneli kodu girin.
               </p>
               <input
-                required maxLength={8} type="text" placeholder="000000"
+                required maxLength={8} type="text" placeholder="00000000"
                 className="w-full p-6 bg-gray-50 rounded-3xl text-center text-4xl font-black tracking-[0.2em] text-[#00A3AD] focus:ring-4 ring-[#00A3AD]/20 outline-none transition-all placeholder:text-gray-200"
                 onChange={e => setOtp(e.target.value)} value={otp}
               />

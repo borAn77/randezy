@@ -80,12 +80,13 @@ export default function Navbar() {
       if (verified && currentUser) checkProfileStatus(currentUser);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const currentUser = session?.user ?? null;
       const verified = currentUser?.email_confirmed_at != null;
       setUser(verified ? currentUser : null);
       if (verified && session) {
-        setIsAuthOpen(false);
+        // Sadece gerçek login'de modal kapat — signUp sırasında kapatma
+        if (event === 'SIGNED_IN') setIsAuthOpen(false);
         checkProfileStatus(currentUser);
       } else {
         setShowCompleteProfile(false);
