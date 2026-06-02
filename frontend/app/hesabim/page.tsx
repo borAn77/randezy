@@ -28,6 +28,10 @@ export default function HesabimPage() {
   useEffect(() => {
     const getInitialData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user || !session.user.email_confirmed_at) {
+        router.replace('/');
+        return;
+      }
       if (session?.user) {
         setUser(session.user);
         const { data: prof } = await supabase

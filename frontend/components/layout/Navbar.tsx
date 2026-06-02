@@ -49,19 +49,22 @@ export default function Navbar() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) checkProfileStatus(currentUser);
+      const verified = currentUser?.email_confirmed_at != null;
+      setUser(verified ? currentUser : null);
+      if (verified && currentUser) checkProfileStatus(currentUser);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (session) {
+      const verified = currentUser?.email_confirmed_at != null;
+      setUser(verified ? currentUser : null);
+      if (verified && session) {
         setIsAuthOpen(false);
         checkProfileStatus(currentUser);
       } else {
         setShowCompleteProfile(false);
         setUserRole(null);
+        setUserFullName(null);
       }
     });
 

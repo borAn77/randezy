@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../components/layout/Navbar";
@@ -42,6 +42,14 @@ export default function IsletmeEkle() {
     district: "",
     street: "",
   });
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user || !session.user.email_confirmed_at) {
+        router.replace('/');
+      }
+    });
+  }, [router]);
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 

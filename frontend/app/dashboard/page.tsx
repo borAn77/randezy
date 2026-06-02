@@ -195,7 +195,7 @@ export default function Dashboard() {
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace('/'); return; }
+    if (!user || !user.email_confirmed_at) { router.replace('/'); return; }
 
     const { data: profile } = await supabase
       .from('profiles')
