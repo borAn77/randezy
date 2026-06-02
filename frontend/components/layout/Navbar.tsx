@@ -7,6 +7,12 @@ import UserMenu from "./UserMenu";
 import CompleteProfileModal from "./CompleteProfileModal";
 import { supabase } from "../../lib/supabase";
 
+const isValidName = (name: string | null | undefined): boolean => {
+  if (!name || name.trim().length < 2) return false;
+  if (/^\d+$/.test(name.trim())) return false;
+  return true;
+};
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -29,8 +35,20 @@ export default function Navbar() {
 
     if (data) {
       setUserRole(data.role);
-      setUserFullName(data.full_name || null);
-      if (!data.phone || !data.full_name) {
+
+      let displayName: string | null = isValidName(data.full_name) ? data.full_name : null;
+
+      // Geçersiz veya eksik full_name varsa Google/OAuth metadata'dan tek seferlik doldur
+      if (!displayName) {
+        const metaName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name;
+        if (isValidName(metaName)) {
+          displayName = metaName;
+          await supabase.from('profiles').update({ full_name: metaName }).eq('id', sessionUser.id);
+        }
+      }
+
+      setUserFullName(displayName);
+      if (!data.phone || !displayName) {
         setShowCompleteProfile(true);
       } else {
         setShowCompleteProfile(false);

@@ -8,7 +8,7 @@ export default function UserMenu({ user, isDark = true, fullName }: { user: any;
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const displayName = fullName || user?.user_metadata?.full_name || 'Müşteri';
+  const displayName = fullName || 'Müşteri';
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);

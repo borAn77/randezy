@@ -437,7 +437,7 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase.from('profiles').upsert({ id: user.id, email: user.email, role: 'business_owner', full_name: fd.get('name') as string });
+    await supabase.from('profiles').upsert({ id: user.id, email: user.email, role: 'business_owner' });
 
     // Mevcut dükkanı bul — yoksa yeni oluştur, varsa üzerine yaz
     let shopId = shop?.id;

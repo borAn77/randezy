@@ -6,6 +6,14 @@ import { X, ShieldCheck, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 type Mode = 'login' | 'register' | 'otp' | 'forgot' | 'forgotSent';
 
+const normalizePhone = (raw: string): string | null => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('90') && digits.length === 12) return '+' + digits;
+  if (digits.startsWith('0') && digits.length === 11) return '+90' + digits.slice(1);
+  if (digits.startsWith('5') && digits.length === 10) return '+90' + digits;
+  return null;
+};
+
 export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [mode, setMode] = useState<Mode>('login');
   const [loading, setLoading] = useState(false);
@@ -14,6 +22,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [kvkkConsent, setKvkkConsent] = useState(false);
   const [internationalConsent, setInternationalConsent] = useState(false);
@@ -34,6 +45,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const handleClose = () => {
     setMode('login');
     setEmail(""); setPassword(""); setConfirmPassword(""); setOtp("");
+    setFirstName(""); setLastName(""); setPhone("");
     setShowPassword(false);
     setAuthError(null);
     setKvkkConsent(false);
@@ -69,6 +81,19 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       setAuthError("Devam etmek için zorunlu onay kutucuklarını işaretleyin.");
       return;
     }
+    if (firstName.trim().length < 2 || /^\d+$/.test(firstName.trim())) {
+      setAuthError("Geçerli bir ad girin (en az 2 harf).");
+      return;
+    }
+    if (lastName.trim().length < 2 || /^\d+$/.test(lastName.trim())) {
+      setAuthError("Geçerli bir soyad girin (en az 2 harf).");
+      return;
+    }
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      setAuthError("Geçerli bir Türkiye cep telefonu girin. Örnek: 05321234567");
+      return;
+    }
     if (!/^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/.test(password)) {
       setAuthError("Şifre en az 8 karakter, 1 büyük harf ve 1 sembol (!@#$%^&*) içermelidir.");
       return;
@@ -98,6 +123,18 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.access_token) {
+          // Profil yaz — OTP doğrulandıktan sonra
+          const normalizedPhone = normalizePhone(phone);
+          await supabase.from('profiles').upsert({
+            id: session.user.id,
+            email: session.user.email,
+            full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            phone: normalizedPhone,
+          }, { onConflict: 'id' });
+
+          // Yasal onayları yaz
           const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
           if (marketingConsent) documents.push('ticari_ileti_v1');
           const res = await fetch('/api/legal-consents', {
@@ -205,9 +242,26 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-6">Ücretsiz hesap oluştur.</p>
 
               <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    required placeholder="Ad"
+                    value={firstName} onChange={e => setFirstName(e.target.value)}
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all"
+                  />
+                  <input
+                    required placeholder="Soyad"
+                    value={lastName} onChange={e => setLastName(e.target.value)}
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all"
+                  />
+                </div>
                 <input
                   required type="email" placeholder="E-posta adresin"
                   value={email} onChange={e => setEmail(e.target.value)}
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all"
+                />
+                <input
+                  required type="tel" placeholder="Telefon (05321234567)"
+                  value={phone} onChange={e => setPhone(e.target.value)}
                   className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all"
                 />
                 <div className="relative">
