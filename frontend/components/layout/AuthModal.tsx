@@ -30,12 +30,18 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const [internationalConsent, setInternationalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
 
-  // Body scroll lock
+  // Modal kapanınca state sıfırla
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+      setMode('login');
+      setEmail(''); setPassword(''); setConfirmPassword(''); setOtp('');
+      setFirstName(''); setLastName(''); setPhone('');
+      setAuthError(null);
+      setKvkkConsent(false); setInternationalConsent(false); setMarketingConsent(false);
     }
-    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   if (!isOpen) return null;
