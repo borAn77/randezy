@@ -8,6 +8,29 @@ import {
   Store, TrendingUp, Users, Settings, PlusCircle, Heart
 } from "lucide-react";
 
+const normalizePhone = (raw: string): string | null => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('90') && digits.length === 12 && digits[2] === '5') return '+' + digits;
+  if (digits.startsWith('0') && digits.length === 11 && digits[1] === '5') return '+90' + digits.slice(1);
+  if (digits.startsWith('5') && digits.length === 10) return '+90' + digits;
+  return null;
+};
+
+const formatPhoneDisplay = (phone: string | null | undefined): string => {
+  if (!phone) return '';
+  const m = phone.match(/^\+90(\d{3})(\d{3})(\d{2})(\d{2})$/);
+  if (m) return `+90 ${m[1]} ${m[2]} ${m[3]} ${m[4]}`;
+  return phone;
+};
+
+const isValidPersonName = (name: string): boolean => {
+  const t = name.trim();
+  if (t.length < 2 || t.length > 40) return false;
+  if (/^\d+$/.test(t)) return false;
+  if (/^[\s\d!@#$%^&*()\-_=+[\]{}|;:'",.<>?/\\`~]+$/.test(t)) return false;
+  return true;
+};
+
 export default function HesabimPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -21,6 +44,7 @@ export default function HesabimPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -91,21 +115,40 @@ export default function HesabimPage() {
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setProfileError(null);
+
+    if (!isValidPersonName(editForm.firstName)) {
+      setProfileError("Geçerli bir ad girin (en az 2 harf, yalnızca rakam olamaz).");
+      return;
+    }
+    if (!isValidPersonName(editForm.lastName)) {
+      setProfileError("Geçerli bir soyad girin (en az 2 harf, yalnızca rakam olamaz).");
+      return;
+    }
+    const normalizedPhone = normalizePhone(editForm.phone);
+    if (!normalizedPhone) {
+      setProfileError("Geçerli bir Türkiye cep telefonu girin. Örnek: 05321234567");
+      return;
+    }
+
     setSavingProfile(true);
+    const fn = editForm.firstName.trim();
+    const ln = editForm.lastName.trim();
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
-      first_name: editForm.firstName,
-      last_name: editForm.lastName,
-      full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
-      phone: editForm.phone.trim() || null,
+      first_name: fn,
+      last_name: ln,
+      full_name: `${fn} ${ln}`.trim(),
+      phone: normalizedPhone,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
     setSavingProfile(false);
     if (!error) {
-      setProfile({ ...profile, first_name: editForm.firstName, last_name: editForm.lastName, full_name: `${editForm.firstName} ${editForm.lastName}`.trim(), phone: editForm.phone.trim() || null });
+      setProfile({ ...profile, first_name: fn, last_name: ln, full_name: `${fn} ${ln}`.trim(), phone: normalizedPhone });
       setIsEditingProfile(false);
+      window.dispatchEvent(new CustomEvent('profile-updated'));
     } else {
-      alert("Güncelleme hatası: " + error.message);
+      setProfileError("Güncelleme başarısız, tekrar deneyin.");
     }
   };
 
@@ -248,22 +291,52 @@ export default function HesabimPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Ad</label>
-                      <input required value={editForm.firstName} onChange={e => setEditForm({...editForm, firstName: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                      <input
+                        required
+                        value={editForm.firstName}
+                        onChange={e => { setEditForm({...editForm, firstName: e.target.value}); setProfileError(null); }}
+                        maxLength={40}
+                        className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all"
+                      />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Soyad</label>
-                      <input required value={editForm.lastName} onChange={e => setEditForm({...editForm, lastName: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                      <input
+                        required
+                        value={editForm.lastName}
+                        onChange={e => { setEditForm({...editForm, lastName: e.target.value}); setProfileError(null); }}
+                        maxLength={40}
+                        className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all"
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Telefon</label>
-                    <input value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all" />
+                    <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">E-Posta</label>
+                    <input
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full p-5 bg-gray-100 rounded-2xl border-2 border-gray-100 font-bold text-sm text-gray-400 outline-none cursor-not-allowed"
+                    />
+                    <p className="text-[9px] text-gray-400 font-medium">E-posta adresi hesap kimliğidir ve değiştirilemez.</p>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-[#00A3AD] uppercase tracking-widest">Telefon</label>
+                    <input
+                      type="tel"
+                      placeholder="05321234567"
+                      value={editForm.phone}
+                      onChange={e => { setEditForm({...editForm, phone: e.target.value}); setProfileError(null); }}
+                      className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-bold text-sm text-black focus:border-[#00A3AD] focus:bg-white outline-none transition-all"
+                    />
+                  </div>
+                  {profileError && (
+                    <p className="text-sm font-bold text-red-500">{profileError}</p>
+                  )}
                   <div className="flex gap-4 mt-8">
                     <button type="submit" disabled={savingProfile} className="flex-1 bg-black text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-xl disabled:opacity-50">
                       {savingProfile ? "Kaydediliyor..." : "Kaydet"}
                     </button>
-                    <button type="button" onClick={() => setIsEditingProfile(false)} disabled={savingProfile} className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50">İptal</button>
+                    <button type="button" onClick={() => { setIsEditingProfile(false); setProfileError(null); }} disabled={savingProfile} className="px-8 py-5 rounded-2xl font-black uppercase tracking-widest border-2 border-gray-100 text-gray-500 hover:bg-gray-50 transition-all disabled:opacity-50">İptal</button>
                   </div>
                 </form>
               ) : (
@@ -273,7 +346,7 @@ export default function HesabimPage() {
                       { label: "Ad", value: profile?.first_name || profile?.full_name?.split(' ')[0] },
                       { label: "Soyad", value: profile?.last_name || profile?.full_name?.split(' ').slice(1).join(' ') },
                       { label: "E-Posta", value: user?.email, muted: true },
-                      { label: "Telefon", value: profile?.phone },
+                      { label: "Telefon", value: formatPhoneDisplay(profile?.phone) },
                       { label: "Yaş", value: profile?.age }
                     ].map((field, i) => (
                       <div key={i} className="space-y-2">
