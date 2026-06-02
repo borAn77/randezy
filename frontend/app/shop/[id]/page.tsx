@@ -1260,9 +1260,14 @@ export default function ShopDetail() {
                 {loading ? 'Kaydediliyor...' : cart.length === 0 ? 'Hizmet seç' : 'Randevuyu onayla →'}
               </button>
               {cart.length > 0 && (
-                <p className="text-[9px] text-center leading-relaxed mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  Randevu oluşturarak ad, iletişim ve randevu bilgilerinizin ilgili işletme ile paylaşılmasını kabul etmiş sayılırsınız.
-                </p>
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Randevu oluşturarak ad, iletişim ve randevu bilgilerinizin ilgili işletme ile paylaşılmasını kabul etmiş sayılırsınız.
+                  </p>
+                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                    Gelemeyeceğiniz randevuları mümkün olduğunca erken iptal etmenizi rica ederiz. Geç iptal veya randevuya gelmeme durumlarında işletmeler ileride ön ödeme talep edebilir.
+                  </p>
+                </div>
               )}
             </div>
           </div>
