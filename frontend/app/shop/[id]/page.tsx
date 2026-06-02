@@ -579,11 +579,16 @@ export default function ShopDetail() {
       }
     }
 
-    await supabase.from('profiles').upsert({ id: session.user.id, email: session.user.email }, { onConflict: 'id' });
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .upsert({ id: session.user.id, email: session.user.email }, { onConflict: 'id' })
+      .select('full_name')
+      .single();
+    const customerName = profileData?.full_name || session.user.user_metadata?.full_name || 'Müşteri';
     const inserts = cart.map(item => ({
       user_id: session.user.id,
       shop_id: shopId,
-      customer_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
+      customer_name: customerName,
       service_id: item.service.id,
       service_name: item.service.name,
       price: item.discountedPrice,

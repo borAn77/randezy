@@ -15,6 +15,7 @@ export default function Navbar() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -28,6 +29,7 @@ export default function Navbar() {
 
     if (data) {
       setUserRole(data.role);
+      setUserFullName(data.full_name || null);
       if (!data.phone || !data.full_name) {
         setShowCompleteProfile(true);
       } else {
@@ -94,7 +96,7 @@ export default function Navbar() {
 
           <div className="flex items-center gap-3 sm:gap-6 lg:gap-12">
             {user ? (
-              <UserMenu user={user} isDark={!isScrolled && isHomePage} />
+              <UserMenu user={user} isDark={!isScrolled && isHomePage} fullName={userFullName} />
             ) : (
               <button
                 onClick={() => setIsAuthOpen(true)}

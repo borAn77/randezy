@@ -4,11 +4,11 @@ import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { User, Calendar, Gift, LogOut, ChevronDown } from "lucide-react"; // ✂️ Settings buradan silindi
 
-export default function UserMenu({ user, isDark = true }: { user: any; isDark?: boolean }) {
+export default function UserMenu({ user, isDark = true, fullName }: { user: any; isDark?: boolean; fullName?: string | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0];
+  const displayName = fullName || user?.user_metadata?.full_name || 'Müşteri';
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
