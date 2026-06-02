@@ -369,6 +369,7 @@ export default function ShopDetail() {
   const [serviceStaffFilter, setServiceStaffFilter] = useState<any>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
   const [nearbyShops, setNearbyShops] = useState<any[]>([]);
   const [nearbyAvailability, setNearbyAvailability] = useState<Record<number, boolean>>({});
@@ -1253,7 +1254,7 @@ export default function ShopDetail() {
               )}
               <button
                 disabled={cart.length === 0 || loading}
-                onClick={handleCartConfirm}
+                onClick={() => { if (cart.length > 0) setShowConfirmModal(true); }}
                 className="w-full rounded-xl py-3.5 font-bold text-sm transition-all"
                 style={{ background: cart.length === 0 ? 'rgba(255,255,255,0.1)' : '#14b8a6', color: cart.length === 0 ? 'rgba(255,255,255,0.3)' : '#04221d', cursor: cart.length === 0 ? 'not-allowed' : 'pointer' }}
               >
@@ -1261,10 +1262,10 @@ export default function ShopDetail() {
               </button>
               {cart.length > 0 && (
                 <div className="mt-2 space-y-1.5">
-                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
                     Randevu oluşturarak ad, iletişim ve randevu bilgilerinizin ilgili işletme ile paylaşılmasını kabul etmiş sayılırsınız.
                   </p>
-                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                  <p className="text-[9px] text-center leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
                     Gelemeyeceğiniz randevuları mümkün olduğunca erken iptal etmenizi rica ederiz. Geç iptal veya randevuya gelmeme durumlarında işletmeler ileride ön ödeme talep edebilir.
                   </p>
                 </div>
@@ -1285,7 +1286,7 @@ export default function ShopDetail() {
           </div>
           <button
             onClick={() => {
-              if (cart.length > 0 && currentUserId) { handleCartConfirm(); }
+              if (cart.length > 0 && currentUserId) { setShowConfirmModal(true); }
               else { document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' }); }
             }}
             className="flex-shrink-0 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
@@ -1305,6 +1306,63 @@ export default function ShopDetail() {
       )}
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+
+      {/* Confirm booking modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[260] flex items-end sm:items-center justify-center p-0 sm:p-6" style={{ background: 'rgba(12,12,13,0.55)', backdropFilter: 'blur(8px)' }} onClick={() => setShowConfirmModal(false)}>
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <h3 className="text-base font-black uppercase tracking-tight text-[#0c0c0d]">Randevunu Onayla</h3>
+              <button onClick={() => setShowConfirmModal(false)} className="w-8 h-8 rounded-full border border-gray-200 grid place-items-center hover:bg-gray-50 transition-colors"><X size={16} /></button>
+            </div>
+            {/* Cart summary */}
+            <div className="px-6 py-4 space-y-3 max-h-[40vh] overflow-y-auto">
+              {cart.map((item, i) => {
+                const hasDiscount = item.discountedPrice < (Number(item.service.price) || 0);
+                return (
+                  <div key={i} className="flex items-start justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+                    <div>
+                      <div className="font-bold text-[13px] text-[#0c0c0d]">{item.service.name}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5 font-mono">
+                        {item.date.getDate()} {MONTHS_SHORT[item.date.getMonth()]} · {item.time}{item.staff ? ` · ${item.staff.first_name}` : ''} · {item.service.duration} dk
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      {hasDiscount && <div className="text-[10px] line-through text-gray-300 font-mono">{item.service.price} ₺</div>}
+                      <div className="font-bold text-[13px] font-mono" style={{ color: hasDiscount ? '#14b8a6' : '#0c0c0d' }}>{item.discountedPrice} ₺</div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between items-baseline pt-1 font-mono text-[12px] font-bold">
+                <span className="text-gray-400">Toplam · {cartDuration} dk</span>
+                <span className="text-[#0c0c0d]">{cartTotal} ₺</span>
+              </div>
+            </div>
+            {/* Warning */}
+            <div className="mx-6 mb-4 rounded-xl px-4 py-3" style={{ background: '#FFF8EC' }}>
+              <p className="text-[11px] leading-relaxed text-[#92601A] font-medium">
+                Gelemeyeceğiniz randevuları mümkün olduğunca erken iptal etmenizi rica ederiz. Geç iptal veya randevuya gelmeme durumlarında işletmeler ileride ön ödeme talep edebilir.
+              </p>
+            </div>
+            {/* Actions */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => setShowConfirmModal(false)} className="flex-1 py-3 rounded-xl font-bold text-sm border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+                Vazgeç
+              </button>
+              <button
+                onClick={() => { setShowConfirmModal(false); handleCartConfirm(); }}
+                disabled={loading}
+                className="flex-1 py-3 rounded-xl font-bold text-sm transition-colors"
+                style={{ background: '#14b8a6', color: '#04221d' }}
+              >
+                {loading ? 'Kaydediliyor...' : 'Evet, onayla →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cancellation modal */}
       {showCancellationModal && (
