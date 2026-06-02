@@ -344,7 +344,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               </div>
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-2">Kodu Onayla</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-relaxed px-4">
-                {email} adresine gönderilen 8 haneli kodu girin.
+                {email} adresine doğrulama kodu gönderildi. Gelen kutunu kontrol et.
               </p>
               <input
                 required maxLength={8} type="text" placeholder="00000000"
