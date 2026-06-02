@@ -7,6 +7,7 @@ export default function AuthCallback() {
   const router = useRouter();
   const [consentError, setConsentError] = useState(false);
   const [accessToken, setAccessToken] = useState('');
+  const [loadingStep, setLoadingStep] = useState('checking');
 
   const checkAndWriteConsent = async (token: string): Promise<{ ok: boolean; needsConsent: boolean }> => {
     const legalFlag = sessionStorage.getItem('randezy_legal_consent');
@@ -18,6 +19,7 @@ export default function AuthCallback() {
       sessionStorage.removeItem('randezy_legal_consent');
       sessionStorage.removeItem('randezy_marketing_consent');
 
+      setLoadingStep('writing');
       try {
         const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
         if (marketing) documents.push('ticari_ileti_v1');
@@ -36,6 +38,7 @@ export default function AuthCallback() {
     }
 
     // Mevcut kullanıcıysa required consent var mı kontrol et
+    setLoadingStep('checking');
     try {
       const res = await fetch('/api/legal-consents?required=true', {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -108,8 +111,37 @@ export default function AuthCallback() {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-      <p>Giriş yapılıyor...</p>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 24, backgroundColor: '#F9F9F9' }}>
+      {/* Randezy Logo */}
+      <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, color: '#0C0C0D' }}>
+        randezy
+      </div>
+
+      {/* Spinner */}
+      <div style={{
+        width: 48,
+        height: 48,
+        border: '4px solid #E5E5E5',
+        borderTop: '4px solid #00A3AD',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite',
+      }} />
+
+      {/* Loading steps */}
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#0C0C0D', margin: 0 }}>
+          {loadingStep === 'writing' ? 'Onaylar kaydediliyor...' : 'Giriş yapılıyor...'}
+        </p>
+        <p style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
+          {loadingStep === 'writing' ? 'Lütfen bekleyin' : 'Yasal onaylar kontrol ediliyor...'}
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
