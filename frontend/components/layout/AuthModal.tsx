@@ -101,6 +101,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     if (password !== confirmPassword) { setAuthError("Şifreler eşleşmiyor."); return; }
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email, password });
+    // Eğer Supabase confirm email kapalıysa session otomatik oluşur.
+    // Her halükarda signOut yaparak OTP ekranına temiz geçiyoruz.
+    await supabase.auth.signOut();
     setLoading(false);
     if (error) {
       if (error.message.includes("already registered")) {
@@ -344,17 +347,30 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               </div>
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-2">Kodu Onayla</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-10 leading-relaxed px-4">
-                {email} adresine gönderilen 8 haneli kodu girin.
+                {email} adresine gönderilen 6 haneli kodu girin.
               </p>
               <input
-                required maxLength={8} type="text" placeholder="00000000"
+                required maxLength={8} type="text" placeholder="000000"
                 className="w-full p-6 bg-gray-50 rounded-3xl text-center text-4xl font-black tracking-[0.2em] text-[#00A3AD] focus:ring-4 ring-[#00A3AD]/20 outline-none transition-all placeholder:text-gray-200"
                 onChange={e => setOtp(e.target.value)} value={otp}
               />
               <button disabled={loading} className="w-full bg-[#00A3AD] text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-8 hover:bg-black transition-all">
                 {loading ? "Onaylanıyor..." : "Onayla ve Devam Et"}
               </button>
-              <p className="mt-6 text-[10px] font-bold text-gray-300 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => switchMode('register')}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={async () => {
+                  setAuthError(null);
+                  const { error } = await supabase.auth.resend({ type: 'signup', email });
+                  if (error) setAuthError("Kod gönderilemedi, lütfen tekrar deneyin.");
+                  else setAuthError("Yeni doğrulama kodu gönderildi.");
+                }}
+                className="mt-4 w-full py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-[#00A3AD] transition-colors"
+              >
+                Kodu tekrar gönder
+              </button>
+              <p className="mt-2 text-[10px] font-bold text-gray-300 uppercase cursor-pointer hover:text-black transition-colors" onClick={() => switchMode('register')}>
                 Geri dön
               </p>
             </form>
