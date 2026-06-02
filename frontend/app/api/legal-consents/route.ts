@@ -6,6 +6,35 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
 );
 
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "").trim();
+  if (!token) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { data } = await supabaseAdmin
+      .from("legal_consents")
+      .select("document_key")
+      .eq("user_id", user.id);
+
+    const keys = new Set(data?.map(row => row.document_key) || []);
+    const requiredKeys = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+    const hasRequired = requiredKeys.every(k => keys.has(k));
+
+    return NextResponse.json({ ok: true, hasRequired, keys: Array.from(keys) });
+  } catch (error: any) {
+    console.error("[legal-consents GET] error:", error);
+    return NextResponse.json({ ok: false, reason: error.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ ok: false, reason: "config_error" }, { status: 500 });

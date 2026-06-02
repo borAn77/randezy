@@ -8,55 +8,75 @@ export default function AuthCallback() {
   const [consentError, setConsentError] = useState(false);
   const [accessToken, setAccessToken] = useState('');
 
-  const writeConsent = async (token: string): Promise<boolean> => {
+  const checkAndWriteConsent = async (token: string): Promise<{ ok: boolean; needsConsent: boolean }> => {
     const legalFlag = sessionStorage.getItem('randezy_legal_consent');
-    if (legalFlag !== 'true') return true; // mevcut kullanıcı girişi — consent gerekmez
 
-    const marketingRaw = sessionStorage.getItem('randezy_marketing_consent');
-    const marketing = marketingRaw === 'true';
+    // Register modundan geldiyse consent yaz
+    if (legalFlag === 'true') {
+      const marketingRaw = sessionStorage.getItem('randezy_marketing_consent');
+      const marketing = marketingRaw === 'true';
+      sessionStorage.removeItem('randezy_legal_consent');
+      sessionStorage.removeItem('randezy_marketing_consent');
 
-    sessionStorage.removeItem('randezy_legal_consent');
-    sessionStorage.removeItem('randezy_marketing_consent');
+      try {
+        const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+        if (marketing) documents.push('ticari_ileti_v1');
+        const res = await fetch('/api/legal-consents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ documents, marketing_consent: marketing }),
+        });
+        return { ok: res.ok, needsConsent: false };
+      } catch {
+        return { ok: false, needsConsent: false };
+      }
+    }
 
+    // Mevcut kullanıcıysa required consent var mı kontrol et
     try {
-      const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
-      if (marketing) documents.push('ticari_ileti_v1');
-      const res = await fetch('/api/legal-consents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ documents, marketing_consent: marketing }),
+      const res = await fetch('/api/legal-consents?required=true', {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-      return res.ok;
+      const data = await res.json();
+      return { ok: true, needsConsent: !data.hasRequired };
     } catch {
-      return false;
+      return { ok: true, needsConsent: true };
     }
   };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        const ok = await writeConsent(session.access_token);
-        if (!ok) {
+        const result = await checkAndWriteConsent(session.access_token);
+        if (!result.ok) {
           setConsentError(true);
           setAccessToken(session.access_token);
           return;
         }
-        router.replace('/');
+        if (result.needsConsent) {
+          router.replace('/legal-onay');
+        } else {
+          router.replace('/');
+        }
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        const ok = await writeConsent(session.access_token);
-        if (!ok) {
+        const result = await checkAndWriteConsent(session.access_token);
+        if (!result.ok) {
           setConsentError(true);
           setAccessToken(session.access_token);
           return;
         }
-        router.replace('/');
+        if (result.needsConsent) {
+          router.replace('/legal-onay');
+        } else {
+          router.replace('/');
+        }
       }
     });
 
@@ -65,9 +85,14 @@ export default function AuthCallback() {
 
   const handleRetry = async () => {
     setConsentError(false);
-    const ok = await writeConsent(accessToken);
-    if (ok) router.replace('/');
-    else setConsentError(true);
+    const result = await checkAndWriteConsent(accessToken);
+    if (!result.ok) {
+      setConsentError(true);
+    } else if (result.needsConsent) {
+      router.replace('/legal-onay');
+    } else {
+      router.replace('/');
+    }
   };
 
   if (consentError) {
