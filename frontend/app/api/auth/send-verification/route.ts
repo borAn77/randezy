@@ -24,16 +24,12 @@ export async function POST(req: NextRequest) {
     if (error || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
     userId = user.id;
     userEmail = user.email!;
-  } else if (body?.userId) {
+  } else if (body?.userId && body?.email) {
     // Supabase confirmation ON: session yok ama userId var (yeni kayıt)
-    const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(body.userId);
-    if (error || !user || user.email !== body.email) {
-      return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
-    }
-    userId = user.id;
-    userEmail = user.email!;
+    userId = body.userId;
+    userEmail = body.email;
 
-    // Profili oluştur (henüz yoksa)
+    // Profili oluştur veya güncelle
     await supabaseAdmin.from("profiles").upsert({
       id: userId,
       email: userEmail,
