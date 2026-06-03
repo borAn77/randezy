@@ -55,5 +55,8 @@ export async function POST(req: NextRequest) {
     .update({ email_verified: true, email_otp: null, email_otp_expires_at: null })
     .eq("id", userId);
 
+  // Supabase tarafında da email'i onayla (confirmation ON olsa bile login çalışsın)
+  await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+
   return NextResponse.json({ status: "verified" });
 }

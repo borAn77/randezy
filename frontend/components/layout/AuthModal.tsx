@@ -184,12 +184,36 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       setAuthError(err?.body?.detail || "Doğrulama kodu hatalı veya süresi dolmuş.");
       return;
     }
-    // Profilde email_verified = true yap
+    // Session varsa profili güncelle + refresh et, yoksa şifreyle giriş yap
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await supabase.from('profiles').update({ email_verified: true }).eq('id', session.user.id);
-      window.dispatchEvent(new CustomEvent('profile-updated'));
+      await supabase.auth.refreshSession();
+    } else if (password) {
+      // Supabase confirmation açıksa session gelmiyordu — şimdi onaylandı, giriş yap
+      const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInData.session) {
+        const normalizedPhone = normalizePhone(phone);
+        await supabase.from('profiles').upsert({
+          id: signInData.session.user.id,
+          email: signInData.session.user.email,
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone: normalizedPhone || null,
+          email_verified: true,
+        }, { onConflict: 'id' });
+        const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+        if (marketingConsent) documents.push('ticari_ileti_v1');
+        await fetch('/api/legal-consents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${signInData.session.access_token}` },
+          body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
+        });
+        await supabase.auth.refreshSession();
+      }
     }
+    window.dispatchEvent(new CustomEvent('profile-updated'));
     setLoading(false);
     handleClose();
   };
