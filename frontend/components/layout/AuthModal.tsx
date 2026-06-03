@@ -136,7 +136,19 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     }
     const session = signUpData.session;
     if (!session) {
-      // Supabase onayı açıksa session gelmiyor — sadece OTP ekranına geç
+      // Supabase confirmation ON: profil oluştur + OTP gönder (userId ile)
+      try {
+        await api.sendEmailVerification(email, {
+          userId: signUpData.user!.id,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: normalizedPhone,
+        });
+      } catch {
+        setLoading(false);
+        setAuthError("Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.");
+        return;
+      }
       setLoading(false);
       switchMode('otp');
       return;

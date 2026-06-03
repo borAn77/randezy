@@ -15,27 +15,48 @@ export async function POST(req: NextRequest) {
 
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
 
+  let body: any = {};
+  try { body = await req.json(); } catch { /* empty body ok */ }
+
   if (token) {
-    // Oturumu olan kullanıcı (login sonrası)
+    // Oturumu olan kullanıcı
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
     userId = user.id;
     userEmail = user.email!;
-  } else {
-    // Oturumu olmayan kullanıcı (signUp sonrası Supabase confirmation açıksa)
-    let body: any;
-    try { body = await req.json(); } catch { body = {}; }
-    if (!body?.email) return NextResponse.json({ detail: "email required" }, { status: 400 });
+  } else if (body?.userId) {
+    // Supabase confirmation ON: session yok ama userId var (yeni kayıt)
+    const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(body.userId);
+    if (error || !user || user.email !== body.email) {
+      return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+    }
+    userId = user.id;
+    userEmail = user.email!;
 
+    // Profili oluştur (henüz yoksa)
+    await supabaseAdmin.from("profiles").upsert({
+      id: userId,
+      email: userEmail,
+      email_verified: false,
+      ...(body.firstName && {
+        first_name: body.firstName,
+        last_name: body.lastName ?? "",
+        full_name: `${body.firstName} ${body.lastName ?? ""}`.trim(),
+      }),
+      ...(body.phone && { phone: body.phone }),
+    }, { onConflict: 'id' });
+  } else if (body?.email) {
+    // Tekrar gönder — profil zaten var
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("email", body.email)
       .single();
-
     if (!profile) return NextResponse.json({ detail: "user not found" }, { status: 404 });
     userId = profile.id;
     userEmail = body.email;
+  } else {
+    return NextResponse.json({ detail: "email required" }, { status: 400 });
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
