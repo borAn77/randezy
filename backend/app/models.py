@@ -47,6 +47,9 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         SQLEnum(UserRole, name="userrole"), server_default=UserRole.customer.value
     )
+    email_verified: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    email_otp: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    email_otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     businesses: Mapped[list[Business]] = relationship("Business", back_populates="owner")

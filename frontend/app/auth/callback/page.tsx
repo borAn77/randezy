@@ -50,36 +50,35 @@ export default function AuthCallback() {
     }
   };
 
+  const handleSession = async (session: any) => {
+    const result = await checkAndWriteConsent(session.access_token);
+    if (!result.ok) {
+      setConsentError(true);
+      setAccessToken(session.access_token);
+      return;
+    }
+    // Google ile giriş yapanlar email_verified=true olarak işaretle
+    await supabase.from('profiles').upsert(
+      { id: session.user.id, email: session.user.email ?? '', email_verified: true },
+      { onConflict: 'id' }
+    );
+    if (result.needsConsent) {
+      router.replace('/legal-onay');
+    } else {
+      router.replace('/');
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        const result = await checkAndWriteConsent(session.access_token);
-        if (!result.ok) {
-          setConsentError(true);
-          setAccessToken(session.access_token);
-          return;
-        }
-        if (result.needsConsent) {
-          router.replace('/legal-onay');
-        } else {
-          router.replace('/');
-        }
+        await handleSession(session);
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        const result = await checkAndWriteConsent(session.access_token);
-        if (!result.ok) {
-          setConsentError(true);
-          setAccessToken(session.access_token);
-          return;
-        }
-        if (result.needsConsent) {
-          router.replace('/legal-onay');
-        } else {
-          router.replace('/');
-        }
+        await handleSession(session);
       }
     });
 

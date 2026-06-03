@@ -26,33 +26,45 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   const checkProfileStatus = async (sessionUser: any) => {
-    if (!sessionUser) return;
+    if (!sessionUser) {
+      setUser(null);
+      setShowCompleteProfile(false);
+      setUserRole(null);
+      setUserFullName(null);
+      return;
+    }
     const { data } = await supabase
       .from('profiles')
-      .select('phone, full_name, role')
+      .select('phone, full_name, role, email_verified')
       .eq('id', sessionUser.id)
       .single();
 
-    if (data) {
-      setUserRole(data.role);
+    if (!data?.email_verified) {
+      setUser(null);
+      setShowCompleteProfile(false);
+      setUserRole(null);
+      setUserFullName(null);
+      return;
+    }
 
-      let displayName: string | null = isValidName(data.full_name) ? data.full_name : null;
+    setUserRole(data.role);
 
-      // Geçersiz veya eksik full_name varsa Google/OAuth metadata'dan tek seferlik doldur
-      if (!displayName) {
-        const metaName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name;
-        if (isValidName(metaName)) {
-          displayName = metaName;
-          await supabase.from('profiles').update({ full_name: metaName }).eq('id', sessionUser.id);
-        }
+    let displayName: string | null = isValidName(data.full_name) ? data.full_name : null;
+    if (!displayName) {
+      const metaName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name;
+      if (isValidName(metaName)) {
+        displayName = metaName;
+        await supabase.from('profiles').update({ full_name: metaName }).eq('id', sessionUser.id);
       }
+    }
 
-      setUserFullName(displayName);
-      if (!data.phone || !displayName) {
-        setShowCompleteProfile(true);
-      } else {
-        setShowCompleteProfile(false);
-      }
+    setUserFullName(displayName);
+    setUser(sessionUser);
+
+    if (!data.phone || !displayName) {
+      setShowCompleteProfile(true);
+    } else {
+      setShowCompleteProfile(false);
     }
   };
 
@@ -74,24 +86,17 @@ export default function Navbar() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      const verified = currentUser?.email_confirmed_at != null;
-      setUser(verified ? currentUser : null);
-      if (verified && currentUser) checkProfileStatus(currentUser);
+      checkProfileStatus(session?.user ?? null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      const currentUser = session?.user ?? null;
-      const verified = currentUser?.email_confirmed_at != null;
-      setUser(verified ? currentUser : null);
-      if (verified && session) {
-        // Sadece gerçek login'de modal kapat — signUp sırasında kapatma
-        if (event === 'SIGNED_IN') setIsAuthOpen(false);
-        checkProfileStatus(currentUser);
-      } else {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
         setShowCompleteProfile(false);
         setUserRole(null);
         setUserFullName(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        checkProfileStatus(session?.user ?? null);
       }
     });
 

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 import { X, ShieldCheck, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 type Mode = 'login' | 'register' | 'otp' | 'forgot' | 'forgotSent';
@@ -75,10 +76,26 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setLoading(false);
+      if (error.message.includes("Invalid login credentials")) {
+        setAuthError("E-posta veya şifre hatalı.");
+      } else {
+        setAuthError("Giriş yapılamadı. Tekrar deneyin.");
+      }
+      return;
+    }
+    // Email doğrulaması kontrolü
+    const { data: profile } = await supabase.from('profiles').select('email_verified').eq('id', data.user.id).single();
     setLoading(false);
-    if (error) setAuthError(error.message.includes("Invalid login credentials") ? "E-posta veya şifre hatalı." : "Giriş yapılamadı. Tekrar deneyin.");
-    else handleClose();
+    if (!profile?.email_verified) {
+      try { await api.sendEmailVerification(); } catch { /* ignore */ }
+      switchMode('otp');
+      setAuthError("E-posta adresiniz henüz doğrulanmamış. Yeni bir doğrulama kodu gönderdik.");
+      return;
+    }
+    handleClose();
   };
 
   const handleRegister = async (e: any) => {
@@ -106,58 +123,75 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     }
     if (password !== confirmPassword) { setAuthError("Şifreler eşleşmiyor."); return; }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
+    const { data: signUpData, error } = await supabase.auth.signUp({ email, password });
     if (error) {
+      setLoading(false);
       if (error.message.includes("already registered")) {
         setAuthError("Bu e-posta zaten kayıtlı. Giriş yapın.");
         switchMode('login');
-      } else setAuthError("Kayıt başarısız. Tekrar deneyin.");
-    } else {
-      switchMode('otp');
+      } else {
+        setAuthError("Kayıt başarısız. Tekrar deneyin.");
+      }
+      return;
     }
+    const session = signUpData.session;
+    if (!session) {
+      // Supabase onayı açıksa session gelmiyor — sadece OTP ekranına geç
+      setLoading(false);
+      switchMode('otp');
+      return;
+    }
+    try {
+      // Profil oluştur (email_verified: false)
+      await supabase.from('profiles').upsert({
+        id: session.user.id,
+        email: session.user.email,
+        full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        phone: normalizedPhone,
+        email_verified: false,
+      }, { onConflict: 'id' });
+
+      // Yasal onayları yaz
+      const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+      if (marketingConsent) documents.push('ticari_ileti_v1');
+      const res = await fetch('/api/legal-consents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
+      });
+      if (!res.ok) throw new Error('legal-consents failed');
+
+      // Backend üzerinden doğrulama kodu gönder
+      await api.sendEmailVerification();
+    } catch {
+      setLoading(false);
+      setAuthError("Kayıt esnasında bir hata oluştu. Lütfen tekrar deneyin.");
+      return;
+    }
+    setLoading(false);
+    switchMode('otp');
   };
 
   const handleVerifyOtp = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
-    setLoading(false);
-    if (error) {
-      setAuthError("Doğrulama kodu hatalı veya süresi dolmuş.");
-    } else {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          // Profil yaz — OTP doğrulandıktan sonra
-          const normalizedPhone = normalizePhone(phone);
-          await supabase.from('profiles').upsert({
-            id: session.user.id,
-            email: session.user.email,
-            full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            phone: normalizedPhone,
-          }, { onConflict: 'id' });
-
-          // Yasal onayları yaz
-          const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
-          if (marketingConsent) documents.push('ticari_ileti_v1');
-          const res = await fetch('/api/legal-consents', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-            body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
-          });
-          if (!res.ok) { setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin."); return; }
-          // Navbar'a profil yazıldığını bildir — CompleteProfileModal açılmasın
-          window.dispatchEvent(new CustomEvent('profile-updated'));
-        }
-      } catch {
-        setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin.");
-        return;
-      }
-      handleClose();
+    try {
+      await api.verifyEmail(otp);
+    } catch (err: any) {
+      setLoading(false);
+      setAuthError(err?.body?.detail || "Doğrulama kodu hatalı veya süresi dolmuş.");
+      return;
     }
+    // Profilde email_verified = true yap
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.from('profiles').update({ email_verified: true }).eq('id', session.user.id);
+      window.dispatchEvent(new CustomEvent('profile-updated'));
+    }
+    setLoading(false);
+    handleClose();
   };
 
   const handleForgotPassword = async () => {
@@ -367,9 +401,12 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 disabled={loading}
                 onClick={async () => {
                   setAuthError(null);
-                  const { error } = await supabase.auth.resend({ type: 'signup', email });
-                  if (error) setAuthError("Kod gönderilemedi, lütfen tekrar deneyin.");
-                  else setAuthError("Yeni doğrulama kodu gönderildi.");
+                  try {
+                    await api.sendEmailVerification();
+                    setAuthError("Yeni doğrulama kodu gönderildi.");
+                  } catch {
+                    setAuthError("Kod gönderilemedi, lütfen tekrar deneyin.");
+                  }
                 }}
                 className="mt-4 w-full py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-[#00A3AD] transition-colors"
               >

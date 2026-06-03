@@ -27,6 +27,10 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
 
 
+class VerifyOtpRequest(BaseModel):
+    otp: str
+
+
 # ── Business ──────────────────────────────────────────────────────────────────
 
 class BusinessCreate(BaseModel):
