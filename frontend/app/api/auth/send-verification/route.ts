@@ -43,24 +43,23 @@ export async function POST(req: NextRequest) {
     userId = body.userId;
     userEmail = body.email;
 
-    // Profil oluştur + OTP aynı anda — iki ayrı işlem olmadan
+    // Önceki deneme(ler)den kalan eski profili temizle (email benzersiz constraint çakışması önlenir)
+    await supabaseAdmin.from("profiles").delete().eq("email", userEmail).neq("id", userId);
+
+    // Profil oluştur + OTP aynı anda — tek atomik işlem
     const { error: upsertError } = await supabaseAdmin.from("profiles").upsert({
       id: userId,
       email: userEmail,
       email_verified: false,
       email_otp: otp,
       email_otp_expires_at: expiresAt,
-      ...(body.firstName && {
-        first_name: body.firstName,
-        last_name: body.lastName ?? "",
-        full_name: `${body.firstName} ${body.lastName ?? ""}`.trim(),
-      }),
+      full_name: body.firstName ? `${body.firstName} ${body.lastName ?? ""}`.trim() : null,
       ...(body.phone && { phone: body.phone }),
     }, { onConflict: 'id' });
 
     if (upsertError) {
-      console.error("[send-verification] upsert:", upsertError);
-      return NextResponse.json({ detail: "db_error" }, { status: 500 });
+      console.error("[send-verification] upsert:", upsertError.code, upsertError.message);
+      return NextResponse.json({ detail: `db_error: ${upsertError.message}` }, { status: 500 });
     }
   } else if (body?.email) {
     // Tekrar gönder — profil zaten var
