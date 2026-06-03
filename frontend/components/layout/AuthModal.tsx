@@ -225,9 +225,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
         await supabase.auth.refreshSession();
       }
     }
-    window.dispatchEvent(new CustomEvent('profile-updated'));
     setLoading(false);
     handleClose();
+    // Sayfayı yenile — Navbar session'ı yeniden okusun
+    window.location.reload();
   };
 
   const handleForgotPassword = async () => {
