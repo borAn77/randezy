@@ -43,23 +43,36 @@ export async function POST(req: NextRequest) {
     userId = body.userId;
     userEmail = body.email;
 
-    // Önceki deneme(ler)den kalan eski profili temizle (email benzersiz constraint çakışması önlenir)
-    await supabaseAdmin.from("profiles").delete().eq("email", userEmail).neq("id", userId);
+    // 1. Önce bu userId ile profil var mı dene — sadece OTP güncelle
+    const { data: existingById } = await supabaseAdmin
+      .from("profiles").select("id").eq("id", userId).maybeSingle();
 
-    // Profil oluştur + OTP aynı anda — tek atomik işlem
-    const { error: upsertError } = await supabaseAdmin.from("profiles").upsert({
-      id: userId,
-      email: userEmail,
-      email_verified: false,
-      email_otp: otp,
-      email_otp_expires_at: expiresAt,
-      full_name: body.firstName ? `${body.firstName} ${body.lastName ?? ""}`.trim() : null,
-      ...(body.phone && { phone: body.phone }),
-    }, { onConflict: 'id' });
+    if (existingById) {
+      // Profil zaten var, sadece OTP'yi güncelle
+      const { error: updErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false })
+        .eq("id", userId);
+      if (updErr) {
+        console.error("[send-verification] update otp:", updErr.code, updErr.message);
+        return NextResponse.json({ detail: `otp_update_error: ${updErr.message}` }, { status: 500 });
+      }
+    } else {
+      // 2. Eski profil varsa temizle (email unique constraint çakışması önlenir)
+      await supabaseAdmin.from("profiles").delete().eq("email", userEmail).neq("id", userId);
 
-    if (upsertError) {
-      console.error("[send-verification] upsert:", upsertError.code, upsertError.message);
-      return NextResponse.json({ detail: `db_error: ${upsertError.message}` }, { status: 500 });
+      // 3. Minimal INSERT — sadece zorunlu alanlar
+      const { error: insErr } = await supabaseAdmin.from("profiles").insert({
+        id: userId,
+        email: userEmail,
+        email_verified: false,
+        email_otp: otp,
+        email_otp_expires_at: expiresAt,
+      });
+      if (insErr) {
+        console.error("[send-verification] insert:", insErr.code, insErr.message);
+        return NextResponse.json({ detail: `insert_error: ${insErr.code} – ${insErr.message}` }, { status: 500 });
+      }
     }
   } else if (body?.email) {
     // Tekrar gönder — profil zaten var
