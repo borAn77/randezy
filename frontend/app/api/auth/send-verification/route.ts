@@ -18,22 +18,38 @@ export async function POST(req: NextRequest) {
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body ok */ }
 
+  // OTP'yi en başta oluştur — tek atomik işlem için
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
   if (token) {
     // Oturumu olan kullanıcı
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
     userId = user.id;
     userEmail = user.email!;
+
+    const { error: dbError } = await supabaseAdmin
+      .from("profiles")
+      .update({ email_otp: otp, email_otp_expires_at: expiresAt })
+      .eq("id", userId);
+
+    if (dbError) {
+      console.error("[send-verification] token-path db:", dbError);
+      return NextResponse.json({ detail: "db_error" }, { status: 500 });
+    }
   } else if (body?.userId && body?.email) {
-    // Supabase confirmation ON: session yok ama userId var (yeni kayıt)
+    // Yeni kayıt — session yok, userId ve email body'den geliyor
     userId = body.userId;
     userEmail = body.email;
 
-    // Profili oluştur veya güncelle
-    await supabaseAdmin.from("profiles").upsert({
+    // Profil oluştur + OTP aynı anda — iki ayrı işlem olmadan
+    const { error: upsertError } = await supabaseAdmin.from("profiles").upsert({
       id: userId,
       email: userEmail,
       email_verified: false,
+      email_otp: otp,
+      email_otp_expires_at: expiresAt,
       ...(body.firstName && {
         first_name: body.firstName,
         last_name: body.lastName ?? "",
@@ -41,6 +57,11 @@ export async function POST(req: NextRequest) {
       }),
       ...(body.phone && { phone: body.phone }),
     }, { onConflict: 'id' });
+
+    if (upsertError) {
+      console.error("[send-verification] upsert:", upsertError);
+      return NextResponse.json({ detail: "db_error" }, { status: 500 });
+    }
   } else if (body?.email) {
     // Tekrar gönder — profil zaten var
     const { data: profile } = await supabaseAdmin
@@ -51,21 +72,18 @@ export async function POST(req: NextRequest) {
     if (!profile) return NextResponse.json({ detail: "user not found" }, { status: 404 });
     userId = profile.id;
     userEmail = body.email;
+
+    const { error: dbError } = await supabaseAdmin
+      .from("profiles")
+      .update({ email_otp: otp, email_otp_expires_at: expiresAt })
+      .eq("id", userId);
+
+    if (dbError) {
+      console.error("[send-verification] resend-path db:", dbError);
+      return NextResponse.json({ detail: "db_error" }, { status: 500 });
+    }
   } else {
     return NextResponse.json({ detail: "email required" }, { status: 400 });
-  }
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-  const { error: dbError } = await supabaseAdmin
-    .from("profiles")
-    .update({ email_otp: otp, email_otp_expires_at: expiresAt })
-    .eq("id", userId);
-
-  if (dbError) {
-    console.error("[send-verification] db:", dbError);
-    return NextResponse.json({ detail: "db_error" }, { status: 500 });
   }
 
   const { error: emailError } = await resend.emails.send({

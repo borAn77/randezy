@@ -189,6 +189,8 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   const handleVerifyOtp = async (e: any) => {
     e.preventDefault();
     setLoading(true);
+
+    // OTP doğrula
     try {
       await api.verifyEmail(otp, email);
     } catch (err: any) {
@@ -196,38 +198,45 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       setAuthError(err?.body?.detail || "Doğrulama kodu hatalı veya süresi dolmuş.");
       return;
     }
-    // Session varsa profili güncelle + refresh et, yoksa şifreyle giriş yap
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from('profiles').update({ email_verified: true }).eq('id', session.user.id);
-      await supabase.auth.refreshSession();
-    } else if (password) {
-      // Supabase confirmation açıksa session gelmiyordu — şimdi onaylandı, giriş yap
-      const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInData.session) {
-        const normalizedPhone = normalizePhone(phone);
-        await supabase.from('profiles').upsert({
-          id: signInData.session.user.id,
-          email: signInData.session.user.email,
-          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          phone: normalizedPhone || null,
-          email_verified: true,
-        }, { onConflict: 'id' });
-        const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
-        if (marketingConsent) documents.push('ticari_ileti_v1');
-        await fetch('/api/legal-consents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${signInData.session.access_token}` },
-          body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
-        });
-        await supabase.auth.refreshSession();
+
+    // Confirmation ON ise henüz session yok — bunu kaydet, legal consent gerekecek
+    const { data: { session: preSession } } = await supabase.auth.getSession();
+    const needsConsent = !preSession && firstName.trim() !== '';
+
+    // Her durumda signInWithPassword — hem session oluşturur hem SIGNED_IN event'i tetikler
+    let finalSession = null;
+    {
+      const { data } = await supabase.auth.signInWithPassword({ email, password });
+      if (data?.session) {
+        finalSession = data.session;
+      } else {
+        // Supabase email onayı biraz gecikebilir — bir kez daha dene
+        await new Promise(r => setTimeout(r, 700));
+        const { data: retry } = await supabase.auth.signInWithPassword({ email, password });
+        if (retry?.session) finalSession = retry.session;
       }
     }
+
+    if (!finalSession) {
+      setLoading(false);
+      setAuthError("E-posta doğrulandı. Lütfen e-posta ve şifrenizle giriş yapın.");
+      switchMode('login');
+      return;
+    }
+
+    // Confirmation ON yeni kayıt ise legal onayları kaydet
+    if (needsConsent) {
+      const documents = ['kullanici_sozlesmesi_v1', 'kvkk_v1', 'yurtdisi_aktarim_v1'];
+      if (marketingConsent) documents.push('ticari_ileti_v1');
+      await fetch('/api/legal-consents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${finalSession.access_token}` },
+        body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
+      }).catch(() => {});
+    }
+
     setLoading(false);
     handleClose();
-    // Sayfayı yenile — Navbar session'ı yeniden okusun
     window.location.reload();
   };
 

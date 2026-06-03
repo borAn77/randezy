@@ -50,13 +50,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Doğrulama kodu hatalı." }, { status: 400 });
   }
 
-  await supabaseAdmin
+  const { error: profileUpdateError } = await supabaseAdmin
     .from("profiles")
     .update({ email_verified: true, email_otp: null, email_otp_expires_at: null })
     .eq("id", userId);
 
-  // Supabase tarafında da email'i onayla (confirmation ON olsa bile login çalışsın)
-  await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+  if (profileUpdateError) {
+    console.error("[verify-otp] profile update:", profileUpdateError);
+    return NextResponse.json({ detail: "Doğrulama kaydedilemedi." }, { status: 500 });
+  }
+
+  // Supabase auth tarafında da email'i onayla
+  const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+  if (confirmError) {
+    console.error("[verify-otp] updateUserById:", confirmError);
+    // Profil güncellendi ama auth onayı başarısız — yine de devam et
+  }
 
   return NextResponse.json({ status: "verified" });
 }
