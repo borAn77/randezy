@@ -149,6 +149,8 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
           });
           if (!res.ok) { setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin."); return; }
+          // Navbar'a profil yazıldığını bildir — CompleteProfileModal açılmasın
+          window.dispatchEvent(new CustomEvent('profile-updated'));
         }
       } catch {
         setAuthError("Yasal onay kaydı oluşturulamadı, lütfen tekrar deneyin.");
