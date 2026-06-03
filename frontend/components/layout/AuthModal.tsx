@@ -190,9 +190,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     e.preventDefault();
     setLoading(true);
 
-    // OTP doğrula
+    // OTP doğrula — şifreyi de gönder (eski hesap farklı şifreyle kayıtlıysa güncellenir)
     try {
-      await api.verifyEmail(otp, email);
+      await api.verifyEmail(otp, email, password || undefined);
     } catch (err: any) {
       setLoading(false);
       setAuthError(err?.body?.detail || "Doğrulama kodu hatalı veya süresi dolmuş.");

@@ -60,11 +60,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: "Doğrulama kaydedilemedi." }, { status: 500 });
   }
 
-  // Supabase auth tarafında da email'i onayla
-  const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+  // Supabase auth tarafında email'i onayla + gerekirse şifreyi güncelle
+  const updateAttrs: Record<string, any> = { email_confirm: true };
+  if (body.newPassword) updateAttrs.password = body.newPassword;
+
+  const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(userId, updateAttrs);
   if (confirmError) {
     console.error("[verify-otp] updateUserById:", confirmError);
-    // Profil güncellendi ama auth onayı başarısız — yine de devam et
   }
 
   return NextResponse.json({ status: "verified" });

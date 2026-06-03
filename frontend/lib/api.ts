@@ -167,12 +167,15 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res.json() as Promise<{ status: string }>;
   },
-  verifyEmail: async (otp: string, email?: string) => {
+  verifyEmail: async (otp: string, email?: string, newPassword?: string) => {
     const headers = await authHeaders();
+    const body: Record<string, string> = { otp };
+    if (email) body.email = email;
+    if (newPassword) body.newPassword = newPassword;
     const res = await fetch("/api/auth/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(email ? { otp, email } : { otp }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res.json() as Promise<{ status: string }>;
