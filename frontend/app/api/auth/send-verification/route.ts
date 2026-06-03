@@ -10,11 +10,33 @@ const supabaseAdmin = createClient(
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+  let userId: string;
+  let userEmail: string;
 
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+  const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
+
+  if (token) {
+    // Oturumu olan kullanıcı (login sonrası)
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+    userId = user.id;
+    userEmail = user.email!;
+  } else {
+    // Oturumu olmayan kullanıcı (signUp sonrası Supabase confirmation açıksa)
+    let body: any;
+    try { body = await req.json(); } catch { body = {}; }
+    if (!body?.email) return NextResponse.json({ detail: "email required" }, { status: 400 });
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", body.email)
+      .single();
+
+    if (!profile) return NextResponse.json({ detail: "user not found" }, { status: 404 });
+    userId = profile.id;
+    userEmail = body.email;
+  }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
@@ -22,16 +44,16 @@ export async function POST(req: NextRequest) {
   const { error: dbError } = await supabaseAdmin
     .from("profiles")
     .update({ email_otp: otp, email_otp_expires_at: expiresAt })
-    .eq("id", user.id);
+    .eq("id", userId);
 
   if (dbError) {
-    console.error("[send-verification]", dbError);
+    console.error("[send-verification] db:", dbError);
     return NextResponse.json({ detail: "db_error" }, { status: 500 });
   }
 
   const { error: emailError } = await resend.emails.send({
     from: "Randezy <noreply@randezy.com>",
-    to: [user.email!],
+    to: [userEmail],
     subject: "E-posta Doğrulaması – Randezy",
     html: `
 <div style="font-family:sans-serif;max-width:520px;margin:0 auto">

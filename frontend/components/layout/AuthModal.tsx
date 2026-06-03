@@ -90,7 +90,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     const { data: profile } = await supabase.from('profiles').select('email_verified').eq('id', data.user.id).single();
     setLoading(false);
     if (!profile?.email_verified) {
-      try { await api.sendEmailVerification(); } catch { /* ignore */ }
+      try { await api.sendEmailVerification(email); } catch { /* ignore */ }
       switchMode('otp');
       setAuthError("E-posta adresiniz henüz doğrulanmamış. Yeni bir doğrulama kodu gönderdik.");
       return;
@@ -164,7 +164,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       if (!res.ok) throw new Error('legal-consents failed');
 
       // Backend üzerinden doğrulama kodu gönder
-      await api.sendEmailVerification();
+      await api.sendEmailVerification(email);
     } catch {
       setLoading(false);
       setAuthError("Kayıt esnasında bir hata oluştu. Lütfen tekrar deneyin.");
@@ -178,7 +178,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     e.preventDefault();
     setLoading(true);
     try {
-      await api.verifyEmail(otp);
+      await api.verifyEmail(otp, email);
     } catch (err: any) {
       setLoading(false);
       setAuthError(err?.body?.detail || "Doğrulama kodu hatalı veya süresi dolmuş.");
@@ -402,7 +402,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 onClick={async () => {
                   setAuthError(null);
                   try {
-                    await api.sendEmailVerification();
+                    await api.sendEmailVerification(email);
                     setAuthError("Yeni doğrulama kodu gönderildi.");
                   } catch {
                     setAuthError("Kod gönderilemedi, lütfen tekrar deneyin.");

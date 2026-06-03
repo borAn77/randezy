@@ -156,22 +156,22 @@ export const api = {
   me: () => get<CurrentUser>("/auth/me"),
   updateMe: (data: { full_name?: string; phone?: string }) => patch<CurrentUser>("/auth/me", data),
   myBusinesses: () => get<Business[]>("/me/businesses"),
-  sendEmailVerification: async () => {
+  sendEmailVerification: async (email?: string) => {
     const headers = await authHeaders();
     const res = await fetch("/api/auth/send-verification", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({}),
+      body: JSON.stringify(email ? { email } : {}),
     });
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res.json() as Promise<{ status: string }>;
   },
-  verifyEmail: async (otp: string) => {
+  verifyEmail: async (otp: string, email?: string) => {
     const headers = await authHeaders();
     const res = await fetch("/api/auth/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ otp }),
+      body: JSON.stringify(email ? { otp, email } : { otp }),
     });
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
     return res.json() as Promise<{ status: string }>;

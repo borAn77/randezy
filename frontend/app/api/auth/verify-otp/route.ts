@@ -7,26 +7,35 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+
   const token = req.headers.get("authorization")?.replace("Bearer ", "").trim();
-  if (!token) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
 
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ detail: "invalid_body" }, { status: 400 }); }
 
-  let otp: string;
-  try {
-    const body = await req.json();
-    otp = body.otp?.trim();
-  } catch {
-    return NextResponse.json({ detail: "invalid_body" }, { status: 400 });
-  }
-
+  const otp = body?.otp?.trim();
   if (!otp) return NextResponse.json({ detail: "Kod gerekli." }, { status: 400 });
+
+  if (token) {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return NextResponse.json({ detail: "unauthorized" }, { status: 401 });
+    userId = user.id;
+  } else {
+    if (!body?.email) return NextResponse.json({ detail: "email required" }, { status: 400 });
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", body.email)
+      .single();
+    if (!profile) return NextResponse.json({ detail: "user not found" }, { status: 404 });
+    userId = profile.id;
+  }
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("email_otp, email_otp_expires_at")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (!profile?.email_otp) {
@@ -44,7 +53,7 @@ export async function POST(req: NextRequest) {
   await supabaseAdmin
     .from("profiles")
     .update({ email_verified: true, email_otp: null, email_otp_expires_at: null })
-    .eq("id", user.id);
+    .eq("id", userId);
 
   return NextResponse.json({ status: "verified" });
 }
