@@ -43,35 +43,50 @@ export async function POST(req: NextRequest) {
     userId = body.userId;
     userEmail = body.email;
 
-    // 1. Önce bu userId ile profil var mı dene — sadece OTP güncelle
-    const { data: existingById } = await supabaseAdmin
+    // 1. Bu userId için profil var mı? (trigger veya önceki kayıt)
+    const { data: byId } = await supabaseAdmin
       .from("profiles").select("id").eq("id", userId).maybeSingle();
 
-    if (existingById) {
-      // Profil zaten var, sadece OTP'yi güncelle
-      const { error: updErr } = await supabaseAdmin
-        .from("profiles")
+    if (byId) {
+      // Doğru profil mevcut — sadece OTP güncelle
+      await supabaseAdmin.from("profiles")
         .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false })
         .eq("id", userId);
-      if (updErr) {
-        console.error("[send-verification] update otp:", updErr.code, updErr.message);
-        return NextResponse.json({ detail: `otp_update_error: ${updErr.message}` }, { status: 500 });
-      }
     } else {
-      // 2. Eski profil varsa temizle (email unique constraint çakışması önlenir)
-      await supabaseAdmin.from("profiles").delete().eq("email", userEmail).neq("id", userId);
+      // 2. Bu email'e ait başka bir profil var mı? (önceki doğrulanmamış kayıt)
+      const { data: byEmail } = await supabaseAdmin
+        .from("profiles").select("id").eq("email", userEmail).maybeSingle();
 
-      // 3. Minimal INSERT — sadece zorunlu alanlar
-      const { error: insErr } = await supabaseAdmin.from("profiles").insert({
-        id: userId,
-        email: userEmail,
-        email_verified: false,
-        email_otp: otp,
-        email_otp_expires_at: expiresAt,
-      });
-      if (insErr) {
-        console.error("[send-verification] insert:", insErr.code, insErr.message);
-        return NextResponse.json({ detail: `insert_error: ${insErr.code} – ${insErr.message}` }, { status: 500 });
+      if (byEmail) {
+        // Eski profil mevcut — o profilin gerçek userId'sini kullan
+        userId = byEmail.id;
+        await supabaseAdmin.from("profiles")
+          .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false })
+          .eq("id", userId);
+      } else {
+        // 3. Hiç profil yok — yeni INSERT
+        const { error: insErr } = await supabaseAdmin.from("profiles").insert({
+          id: userId, email: userEmail, email_verified: false,
+          email_otp: otp, email_otp_expires_at: expiresAt,
+        });
+
+        if (insErr?.code === "23503") {
+          // FK hatası: Supabase sahte userId döndürdü (email zaten kayıtlı ama doğrulanmamış)
+          // Admin API ile gerçek userId'yi bul
+          const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+          const realUser = users?.find(u => u.email?.toLowerCase() === userEmail.toLowerCase());
+          if (!realUser) {
+            return NextResponse.json({ detail: "Bu e-posta zaten kayıtlı. Lütfen giriş yapın." }, { status: 400 });
+          }
+          userId = realUser.id;
+          await supabaseAdmin.from("profiles").upsert(
+            { id: userId, email: userEmail, email_verified: false, email_otp: otp, email_otp_expires_at: expiresAt },
+            { onConflict: "id" }
+          );
+        } else if (insErr) {
+          console.error("[send-verification] insert:", insErr.code, insErr.message);
+          return NextResponse.json({ detail: `insert_error: ${insErr.code} – ${insErr.message}` }, { status: 500 });
+        }
       }
     }
   } else if (body?.email) {
