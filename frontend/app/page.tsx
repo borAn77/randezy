@@ -211,8 +211,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans">
-      <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
-        <div className="absolute inset-0 bg-[#050505]" style={{ height: '100vh', overflow: 'hidden' }}>
+      <section className="relative min-h-[82vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
+        <div className="absolute inset-0 bg-[#050505]" style={{ height: '100%', overflow: 'hidden' }}>
           {userId ? (
             <img
               src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
@@ -405,18 +405,18 @@ export default function Home() {
 
       </section>
 
-      {/* Shops grid */}
-      <section ref={shopsRef} className="max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 pt-12 pb-14 bg-white" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+      {/* Shops grid — düz beyaz geçiş */}
+      <section ref={shopsRef} className="bg-white max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 pt-8 md:pt-10 pb-16" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
 
         {/* Tek konsolide header: sol başlık+meta / sağ kontroller */}
         {!loading && !error && (
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
             <div>
               <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight" style={{ color: "#0c0c0d" }}>Öne Çıkanlar</h2>
-              <p className="text-[10px] md:text-[11px] uppercase tracking-widest mt-1.5" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#8a8a8e" }}>
-                Randezy topluluğunun favorileri.
-                <span className="ml-2" style={{ color: "#0c0c0d" }}><b>{filteredShops.length}</b> işletme</span>
-              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] md:text-[11px] uppercase tracking-widest" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>
+                <p style={{ color: "#8a8a8e" }}>Randezy topluluğunun favorileri.</p>
+                <span style={{ color: "#0c0c0d" }}><b>{filteredShops.length}</b> işletme</span>
+              </div>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <button
