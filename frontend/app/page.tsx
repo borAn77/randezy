@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, MapPin, ArrowUpDown, Heart } from "lucide-react";
+import { Search, X, MapPin, ArrowUpDown, Heart, ChevronDown } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import { supabase } from "../lib/supabase";
@@ -35,6 +35,7 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [sortBy, setSortBy] = useState<"default" | "rating">("default");
+  const [whereOpen, setWhereOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -175,6 +176,14 @@ export default function Home() {
     return result;
   }, [shops, searchQuery, selectedCategory, selectedCity, selectedDistrict, sortBy]);
 
+  const pickCity = (city: string) => {
+    setSelectedCity(city);
+    setSelectedDistrict("");
+    localStorage.setItem("randezy_city", city);
+    setWhereOpen(false);
+    shopsRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   const handleCitySelect = (city: string) => {
     const next = selectedCity === city ? "" : city;
     setSelectedCity(next);
@@ -252,27 +261,69 @@ export default function Home() {
             Bölgendeki en iyi uzmanları keşfet ve anında randevunu al!
           </p>
 
-          {/* Search bar */}
-          <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-2xl w-full max-w-[700px]">
-            <div className="flex-1 flex items-center px-3 md:px-6 min-w-0">
-              <Search className="text-gray-300 mr-2 md:mr-4 flex-shrink-0" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") shopsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-                placeholder="Hizmet, işletme veya ilçe ara..."
-                className="w-full py-3 md:py-4 text-black outline-none font-bold text-sm placeholder:text-gray-300 min-w-0"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="text-gray-300 hover:text-black transition-colors ml-2 flex-shrink-0">
-                  <X size={16} />
-                </button>
+          {/* Search bar — 3 alanlı */}
+          <div className="bg-white rounded-2xl p-1.5 flex flex-col md:flex-row md:items-stretch shadow-2xl w-full max-w-[860px] text-left" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+            {/* Ne arıyorsun? */}
+            <div className="flex-1 flex flex-col justify-center px-4 py-2 min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>Ne arıyorsun?</span>
+              <div className="flex items-center mt-0.5">
+                <Search className="text-gray-500 mr-2 flex-shrink-0" size={16} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") shopsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  placeholder="Hizmet, işletme veya ilçe ara..."
+                  className="w-full text-black outline-none font-semibold text-sm placeholder:text-gray-400 min-w-0 bg-transparent"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-black transition-colors ml-2 flex-shrink-0">
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="hidden md:block w-px bg-gray-100 my-2" />
+            <div className="md:hidden h-px bg-gray-100 mx-3" />
+
+            {/* Nerede? */}
+            <div className="relative flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => setWhereOpen(v => !v)}
+                className="w-full flex flex-col justify-center px-4 py-2 text-left"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>Nerede?</span>
+                <div className="flex items-center mt-0.5 gap-2">
+                  <MapPin className="text-gray-500 flex-shrink-0" size={15} />
+                  <span className={`text-sm font-semibold truncate ${selectedCity ? "text-black" : "text-gray-500"}`}>
+                    {selectedCity || "Tüm şehirler"}
+                  </span>
+                  <ChevronDown className="text-gray-500 ml-auto flex-shrink-0" size={15} />
+                </div>
+              </button>
+              {whereOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setWhereOpen(false)} />
+                  <div className="absolute left-2 right-2 top-full mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 py-1.5 max-h-64 overflow-y-auto">
+                    <button onClick={() => pickCity("")} className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-gray-50 ${!selectedCity ? "text-[#14b8a6]" : "text-gray-600"}`}>
+                      Tüm şehirler
+                    </button>
+                    {cities.map(city => (
+                      <button key={city} onClick={() => pickCity(city)} className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-gray-50 ${selectedCity === city ? "text-[#14b8a6]" : "text-black"}`}>
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+
             <button
               onClick={() => shopsRef.current?.scrollIntoView({ behavior: "smooth" })}
-              className="bg-[#222] text-white px-5 md:px-10 py-3 md:py-4 rounded-xl font-black text-sm uppercase tracking-widest flex-shrink-0"
+              className="bg-[#0c0c0d] text-white px-6 md:px-9 py-3 md:py-0 rounded-xl font-bold text-sm uppercase tracking-widest flex-shrink-0 m-1 hover:bg-[#14b8a6] transition-colors"
+              style={{ fontFamily: "var(--font-jb-mono), monospace" }}
             >
               Ara
             </button>
