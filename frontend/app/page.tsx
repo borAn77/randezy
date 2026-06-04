@@ -403,69 +403,66 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="absolute bottom-0 left-0 w-full bg-white px-5 md:px-20 py-4 md:py-8 flex justify-between items-center border-t border-gray-100 z-20">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg md:text-2xl font-black text-[#222] tracking-tighter leading-none">Öne Çıkanlar</h3>
-              {selectedCity && <span className="text-lg md:text-2xl font-black text-[#00A3AD] tracking-tighter">— {selectedCity}</span>}
-              {selectedDistrict && <span className="text-lg md:text-2xl font-black text-gray-400 tracking-tighter">/ {selectedDistrict}</span>}
-            </div>
-            <p className="text-[10px] md:text-[12px] font-bold text-gray-400 italic mt-1 uppercase tracking-widest">
-              {selectedCity ? `${selectedDistrict || selectedCity}'daki işletmeler` : "Randezy topluluğunun favorileri."}
-            </p>
-          </div>
-          <button onClick={clearFilters} className="text-[#00A3AD] font-black text-[10px] md:text-[12px] tracking-[0.15em] md:tracking-[0.2em] border-b-2 border-[#00A3AD] pb-1 hover:text-[#008A94] transition-colors uppercase">
-            TÜMÜNÜ GÖR
-          </button>
-        </div>
       </section>
 
       {/* Shops grid */}
-      <section ref={shopsRef} className="max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 py-12 md:py-24 bg-white">
+      <section ref={shopsRef} className="max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 pt-12 pb-14 bg-white" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
 
-        {/* Filter bar */}
+        {/* Tek konsolide header: sol başlık+meta / sağ kontroller */}
         {!loading && !error && (
-          <div className="flex items-center justify-between mb-8 md:mb-12 flex-wrap gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectedCity && (
-                <span className="flex items-center gap-1.5 bg-[#00A3AD]/10 border border-[#00A3AD]/20 text-[#00A3AD] px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  <MapPin size={11} /> {selectedCity}
-                  <button onClick={() => handleCitySelect(selectedCity)} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              {selectedDistrict && (
-                <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  {selectedDistrict}
-                  <button onClick={() => setSelectedDistrict("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              {selectedCategory && (
-                <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  {selectedCategory}
-                  <button onClick={() => setSelectedCategory("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                <span className="text-black font-black">{filteredShops.length}</span> işletme
-              </span>
-              {isFiltered && (
-                <button onClick={clearFilters} className="text-[10px] font-black text-gray-400 hover:text-red-400 uppercase tracking-widest transition-colors">
-                  Temizle
-                </button>
-              )}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight" style={{ color: "#0c0c0d" }}>Öne Çıkanlar</h2>
+              <p className="text-[10px] md:text-[11px] uppercase tracking-widest mt-1.5" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#8a8a8e" }}>
+                Randezy topluluğunun favorileri.
+                <span className="ml-2" style={{ color: "#0c0c0d" }}><b>{filteredShops.length}</b> işletme</span>
+              </p>
             </div>
-            <button
-              onClick={() => setSortBy(p => p === "rating" ? "default" : "rating")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all
-                ${sortBy === "rating"
-                  ? "bg-[#00A3AD] text-white border-[#00A3AD]"
-                  : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"
-                }`}
-            >
-              <ArrowUpDown size={12} />
-              Puana Göre
-            </button>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={() => setSortBy(p => p === "rating" ? "default" : "rating")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all
+                  ${sortBy === "rating"
+                    ? "bg-[#14b8a6] text-white border-[#14b8a6]"
+                    : "bg-white text-gray-500 border-[#ececea] hover:border-gray-300"
+                  }`}
+                style={{ fontFamily: "var(--font-jb-mono), monospace" }}
+              >
+                <ArrowUpDown size={12} />
+                Puana Göre
+              </button>
+              <button
+                onClick={clearFilters}
+                className="text-[#14b8a6] font-bold text-[10px] md:text-[12px] tracking-widest border-b-2 border-[#14b8a6] pb-0.5 hover:text-[#0d9488] transition-colors uppercase whitespace-nowrap"
+                style={{ fontFamily: "var(--font-jb-mono), monospace" }}
+              >
+                Tümünü Gör →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Aktif filtre chip'leri (yalnızca filtre varsa) */}
+        {!loading && !error && isFiltered && (
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            {selectedCity && (
+              <span className="flex items-center gap-1.5 bg-[#14b8a6]/10 border border-[#14b8a6]/20 text-[#0d9488] px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                <MapPin size={11} /> {selectedCity}
+                <button onClick={() => handleCitySelect(selectedCity)} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
+            {selectedDistrict && (
+              <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                {selectedDistrict}
+                <button onClick={() => setSelectedDistrict("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
+            {selectedCategory && (
+              <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                {selectedCategory}
+                <button onClick={() => setSelectedCategory("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
           </div>
         )}
 
@@ -485,7 +482,7 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px] md:gap-[22px]" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
             {filteredShops.map((shop: any) => {
               const _td = new Date(); const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
               const activeCampaign = (shop.campaigns || []).find((c: any) =>
