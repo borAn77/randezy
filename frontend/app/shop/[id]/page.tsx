@@ -349,6 +349,7 @@ export default function ShopDetail() {
   const [shopHours, setShopHours] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [gallery, setGallery] = useState<string[]>([]);
+  const [haircutUrls, setHaircutUrls] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -497,6 +498,7 @@ export default function ShopDetail() {
       if (!shopData) { setNotFound(true); return; }
       setShop(shopData);
       setGallery(shopData.gallery_urls || []);
+      setHaircutUrls(shopData.haircut_urls || []);
       setServices(servicesData || []);
       setShopHours(hoursData || []);
       setStaff(staffData || []);
@@ -971,6 +973,23 @@ export default function ShopDetail() {
                 )}
               </div>
             </div>
+
+            {/* Favori Kesimler */}
+            {haircutUrls.length > 0 && (
+              <div className="mt-14">
+                <div className="flex items-end justify-between mb-6">
+                  <h2 className="text-[28px] font-bold tracking-tight inline-block" style={{ borderBottom: '3px solid #14b8a6', paddingBottom: '6px' }}>Favori Kesimlerimiz</h2>
+                  <div className="font-mono text-[11px] text-gray-400 uppercase tracking-widest">{haircutUrls.length} fotoğraf</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {haircutUrls.map((url, i) => (
+                    <div key={i} className="aspect-square rounded-2xl overflow-hidden bg-gray-100 group cursor-pointer">
+                      <img src={url} alt={`Kesim ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Reviews */}
             <div className="mt-14">
