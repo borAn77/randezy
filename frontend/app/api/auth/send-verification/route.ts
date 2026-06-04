@@ -43,6 +43,17 @@ export async function POST(req: NextRequest) {
     userId = body.userId;
     userEmail = body.email;
 
+    // Kayıt formundan gelen kişisel bilgiler — refresh'e karşı server-side kalıcılık.
+    // first_name/last_name/full_name: unique constraint YOK → insert'e eklemek güvenli.
+    // phone: unique constraint VAR (profiles_phone_key) → OTP'yi bozmamak için
+    //         aşağıda AYRI best-effort update ile yazılır (insert'i asla riske atmaz).
+    const fName = (body.firstName || "").trim();
+    const lName = (body.lastName || "").trim();
+    const regPhone: string | null = body.phone || null;
+    const nameFields = fName && lName
+      ? { first_name: fName, last_name: lName, full_name: `${fName} ${lName}`.trim() }
+      : {};
+
     // 1. Bu userId için profil var mı? (trigger veya önceki kayıt)
     const { data: byId } = await supabaseAdmin
       .from("profiles").select("id").eq("id", userId).maybeSingle();
@@ -50,7 +61,7 @@ export async function POST(req: NextRequest) {
     if (byId) {
       // Doğru profil mevcut — sadece OTP güncelle
       await supabaseAdmin.from("profiles")
-        .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false })
+        .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false, ...nameFields })
         .eq("id", userId);
     } else {
       // 2. Bu email'e ait başka bir profil var mı? (önceki doğrulanmamış kayıt)
@@ -61,13 +72,13 @@ export async function POST(req: NextRequest) {
         // Eski profil mevcut — o profilin gerçek userId'sini kullan
         userId = byEmail.id;
         await supabaseAdmin.from("profiles")
-          .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false })
+          .update({ email_otp: otp, email_otp_expires_at: expiresAt, email_verified: false, ...nameFields })
           .eq("id", userId);
       } else {
         // 3. Hiç profil yok — yeni INSERT
         const { error: insErr } = await supabaseAdmin.from("profiles").insert({
           id: userId, email: userEmail, email_verified: false,
-          email_otp: otp, email_otp_expires_at: expiresAt,
+          email_otp: otp, email_otp_expires_at: expiresAt, ...nameFields,
         });
 
         if (insErr?.code === "23503") {
@@ -80,7 +91,7 @@ export async function POST(req: NextRequest) {
           }
           userId = realUser.id;
           await supabaseAdmin.from("profiles").upsert(
-            { id: userId, email: userEmail, email_verified: false, email_otp: otp, email_otp_expires_at: expiresAt },
+            { id: userId, email: userEmail, email_verified: false, email_otp: otp, email_otp_expires_at: expiresAt, ...nameFields },
             { onConflict: "id" }
           );
         } else if (insErr) {
@@ -88,6 +99,15 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ detail: `insert_error: ${insErr.code} – ${insErr.message}` }, { status: 500 });
         }
       }
+    }
+
+    // Telefon — AYRI best-effort update. Unique constraint çakışırsa (23505)
+    // sadece loglanır, OTP akışı ASLA bozulmaz. Çakışma sonradan profil
+    // tamamlama / login akışında kullanıcıya gösterilir.
+    if (regPhone && userId) {
+      const { error: phoneErr } = await supabaseAdmin
+        .from("profiles").update({ phone: regPhone }).eq("id", userId);
+      if (phoneErr) console.warn("[send-verification] phone skip:", phoneErr.code);
     }
   } else if (body?.email) {
     // Tekrar gönder — profil zaten var

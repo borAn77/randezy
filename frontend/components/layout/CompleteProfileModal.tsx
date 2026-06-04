@@ -1,10 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function CompleteProfileModal({ user, onComplete }: { user: any; onComplete: () => void }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
   const [formData, setFormData] = useState({
     firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
     lastName: user?.user_metadata?.full_name?.split(" ").slice(1).join(" ") || "",
