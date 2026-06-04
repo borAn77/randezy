@@ -68,10 +68,16 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     forgot: 'login',
   };
 
-  // ── Start: email geçerliyse seçilen yola (login/signup) git ─────────
-  const handleStartGo = (target: 'login' | 'signup') => {
-    if (!email.includes('@')) { setAuthError('Önce geçerli bir e-posta adresi girin.'); return; }
-    go(target);
+  // ── Start ─────────────────────────────────────────────────────────
+  // Giriş: e-posta zorunlu (login ekranı e-postayı badge'de gösterir).
+  // Kayıt: e-posta zorunlu DEĞİL — signup formunda girilir/düzenlenir.
+  const handleStartLogin = () => {
+    if (!email.includes('@')) { setAuthError('Giriş yapmak için e-posta adresinizi girin.'); return; }
+    go('login');
+  };
+  const handleStartSignup = () => {
+    // E-posta yazılmışsa signup'a taşınır (alan dolu gelir), boşsa orada girilir.
+    go('signup');
   };
 
   // ── Google — direkt OAuth. Onaylar callback sonrası /legal-onay'da alınır,
@@ -113,6 +119,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   // ── Signup validate → Consents ────────────────────────────────────────
   const handleSignupNext = (e: any) => {
     e.preventDefault();
+    if (!email.includes('@')) {
+      setAuthError("Geçerli bir e-posta adresi girin."); return;
+    }
     if (firstName.trim().length < 2 || /^\d+$/.test(firstName.trim())) {
       setAuthError("Geçerli bir ad girin (en az 2 harf)."); return;
     }
@@ -140,12 +149,31 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     const { data: signUpData, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setLoading(false);
-      if (error.message.includes("already registered")) {
-        setAuthError("Bu e-posta zaten kayıtlı. Giriş yapın.");
+      const e: any = error;
+      console.error("[signup error]", {
+        message: e.message, code: e.code, status: e.status, name: e.name,
+      });
+      // Duplicate / zaten kayıtlı durumları — login'e yönlendir
+      const msg = (e.message || "").toLowerCase();
+      const isDuplicate =
+        e.code === "user_already_exists" ||
+        msg.includes("already registered") ||
+        msg.includes("already been registered") ||
+        msg.includes("user already registered") ||
+        (e.status === 422 && (msg.includes("already") || msg.includes("user") || msg.includes("email")));
+      if (isDuplicate) {
         go('login');
+        setAuthError("Bu e-posta ile hesap zaten var. Şifrenizle giriş yapın. E-postanız doğrulanmadıysa giriş sonrası doğrulama kodu gönderilecek.");
       } else {
-        setAuthError("Kayıt başarısız. Tekrar deneyin.");
+        setAuthError(`Kayıt başlatılamadı: ${e.message}`);
       }
+      return;
+    }
+    // signUp başarılı ama user yoksa — devam edersek patlardı
+    if (!signUpData.user?.id) {
+      setLoading(false);
+      console.error("[signup missing user]", signUpData);
+      setAuthError("Kayıt başlatıldı ama kullanıcı bilgisi alınamadı. Lütfen giriş yapmayı deneyin.");
       return;
     }
     const session = signUpData.session;
@@ -153,14 +181,18 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       // Supabase confirm email ON — session yok, OTP route'a userId ver
       try {
         await api.sendEmailVerification(email, {
-          userId: signUpData.user!.id,
+          userId: signUpData.user.id,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           phone: normalizedPhone,
         });
-      } catch {
+      } catch (err: any) {
         setLoading(false);
-        setAuthError("Doğrulama kodu gönderilemedi. Lütfen tekrar deneyin.");
+        console.error("[send verification after signup failed]", err);
+        const detail = err?.body?.detail || err?.message;
+        setAuthError(detail
+          ? `Doğrulama kodu gönderilemedi: ${detail}`
+          : "Hesap oluşturuldu fakat doğrulama kodu gönderilemedi. Giriş yapmayı deneyin; doğrulama kodu yeniden gönderilecek.");
         return;
       }
     } else {
@@ -183,9 +215,13 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
           body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
         });
         await api.sendEmailVerification(email);
-      } catch {
+      } catch (err: any) {
         setLoading(false);
-        setAuthError("Kayıt esnasında bir hata oluştu. Lütfen tekrar deneyin.");
+        console.error("[signup post-session step failed]", err);
+        const detail = err?.body?.detail || err?.message;
+        setAuthError(detail
+          ? `Doğrulama kodu gönderilemedi: ${detail}`
+          : "Hesap oluşturuldu fakat doğrulama kodu gönderilemedi. Giriş yapmayı deneyin; doğrulama kodu yeniden gönderilecek.");
         return;
       }
     }
@@ -327,19 +363,19 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
           {/* ── BAŞLAYIN ─────────────────────────────────────────── */}
           {mode === 'start' && (
-            <form onSubmit={e => { e.preventDefault(); handleStartGo('login'); }} className="animate-in fade-in duration-300">
+            <form onSubmit={e => { e.preventDefault(); handleStartLogin(); }} className="animate-in fade-in duration-300">
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-1">Başlayın</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-8 leading-relaxed">
                 Randevularını yönetmek için giriş yap veya hesap oluştur.
               </p>
-              <input required type="email" placeholder="E-posta adresiniz"
+              <input type="email" placeholder="E-posta adresiniz"
                 value={email} onChange={e => { setEmail(e.target.value); setAuthError(null); }}
                 className={inp} />
               <button type="submit" disabled={loading}
                 className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-4 hover:bg-[#00A3AD] transition-all">
                 Giriş Yap
               </button>
-              <button type="button" disabled={loading} onClick={() => handleStartGo('signup')}
+              <button type="button" disabled={loading} onClick={handleStartSignup}
                 className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-3 hover:bg-black transition-all">
                 Yeni Hesap Oluştur
               </button>
@@ -385,8 +421,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
             <form onSubmit={handleSignupNext} className="animate-in fade-in duration-300">
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-1">Hesap Oluştur</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-6">Bilgilerini gir, devam edelim.</p>
-              <EmailBadge />
               <div className="space-y-3">
+                <input required type="email" placeholder="E-posta adresiniz" value={email}
+                  onChange={e => { setEmail(e.target.value); setAuthError(null); }}
+                  className={inp} />
                 <div className="flex gap-2">
                   <input required placeholder="Ad" value={firstName}
                     onChange={e => { setFirstName(e.target.value); setAuthError(null); }}
