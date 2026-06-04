@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, MapPin, Image as ImageIcon, ArrowUpDown, Heart } from "lucide-react";
+import { Search, X, MapPin, ArrowUpDown, Heart } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import { supabase } from "../lib/supabase";
@@ -112,7 +112,7 @@ export default function Home() {
   useEffect(() => {
     supabase
       .from("shops")
-      .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active), services(price)")
+      .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active), services(name, price, sort_order), reviews(rating)")
       .eq("is_active", true)
       .then(({ data, error }) => {
         if (error) { setError(true); } else { setShops(data || []); }
@@ -434,7 +434,7 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
             {filteredShops.map((shop: any) => {
               const _td = new Date(); const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
               const activeCampaign = (shop.campaigns || []).find((c: any) =>
@@ -446,33 +446,54 @@ export default function Home() {
                   : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
                   : 'Son Dakika'
                 : null;
-              const _prices = (shop.services || []).map((s: any) => Number(s.price) || Infinity);
-              const startingPrice = _prices.length ? Math.min(..._prices) : Infinity;
+              const isDiscount = activeCampaign && (activeCampaign.type === 'percentage' || activeCampaign.type === 'fixed');
+              const reviewCount = (shop.reviews || []).length;
+              const topServices = [...(shop.services || [])]
+                .filter((s: any) => s && s.name)
+                .sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+                .slice(0, 2);
+              const initial = (shop.name || "?").trim().charAt(0).toUpperCase();
               return (
-                <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
-                  <div className="relative h-52 sm:h-64 md:h-80 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-3 md:mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
+                <Link
+                  href={`/shop/${shop.id}`}
+                  key={shop.id}
+                  className="group flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-[#ececea] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                >
+                  {/* Görsel */}
+                  <div className="relative h-40 sm:h-44 md:h-48 w-full overflow-hidden">
                     {shop.image_url
-                      ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
-                      : <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center gap-2">
-                          <ImageIcon size={40} className="text-gray-300" />
-                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{shop.category || "İşletme"}</span>
+                      ? <img src={shop.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={shop.name} />
+                      : <div className="w-full h-full flex items-center justify-center" style={{ background: "rgba(20,184,166,0.08)" }}>
+                          <span className="text-5xl md:text-6xl font-extrabold" style={{ color: "rgba(20,184,166,0.45)" }}>{initial}</span>
                         </div>
                     }
-                    {shop.score != null && (
-                      <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
-                        ⭐ {shop.score}
+                    {campaignLabel && (
+                      <div className="absolute top-3 left-3">
+                        <span
+                          className="px-2.5 py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wide shadow-sm"
+                          style={{
+                            fontFamily: "var(--font-jb-mono), monospace",
+                            background: isDiscount ? "#c2410c" : "#fbbf24",
+                            color: isDiscount ? "#ffffff" : "#0c0c0d",
+                          }}
+                        >
+                          {campaignLabel}
+                        </span>
                       </div>
                     )}
-                    {campaignLabel && (
-                      <div className="absolute top-3 left-3 md:top-6 md:left-6">
-                        <span className="bg-amber-400 text-black px-2.5 py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wide shadow-sm">
-                          🏷 {campaignLabel}
-                        </span>
+                    {shop.score != null && (
+                      <div
+                        className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] md:text-[11px] font-bold shadow-sm flex items-center gap-1"
+                        style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}
+                      >
+                        <span className="text-amber-400">★</span>
+                        {shop.score}
+                        {reviewCount > 0 && <span style={{ color: "#8a8a8e" }}>({reviewCount})</span>}
                       </div>
                     )}
                     <button
                       onClick={e => toggleFavorite(e, shop.id)}
-                      className="absolute bottom-3 right-3 md:bottom-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
+                      className="absolute bottom-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
                     >
                       <Heart
                         size={16}
@@ -480,17 +501,38 @@ export default function Home() {
                       />
                     </button>
                   </div>
-                  <h3 className="font-black text-sm md:text-xl text-[#222] uppercase tracking-tighter leading-none mb-1">
-                    {shop.name}
-                  </h3>
-                  <p className="text-gray-400 font-bold text-[10px] md:text-[12px] uppercase tracking-widest">
-                    {shop.district}, {shop.city}
-                  </p>
-                  {startingPrice !== Infinity && (
-                    <p className="text-[#00A3AD] font-black text-[10px] md:text-[12px] uppercase tracking-widest mt-1">
-                      ₺{startingPrice}'den başlayan
+
+                  {/* Gövde */}
+                  <div className="flex flex-col flex-1 p-3.5 md:p-4">
+                    <h3 className="font-extrabold text-[13px] md:text-[16px] uppercase tracking-tight leading-tight truncate" style={{ color: "#0c0c0d" }}>
+                      {shop.name}
+                    </h3>
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#8a8a8e" }}>
+                      {shop.district}{shop.district && shop.city ? ", " : ""}{shop.city}
                     </p>
-                  )}
+
+                    {topServices.length > 0 && (
+                      <div className="mt-3 pt-3 space-y-1.5 border-t border-[#ececea]">
+                        {topServices.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-[11px] md:text-[12px]">
+                            <span className="truncate" style={{ color: "rgba(12,12,13,0.8)" }}>{s.name}</span>
+                            <span className="font-bold whitespace-nowrap" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}>
+                              {Number(s.price) > 0 ? `₺${s.price}` : "Ücretsiz"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-auto pt-4">
+                      <div
+                        className="w-full text-center py-2.5 rounded-xl text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-white transition-colors group-hover:bg-[#14b8a6]"
+                        style={{ fontFamily: "var(--font-jb-mono), monospace", background: "#0c0c0d" }}
+                      >
+                        Randevu Al →
+                      </div>
+                    </div>
+                  </div>
                 </Link>
               );
             })}
