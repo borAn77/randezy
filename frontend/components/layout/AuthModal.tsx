@@ -68,11 +68,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
     forgot: 'login',
   };
 
-  // ── Start: email ile devam ──────────────────────────────────────────
-  const handleStartContinue = (e: any) => {
-    e.preventDefault();
-    if (!email.includes('@')) { setAuthError('Geçerli bir e-posta adresi girin.'); return; }
-    go('login');
+  // ── Start: email geçerliyse seçilen yola (login/signup) git ─────────
+  const handleStartGo = (target: 'login' | 'signup') => {
+    if (!email.includes('@')) { setAuthError('Önce geçerli bir e-posta adresi girin.'); return; }
+    go(target);
   };
 
   // ── Google — direkt OAuth. Onaylar callback sonrası /legal-onay'da alınır,
@@ -328,7 +327,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
 
           {/* ── BAŞLAYIN ─────────────────────────────────────────── */}
           {mode === 'start' && (
-            <form onSubmit={handleStartContinue} className="animate-in fade-in duration-300">
+            <form onSubmit={e => { e.preventDefault(); handleStartGo('login'); }} className="animate-in fade-in duration-300">
               <h2 className="text-3xl font-black uppercase tracking-tighter text-black mb-1">Başlayın</h2>
               <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-8 leading-relaxed">
                 Randevularını yönetmek için giriş yap veya hesap oluştur.
@@ -336,9 +335,13 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
               <input required type="email" placeholder="E-posta adresiniz"
                 value={email} onChange={e => { setEmail(e.target.value); setAuthError(null); }}
                 className={inp} />
-              <button disabled={loading}
+              <button type="submit" disabled={loading}
                 className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-4 hover:bg-[#00A3AD] transition-all">
-                Devam Et
+                Giriş Yap
+              </button>
+              <button type="button" disabled={loading} onClick={() => handleStartGo('signup')}
+                className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-3 hover:bg-black transition-all">
+                Yeni Hesap Oluştur
               </button>
               <Divider />
               <GoogleBtn />
@@ -417,6 +420,10 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
                 className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-5 hover:bg-black transition-all">
                 Devam Etmek
               </button>
+              <p className="text-center mt-5 text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                Zaten hesabın var mı?{" "}
+                <button type="button" onClick={() => go('login')} className="text-[#00A3AD] hover:underline">Giriş Yap</button>
+              </p>
             </form>
           )}
 
