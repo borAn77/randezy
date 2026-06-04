@@ -509,7 +509,7 @@ export default function ShopDetail() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUserId(user?.id ?? null);
       if (user) {
-        supabase.from('favorites').select('id').eq('user_id', user.id).eq('shop_id', shopId).single()
+        supabase.from('favorites').select('id').eq('user_id', user.id).eq('shop_id', shopId).maybeSingle()
           .then(({ data }) => setIsFavorited(!!data));
       }
     });
