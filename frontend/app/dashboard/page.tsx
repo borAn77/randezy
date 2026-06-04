@@ -486,15 +486,12 @@ export default function Dashboard() {
       owner_id: user.id,
       name: fd.get('name') as string,
       legal_name: fd.get('legal_name') as string,
-      mersis_no: fd.get('mersis_no') as string,
-      tax_office: fd.get('tax_office') as string,
       tax_no: fd.get('tax_no') as string,
       category: shop?.category || 'BERBER',
       shop_phone: fd.get('phone') as string,
       email: fd.get('email') as string,
       instagram: fd.get('instagram') as string,
       description: fd.get('description') as string,
-      iban: fd.get('iban') as string,
       city: fd.get('city') as string,
       district: fd.get('district') as string,
       neighborhood: fd.get('neighborhood') as string,
@@ -2958,14 +2955,11 @@ export default function Dashboard() {
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Tabela Adı</label><input name="name" defaultValue={shop?.name} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Resmi Ünvan</label><input name="legal_name" defaultValue={shop?.legal_name} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">MERSİS NO</label><input name="mersis_no" defaultValue={shop?.mersis_no} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
-                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Vergi Dairesi</label><input name="tax_office" defaultValue={shop?.tax_office} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Vergi No</label><input name="tax_no" defaultValue={shop?.tax_no} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İletişim Hattı</label><input name="phone" defaultValue={shop?.shop_phone} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">İletişim Hattı</label><input name="phone" defaultValue={shop?.shop_phone} required className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
-                  <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">IBAN</label><input name="iban" defaultValue={shop?.iban} className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">E-posta</label><input name="email" type="email" defaultValue={shop?.email} placeholder="info@isletme.com" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                   <div className="space-y-2"><label className="text-[10px] font-mono text-[#7a7a7e] uppercase tracking-widest">Instagram</label><input name="instagram" defaultValue={shop?.instagram} placeholder="@kullaniciadi" className="p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] w-full text-[#0c0c0d]" /></div>
                 </div>
