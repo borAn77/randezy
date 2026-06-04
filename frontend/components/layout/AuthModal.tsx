@@ -35,6 +35,16 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   // true = OTP ekranı yeni kayıttan geldi (profil yazılacak)
   const [isNewUser, setIsNewUser] = useState(false);
 
+  const resetAll = () => {
+    setMode('start');
+    setEmail(''); setPassword(''); setConfirmPassword(''); setOtp('');
+    setFirstName(''); setLastName(''); setPhone('');
+    setShowPassword(false);
+    setAuthError(null);
+    setKvkkConsent(false); setInternationalConsent(false); setMarketingConsent(false);
+    setIsNewUser(false);
+  };
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -45,16 +55,6 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const resetAll = () => {
-    setMode('start');
-    setEmail(''); setPassword(''); setConfirmPassword(''); setOtp('');
-    setFirstName(''); setLastName(''); setPhone('');
-    setShowPassword(false);
-    setAuthError(null);
-    setKvkkConsent(false); setInternationalConsent(false); setMarketingConsent(false);
-    setIsNewUser(false);
-  };
 
   const handleClose = () => { resetAll(); onClose(); };
   const go = (m: Mode) => { setMode(m); setAuthError(null); };
