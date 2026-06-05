@@ -9,7 +9,6 @@ import { CalendarShowcase } from "../../components/landing/CalendarShowcase";
 import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
 import { Industries } from "../../components/landing/Industries";
-import { CalendarShowcase } from "../../components/landing/CalendarShowcase";
 import { Pricing } from "../../components/landing/Pricing";
 
 export default function ProPage() {
@@ -75,7 +74,6 @@ export default function ProPage() {
       <section id="ozellikler">
         <Stats />
         <Features />
-        <CalendarShowcase />
         <Industries />
       </section>
 
