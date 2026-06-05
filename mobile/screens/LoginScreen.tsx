@@ -4,12 +4,17 @@ import {
   StyleSheet, ActivityIndicator, KeyboardAvoidingView,
   Platform, Alert,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -23,6 +28,42 @@ export default function LoginScreen() {
     });
     setLoading(false);
     if (error) Alert.alert('Giriş başarısız', error.message);
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      const redirectTo = 'randezy-business://auth/callback';
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error || !data?.url) {
+        Alert.alert('Giriş başarısız', error?.message ?? 'Google girişi başlatılamadı.');
+        return;
+      }
+
+      const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (res.type !== 'success' || !res.url) return; // kullanıcı pencereyi kapattı
+
+      const { queryParams } = Linking.parse(res.url);
+      const code = queryParams?.code;
+      if (typeof code !== 'string') {
+        Alert.alert('Giriş başarısız', 'Google yanıtı doğrulanamadı.');
+        return;
+      }
+
+      const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+      if (sessionError) {
+        Alert.alert('Giriş başarısız', sessionError.message);
+        return;
+      }
+      // Session kurulunca App.tsx içindeki onAuthStateChange ekranı geçirir.
+    } catch (e) {
+      Alert.alert('Giriş başarısız', (e as Error).message);
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -52,10 +93,26 @@ export default function LoginScreen() {
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading || googleLoading}>
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>Giriş Yap</Text>}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>veya</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={handleGoogleLogin}
+          disabled={loading || googleLoading}
+        >
+          {googleLoading
+            ? <ActivityIndicator color="#6366f1" />
+            : <Text style={styles.googleButtonText}>Google ile Giriş Yap</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -111,6 +168,35 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+    color: '#94a3b8',
+  },
+  googleButton: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  googleButtonText: {
+    color: '#334155',
     fontSize: 16,
     fontWeight: '600',
   },
