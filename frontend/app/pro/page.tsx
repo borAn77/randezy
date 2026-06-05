@@ -5,8 +5,6 @@ import { supabase } from "../../lib/supabase";
 import AuthModal from "../../components/layout/AuthModal";
 import Footer from "../../components/layout/Footer";
 import { Hero } from "../../components/landing/Hero";
-import { CalendarShowcase } from "../../components/landing/CalendarShowcase";
-import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
 import { Industries } from "../../components/landing/Industries";
 import { Pricing } from "../../components/landing/Pricing";
@@ -69,10 +67,7 @@ export default function ProPage() {
       {/* SaaS Landing Page Sections */}
       <Hero onStart={handleStart} />
 
-      <CalendarShowcase />
-
       <section id="ozellikler">
-        <Stats />
         <Features />
         <Industries />
       </section>
