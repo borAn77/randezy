@@ -4,3 +4,5 @@ __pycache__/
 *.pem
 .env
 .env.local
+
+saas_landing_extracted/

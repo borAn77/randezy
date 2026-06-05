@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+"use client";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IOSDevice, AndroidDevice } from "./calendar/devices";
 import { CalendarApp } from "./calendar/CalendarApp";
 
@@ -9,7 +10,7 @@ const AND_W = 412;
 const GAP = 56;
 const NATURAL_H = 922; // telefon + üst etiket alanı
 
-function PhoneLabel({ children }: { children: React.ReactNode }) {
+function PhoneLabel({ children }: { children: ReactNode }) {
   return (
     <div
       style={{

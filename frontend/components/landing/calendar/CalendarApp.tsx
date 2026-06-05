@@ -1,3 +1,4 @@
+"use client";
 // CalendarApp — ana kabuk.
 // Üst çubuk, görünüm değiştirici, tarih şeridi ve aktif görünümü cihaz çerçevesi içinde render eder.
 import React from "react";

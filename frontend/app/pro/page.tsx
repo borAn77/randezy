@@ -8,7 +8,7 @@ import { Hero } from "../../components/landing/Hero";
 import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
 import { Industries } from "../../components/landing/Industries";
-import { MobilePreview } from "../../components/landing/MobilePreview";
+import { CalendarShowcase } from "../../components/landing/CalendarShowcase";
 import { Pricing } from "../../components/landing/Pricing";
 
 export default function ProPage() {
@@ -72,7 +72,7 @@ export default function ProPage() {
       <section id="ozellikler">
         <Stats />
         <Features />
-        <MobilePreview />
+        <CalendarShowcase />
         <Industries />
       </section>
 
