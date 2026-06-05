@@ -34,21 +34,21 @@ const SCOPE_STYLE = `
 
 export function Hero({ onStart }: { onStart?: () => void }) {
   return (
-    <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 md:px-12 lg:px-24 pt-24 pb-32 overflow-hidden">
+    <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-4 sm:px-6 md:px-12 lg:px-24 pt-20 pb-16 md:pt-24 md:pb-32 overflow-hidden">
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-20 right-20 w-96 h-96 bg-[#00A3AD] rounded-full blur-3xl" />
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-[#00A3AD] rounded-full blur-3xl" />
       </div>
 
       <div className="max-w-[1400px] mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-24 items-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="space-y-8"
           >
-            <h1 className="text-[2.5rem] md:text-[3.5rem] lg:text-[4.5rem] leading-[1.1] tracking-tight font-bold">
+            <h1 className="text-[2rem] sm:text-[2.5rem] md:text-[3.5rem] lg:text-[4.5rem] leading-[1.1] tracking-tight font-bold">
               Telefonu kapat,
               <br />
               işini büyüt.
@@ -62,7 +62,7 @@ export function Hero({ onStart }: { onStart?: () => void }) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onStart}
-              className="bg-white text-black px-10 py-4 rounded-xl text-lg font-semibold hover:shadow-2xl transition-all"
+              className="bg-white text-black px-8 py-3 md:px-10 md:py-4 rounded-xl text-base md:text-lg font-semibold hover:shadow-2xl transition-all"
             >
               Ücretsiz dene
             </motion.button>
