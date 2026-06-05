@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Search, X, MapPin, Image as ImageIcon, ArrowUpDown, Heart } from "lucide-react";
+import { Search, X, MapPin, ArrowUpDown, Heart, ChevronDown } from "lucide-react";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import { supabase } from "../lib/supabase";
@@ -35,6 +35,7 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [sortBy, setSortBy] = useState<"default" | "rating">("default");
+  const [whereOpen, setWhereOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -112,7 +113,7 @@ export default function Home() {
   useEffect(() => {
     supabase
       .from("shops")
-      .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active)")
+      .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active), services(name, price, sort_order), reviews(rating)")
       .eq("is_active", true)
       .then(({ data, error }) => {
         if (error) { setError(true); } else { setShops(data || []); }
@@ -175,6 +176,14 @@ export default function Home() {
     return result;
   }, [shops, searchQuery, selectedCategory, selectedCity, selectedDistrict, sortBy]);
 
+  const pickCity = (city: string) => {
+    setSelectedCity(city);
+    setSelectedDistrict("");
+    localStorage.setItem("randezy_city", city);
+    setWhereOpen(false);
+    shopsRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   const handleCitySelect = (city: string) => {
     const next = selectedCity === city ? "" : city;
     setSelectedCity(next);
@@ -202,8 +211,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans">
-      <section className="relative h-[100vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
-        <div className="absolute inset-0 bg-[#050505]" style={{ height: '100vh', overflow: 'hidden' }}>
+      <section className="relative min-h-[82vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
+        <div className="absolute inset-0 bg-[#050505]" style={{ height: '100%', overflow: 'hidden' }}>
           {userId ? (
             <img
               src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=1600"
@@ -252,27 +261,69 @@ export default function Home() {
             Bölgendeki en iyi uzmanları keşfet ve anında randevunu al!
           </p>
 
-          {/* Search bar */}
-          <div className="bg-white rounded-2xl p-1.5 flex items-center shadow-2xl w-full max-w-[700px]">
-            <div className="flex-1 flex items-center px-3 md:px-6 min-w-0">
-              <Search className="text-gray-300 mr-2 md:mr-4 flex-shrink-0" size={20} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") shopsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-                placeholder="Hizmet, işletme veya ilçe ara..."
-                className="w-full py-3 md:py-4 text-black outline-none font-bold text-sm placeholder:text-gray-300 min-w-0"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="text-gray-300 hover:text-black transition-colors ml-2 flex-shrink-0">
-                  <X size={16} />
-                </button>
+          {/* Search bar — 3 alanlı */}
+          <div className="bg-white rounded-2xl p-1.5 flex flex-col md:flex-row md:items-stretch shadow-2xl w-full max-w-[860px] text-left" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
+            {/* Ne arıyorsun? */}
+            <div className="flex-1 flex flex-col justify-center px-4 py-2 min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>Ne arıyorsun?</span>
+              <div className="flex items-center mt-0.5">
+                <Search className="text-gray-500 mr-2 flex-shrink-0" size={16} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") shopsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  placeholder="Hizmet, işletme veya ilçe ara..."
+                  className="w-full text-black outline-none font-semibold text-sm placeholder:text-gray-400 min-w-0 bg-transparent"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-black transition-colors ml-2 flex-shrink-0">
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="hidden md:block w-px bg-gray-100 my-2" />
+            <div className="md:hidden h-px bg-gray-100 mx-3" />
+
+            {/* Nerede? */}
+            <div className="relative flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => setWhereOpen(v => !v)}
+                className="w-full flex flex-col justify-center px-4 py-2 text-left"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-widest text-gray-500" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>Nerede?</span>
+                <div className="flex items-center mt-0.5 gap-2">
+                  <MapPin className="text-gray-500 flex-shrink-0" size={15} />
+                  <span className={`text-sm font-semibold truncate ${selectedCity ? "text-black" : "text-gray-500"}`}>
+                    {selectedCity || "Tüm şehirler"}
+                  </span>
+                  <ChevronDown className="text-gray-500 ml-auto flex-shrink-0" size={15} />
+                </div>
+              </button>
+              {whereOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setWhereOpen(false)} />
+                  <div className="absolute left-2 right-2 top-full mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-100 py-1.5 max-h-64 overflow-y-auto">
+                    <button onClick={() => pickCity("")} className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-gray-50 ${!selectedCity ? "text-[#14b8a6]" : "text-gray-600"}`}>
+                      Tüm şehirler
+                    </button>
+                    {cities.map(city => (
+                      <button key={city} onClick={() => pickCity(city)} className={`w-full text-left px-4 py-2 text-sm font-semibold hover:bg-gray-50 ${selectedCity === city ? "text-[#14b8a6]" : "text-black"}`}>
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+
             <button
               onClick={() => shopsRef.current?.scrollIntoView({ behavior: "smooth" })}
-              className="bg-[#222] text-white px-5 md:px-10 py-3 md:py-4 rounded-xl font-black text-sm uppercase tracking-widest flex-shrink-0"
+              className="bg-[#0c0c0d] text-white px-6 md:px-9 py-3 md:py-0 rounded-xl font-bold text-sm uppercase tracking-widest flex-shrink-0 m-1 hover:bg-[#14b8a6] transition-colors"
+              style={{ fontFamily: "var(--font-jb-mono), monospace" }}
             >
               Ara
             </button>
@@ -352,69 +403,66 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="absolute bottom-0 left-0 w-full bg-white px-5 md:px-20 py-4 md:py-8 flex justify-between items-center border-t border-gray-100 z-20">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg md:text-2xl font-black text-[#222] tracking-tighter leading-none">Öne Çıkanlar</h3>
-              {selectedCity && <span className="text-lg md:text-2xl font-black text-[#00A3AD] tracking-tighter">— {selectedCity}</span>}
-              {selectedDistrict && <span className="text-lg md:text-2xl font-black text-gray-400 tracking-tighter">/ {selectedDistrict}</span>}
-            </div>
-            <p className="text-[10px] md:text-[12px] font-bold text-gray-400 italic mt-1 uppercase tracking-widest">
-              {selectedCity ? `${selectedDistrict || selectedCity}'daki işletmeler` : "Randezy topluluğunun favorileri."}
-            </p>
-          </div>
-          <button onClick={clearFilters} className="text-[#00A3AD] font-black text-[10px] md:text-[12px] tracking-[0.15em] md:tracking-[0.2em] border-b-2 border-[#00A3AD] pb-1 hover:text-[#008A94] transition-colors uppercase">
-            TÜMÜNÜ GÖR
-          </button>
-        </div>
       </section>
 
-      {/* Shops grid */}
-      <section ref={shopsRef} className="max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 py-12 md:py-24 bg-white">
+      {/* Shops grid — düz beyaz geçiş */}
+      <section ref={shopsRef} className="bg-white max-w-[1400px] mx-auto px-4 sm:px-8 md:px-20 pt-8 md:pt-10 pb-16" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
 
-        {/* Filter bar */}
+        {/* Tek konsolide header: sol başlık+meta / sağ kontroller */}
         {!loading && !error && (
-          <div className="flex items-center justify-between mb-8 md:mb-12 flex-wrap gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              {selectedCity && (
-                <span className="flex items-center gap-1.5 bg-[#00A3AD]/10 border border-[#00A3AD]/20 text-[#00A3AD] px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  <MapPin size={11} /> {selectedCity}
-                  <button onClick={() => handleCitySelect(selectedCity)} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              {selectedDistrict && (
-                <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  {selectedDistrict}
-                  <button onClick={() => setSelectedDistrict("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              {selectedCategory && (
-                <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest">
-                  {selectedCategory}
-                  <button onClick={() => setSelectedCategory("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
-                </span>
-              )}
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">
-                <span className="text-black font-black">{filteredShops.length}</span> işletme
-              </span>
-              {isFiltered && (
-                <button onClick={clearFilters} className="text-[10px] font-black text-gray-400 hover:text-red-400 uppercase tracking-widest transition-colors">
-                  Temizle
-                </button>
-              )}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight" style={{ color: "#0c0c0d" }}>Öne Çıkanlar</h2>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] md:text-[11px] uppercase tracking-widest" style={{ fontFamily: "var(--font-jb-mono), monospace" }}>
+                <p style={{ color: "#8a8a8e" }}>Randezy topluluğunun favorileri.</p>
+                <span style={{ color: "#0c0c0d" }}><b>{filteredShops.length}</b> işletme</span>
+              </div>
             </div>
-            <button
-              onClick={() => setSortBy(p => p === "rating" ? "default" : "rating")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest border transition-all
-                ${sortBy === "rating"
-                  ? "bg-[#00A3AD] text-white border-[#00A3AD]"
-                  : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"
-                }`}
-            >
-              <ArrowUpDown size={12} />
-              Puana Göre
-            </button>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={() => setSortBy(p => p === "rating" ? "default" : "rating")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-widest border transition-all
+                  ${sortBy === "rating"
+                    ? "bg-[#14b8a6] text-white border-[#14b8a6]"
+                    : "bg-white text-gray-500 border-[#ececea] hover:border-gray-300"
+                  }`}
+                style={{ fontFamily: "var(--font-jb-mono), monospace" }}
+              >
+                <ArrowUpDown size={12} />
+                Puana Göre
+              </button>
+              <button
+                onClick={clearFilters}
+                className="text-[#14b8a6] font-bold text-[10px] md:text-[12px] tracking-widest border-b-2 border-[#14b8a6] pb-0.5 hover:text-[#0d9488] transition-colors uppercase whitespace-nowrap"
+                style={{ fontFamily: "var(--font-jb-mono), monospace" }}
+              >
+                Tümünü Gör →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Aktif filtre chip'leri (yalnızca filtre varsa) */}
+        {!loading && !error && isFiltered && (
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            {selectedCity && (
+              <span className="flex items-center gap-1.5 bg-[#14b8a6]/10 border border-[#14b8a6]/20 text-[#0d9488] px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                <MapPin size={11} /> {selectedCity}
+                <button onClick={() => handleCitySelect(selectedCity)} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
+            {selectedDistrict && (
+              <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                {selectedDistrict}
+                <button onClick={() => setSelectedDistrict("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
+            {selectedCategory && (
+              <span className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                {selectedCategory}
+                <button onClick={() => setSelectedCategory("")} className="ml-1 hover:text-red-400 transition-colors"><X size={10} /></button>
+              </span>
+            )}
           </div>
         )}
 
@@ -434,7 +482,7 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[18px] md:gap-[22px]" style={{ fontFamily: "var(--font-manrope), sans-serif" }}>
             {filteredShops.map((shop: any) => {
               const _td = new Date(); const todayStr = `${_td.getFullYear()}-${String(_td.getMonth()+1).padStart(2,'0')}-${String(_td.getDate()).padStart(2,'0')}`;
               const activeCampaign = (shop.campaigns || []).find((c: any) =>
@@ -446,29 +494,54 @@ export default function Home() {
                   : activeCampaign.type === 'today_special' ? 'Bugüne Özel'
                   : 'Son Dakika'
                 : null;
+              const isDiscount = activeCampaign && (activeCampaign.type === 'percentage' || activeCampaign.type === 'fixed');
+              const reviewCount = (shop.reviews || []).length;
+              const topServices = [...(shop.services || [])]
+                .filter((s: any) => s && s.name)
+                .sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
+                .slice(0, 2);
+              const initial = (shop.name || "?").trim().charAt(0).toUpperCase();
               return (
-                <Link href={`/shop/${shop.id}`} key={shop.id} className="group cursor-pointer">
-                  <div className="relative h-52 sm:h-64 md:h-80 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden mb-3 md:mb-6 shadow-2xl transition-all group-hover:-translate-y-2 ring-1 ring-black/5">
+                <Link
+                  href={`/shop/${shop.id}`}
+                  key={shop.id}
+                  className="group flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-[#ececea] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                >
+                  {/* Görsel */}
+                  <div className="relative h-40 sm:h-44 md:h-48 w-full overflow-hidden">
                     {shop.image_url
-                      ? <img src={shop.image_url} className="w-full h-full object-cover" alt={shop.name} />
-                      : <div className="w-full h-full bg-gray-100 flex flex-col items-center justify-center gap-2">
-                          <ImageIcon size={40} className="text-gray-300" />
-                          <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{shop.category || "İşletme"}</span>
+                      ? <img src={shop.image_url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={shop.name} />
+                      : <div className="w-full h-full flex items-center justify-center" style={{ background: "rgba(20,184,166,0.08)" }}>
+                          <span className="text-5xl md:text-6xl font-extrabold" style={{ color: "rgba(20,184,166,0.45)" }}>{initial}</span>
                         </div>
                     }
-                    <div className="absolute top-3 right-3 md:top-6 md:right-6 bg-white/95 backdrop-blur-md px-2 md:px-3 py-1 md:py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black text-black shadow-lg">
-                      ⭐ {shop.score ?? "—"}
-                    </div>
                     {campaignLabel && (
-                      <div className="absolute top-3 left-3 md:top-6 md:left-6">
-                        <span className="bg-amber-400 text-black px-2.5 py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wide shadow-sm">
-                          🏷 {campaignLabel}
+                      <div className="absolute top-3 left-3">
+                        <span
+                          className="px-2.5 py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wide shadow-sm"
+                          style={{
+                            fontFamily: "var(--font-jb-mono), monospace",
+                            background: isDiscount ? "#c2410c" : "#fbbf24",
+                            color: isDiscount ? "#ffffff" : "#0c0c0d",
+                          }}
+                        >
+                          {campaignLabel}
                         </span>
+                      </div>
+                    )}
+                    {shop.score != null && (
+                      <div
+                        className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] md:text-[11px] font-bold shadow-sm flex items-center gap-1"
+                        style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}
+                      >
+                        <span className="text-amber-400">★</span>
+                        {shop.score}
+                        {reviewCount > 0 && <span style={{ color: "#8a8a8e" }}>({reviewCount})</span>}
                       </div>
                     )}
                     <button
                       onClick={e => toggleFavorite(e, shop.id)}
-                      className="absolute bottom-3 right-3 md:bottom-4 md:right-4 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
+                      className="absolute bottom-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:scale-110 transition-all"
                     >
                       <Heart
                         size={16}
@@ -476,12 +549,38 @@ export default function Home() {
                       />
                     </button>
                   </div>
-                  <h3 className="font-black text-sm md:text-xl text-[#222] uppercase tracking-tighter leading-none mb-1">
-                    {shop.name}
-                  </h3>
-                  <p className="text-gray-400 font-bold text-[10px] md:text-[12px] uppercase tracking-widest">
-                    {shop.district}, {shop.city}
-                  </p>
+
+                  {/* Gövde */}
+                  <div className="flex flex-col flex-1 p-3.5 md:p-4">
+                    <h3 className="font-extrabold text-[13px] md:text-[16px] uppercase tracking-tight leading-tight truncate" style={{ color: "#0c0c0d" }}>
+                      {shop.name}
+                    </h3>
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#8a8a8e" }}>
+                      {shop.district}{shop.district && shop.city ? ", " : ""}{shop.city}
+                    </p>
+
+                    {topServices.length > 0 && (
+                      <div className="mt-3 pt-3 space-y-1.5 border-t border-[#ececea]">
+                        {topServices.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between gap-2 text-[11px] md:text-[12px]">
+                            <span className="truncate" style={{ color: "rgba(12,12,13,0.8)" }}>{s.name}</span>
+                            <span className="font-bold whitespace-nowrap" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}>
+                              {Number(s.price) > 0 ? `₺${s.price}` : "Ücretsiz"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-auto pt-4">
+                      <div
+                        className="w-full text-center py-2.5 rounded-xl text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-white transition-colors group-hover:bg-[#14b8a6]"
+                        style={{ fontFamily: "var(--font-jb-mono), monospace", background: "#0c0c0d" }}
+                      >
+                        Randevu Al →
+                      </div>
+                    </div>
+                  </div>
                 </Link>
               );
             })}
