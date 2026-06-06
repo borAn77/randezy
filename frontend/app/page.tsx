@@ -26,6 +26,17 @@ const CATEGORY_MAP: Record<string, string> = {
   "Dövme": "DÖVME",
 };
 
+// Sadece tamamı BÜYÜK harf yazılmış metni yumuşatır (Türkçe-güvenli).
+// Karışık/normal yazımı OLDUĞU GİBİ bırakır — kasıtlı yazımı bozmaz. DB'ye dokunmaz, yalnız görsel.
+function softTitle(s?: string | null): string {
+  if (!s) return s || "";
+  const isAllCaps = s === s.toLocaleUpperCase("tr-TR") && s !== s.toLocaleLowerCase("tr-TR");
+  if (!isAllCaps) return s;
+  return s
+    .toLocaleLowerCase("tr-TR")
+    .replace(/(^|[\s&/().\-])([a-zçğıöşü])/g, (_m, p1, p2) => p1 + p2.toLocaleUpperCase("tr-TR"));
+}
+
 export default function Home() {
   const [shops, setShops] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -518,9 +529,8 @@ export default function Home() {
                     {campaignLabel && (
                       <div className="absolute top-3 left-3">
                         <span
-                          className="px-2.5 py-1 rounded-full text-[9px] md:text-[10px] font-bold uppercase tracking-wide shadow-sm"
+                          className="px-2.5 py-1 rounded-full text-[10px] md:text-[11px] font-semibold shadow-sm"
                           style={{
-                            fontFamily: "var(--font-jb-mono), monospace",
                             background: isDiscount ? "#c2410c" : "#fbbf24",
                             color: isDiscount ? "#ffffff" : "#0c0c0d",
                           }}
@@ -531,8 +541,8 @@ export default function Home() {
                     )}
                     {shop.score != null && (
                       <div
-                        className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] md:text-[11px] font-bold shadow-sm flex items-center gap-1"
-                        style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}
+                        className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-semibold shadow-sm flex items-center gap-1"
+                        style={{ color: "#0c0c0d" }}
                       >
                         <span className="text-amber-400">★</span>
                         {shop.score}
@@ -552,19 +562,20 @@ export default function Home() {
 
                   {/* Gövde */}
                   <div className="flex flex-col flex-1 p-3.5 md:p-4">
-                    <h3 className="font-extrabold text-[13px] md:text-[16px] uppercase tracking-tight leading-tight truncate" style={{ color: "#0c0c0d" }}>
-                      {shop.name}
+                    <h3 className="font-bold text-[14px] md:text-[17px] tracking-tight leading-snug truncate" style={{ color: "#0c0c0d" }}>
+                      {softTitle(shop.name)}
                     </h3>
-                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest mt-1" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#8a8a8e" }}>
-                      {shop.district}{shop.district && shop.city ? ", " : ""}{shop.city}
+                    <p className="flex items-center gap-1 text-[11px] md:text-[12px] mt-1 truncate" style={{ color: "#8a8a8e" }}>
+                      <MapPin size={12} className="flex-shrink-0 opacity-60" />
+                      <span className="truncate">{[softTitle(shop.district), softTitle(shop.city)].filter(Boolean).join(", ")}</span>
                     </p>
 
                     {topServices.length > 0 && (
                       <div className="mt-3 pt-3 space-y-1.5 border-t border-[#ececea]">
                         {topServices.map((s: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between gap-2 text-[11px] md:text-[12px]">
-                            <span className="truncate" style={{ color: "rgba(12,12,13,0.8)" }}>{s.name}</span>
-                            <span className="font-bold whitespace-nowrap" style={{ fontFamily: "var(--font-jb-mono), monospace", color: "#0c0c0d" }}>
+                          <div key={i} className="flex items-center justify-between gap-2 text-[12px] md:text-[13px]">
+                            <span className="truncate" style={{ color: "rgba(12,12,13,0.75)" }}>{s.name}</span>
+                            <span className="font-semibold whitespace-nowrap" style={{ color: "#0c0c0d" }}>
                               {Number(s.price) > 0 ? `₺${s.price}` : "Ücretsiz"}
                             </span>
                           </div>
@@ -574,8 +585,8 @@ export default function Home() {
 
                     <div className="mt-auto pt-4">
                       <div
-                        className="w-full text-center py-2.5 rounded-xl text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-white transition-colors group-hover:bg-[#14b8a6]"
-                        style={{ fontFamily: "var(--font-jb-mono), monospace", background: "#0c0c0d" }}
+                        className="w-full text-center py-2.5 rounded-xl text-[12px] md:text-[13px] font-semibold text-white transition-colors group-hover:bg-[#14b8a6]"
+                        style={{ background: "#0c0c0d" }}
                       >
                         Randevu Al →
                       </div>
