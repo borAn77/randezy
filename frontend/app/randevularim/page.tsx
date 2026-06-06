@@ -150,6 +150,12 @@ export default function Randevularim() {
   const [cancelTarget, setCancelTarget] = useState<AptRow | null>(null);
   const [rateTarget, setRateTarget]     = useState<AptRow | null>(null);
   const [localRatings, setLocalRatings] = useState<Record<string, number>>({});
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -189,7 +195,7 @@ export default function Randevularim() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { error } = await supabase.from('appointments').update(update).eq('id', id).eq('user_id', user.id);
-    if (error) { alert('İptal başarısız: ' + error.message); return; }
+    if (error) { showToast('İptal başarısız: ' + error.message, 'err'); return; }
     setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'İptal Edildi' } : a));
     setCancelTarget(null);
   };
@@ -305,6 +311,15 @@ export default function Randevularim() {
       )}
       {rateTarget && (
         <RateModal apt={rateTarget} onClose={() => setRateTarget(null)} onSubmit={handleRate} />
+      )}
+
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-xl shadow-2xl text-sm font-bold text-white"
+          style={{ background: toast.type === 'err' ? '#dc2626' : '#0c0c0d' }}
+        >
+          {toast.msg}
+        </div>
       )}
     </main>
   );
