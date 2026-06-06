@@ -80,7 +80,9 @@ export default function Home() {
     if (selectedCity) params.set("city", selectedCity);
     if (selectedDistrict) params.set("district", selectedDistrict);
     const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    // null geçmek Next.js'in history.state'ini siler ve geri tuşunu bozar (sayfayı geri yükleyemez).
+    // Mevcut state'i koruyarak sadece URL'i güncelle.
+    window.history.replaceState(window.history.state, "", qs ? `?${qs}` : window.location.pathname);
   }, [searchQuery, selectedCategory, selectedCity, selectedDistrict]);
 
   // Start first video on mount
