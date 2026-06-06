@@ -341,8 +341,11 @@ export default function ShopDetail() {
   const params = useParams();
   const router = useRouter();
 
-  const rawId = Array.isArray(params.id) ? params.id[0] : params.id as string;
-  const shopId = parseInt(rawId, 10);
+  // Bu sayfa iki route'tan render edilir: /shop/[id] ve /b/[slug] (re-export).
+  // id varsa direkt; yoksa slug'dan shop id çözülür. Eski /shop/[id] aynen çalışır.
+  const idParam = (Array.isArray(params.id) ? params.id[0] : params.id) as string | undefined;
+  const slugParam = (Array.isArray(params.slug) ? params.slug[0] : params.slug) as string | undefined;
+  const [shopId, setShopId] = useState<number | null>(idParam ? parseInt(idParam, 10) : null);
 
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
@@ -461,6 +464,7 @@ export default function ShopDetail() {
 
   const toggleFavorite = useCallback(async () => {
     if (!currentUserId) { setIsAuthOpen(true); return; }
+    if (shopId == null) return;
     if (isFavorited) {
       await supabase.from('favorites').delete().eq('user_id', currentUserId).eq('shop_id', shopId);
       setIsFavorited(false);
@@ -482,12 +486,22 @@ export default function ShopDetail() {
   }, [shop]);
 
   const fetchReviews = async () => {
+    if (shopId == null) return;
     const { data } = await supabase.from('reviews').select('*, profiles(full_name), owner_reply, owner_reply_at').eq('shop_id', shopId).order('created_at', { ascending: false });
     setReviews(data || []);
   };
 
+  // Slug route'unda shop id'yi çöz (id route'unda anında set edilir)
   useEffect(() => {
-    if (isNaN(shopId)) { setNotFound(true); return; }
+    if (idParam) { setShopId(parseInt(idParam, 10)); return; }
+    if (slugParam) {
+      supabase.from('shops').select('id').eq('slug', slugParam).maybeSingle()
+        .then(({ data }) => { if (data?.id != null) setShopId(data.id as number); else setNotFound(true); });
+    }
+  }, [idParam, slugParam]);
+
+  useEffect(() => {
+    if (shopId == null || isNaN(shopId)) { return; }
     Promise.all([
       supabase.from('shops').select('*').eq('id', shopId).single(),
       supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
@@ -527,6 +541,7 @@ export default function ShopDetail() {
   const handleSubmitReview = async () => {
     if (!currentUserId) { alert("Yorum yazmak için giriş yapmalısınız."); return; }
     if (reviewRating === 0) { alert("Lütfen bir puan seçin."); return; }
+    if (shopId == null) return;
     setSubmittingReview(true);
     const { error } = await supabase.from('reviews').upsert([{ shop_id: shopId, user_id: currentUserId, rating: reviewRating, comment: reviewComment }], { onConflict: 'shop_id,user_id' });
     if (error) {
@@ -931,7 +946,7 @@ export default function ShopDetail() {
                                 service={service}
                                 shopHours={shopHours}
                                 staff={serviceStaffFilter ? [serviceStaffFilter] : staff}
-                                shopId={shopId}
+                                shopId={shopId!}
                                 currentUserId={currentUserId}
                                 allServices={services}
                                 cartItems={cart}

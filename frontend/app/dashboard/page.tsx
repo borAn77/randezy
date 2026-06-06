@@ -114,7 +114,8 @@ export default function Dashboard() {
 
   const copyBookingLink = () => {
     if (!shop?.id) return;
-    const url = `${window.location.origin}/shop/${shop.id}`;
+    const path = shop.slug ? `/b/${shop.slug}` : `/shop/${shop.id}`;
+    const url = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
@@ -977,7 +978,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             {shop?.id && (
               <>
-                <a href={`/shop/${shop.id}`} target="_blank" rel="noreferrer"
+                <a href={shop.slug ? `/b/${shop.slug}` : `/shop/${shop.id}`} target="_blank" rel="noreferrer"
                   className="flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
                   <ArrowUpRight size={13}/> Sayfamı Gör
                 </a>

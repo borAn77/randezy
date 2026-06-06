@@ -514,7 +514,7 @@ export default function Home() {
               const initial = (shop.name || "?").trim().charAt(0).toUpperCase();
               return (
                 <Link
-                  href={`/shop/${shop.id}`}
+                  href={shop.slug ? `/b/${shop.slug}` : `/shop/${shop.id}`}
                   key={shop.id}
                   className="group flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-[#ececea] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
                 >
