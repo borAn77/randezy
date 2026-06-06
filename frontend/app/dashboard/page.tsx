@@ -454,7 +454,16 @@ export default function Dashboard() {
   const handleBulkSubmit = async () => {
     if (!shop?.id || !bulkValid) return;
     setSavingBulk(true);
-    const payload = bulkRows.map(r => ({
+    // Zaten ekli katalog hizmetlerini atla (özel hizmetler canonical_key'siz, hep eklenir)
+    const existingKeys = new Set(services.map((s: any) => s.canonical_key).filter(Boolean));
+    const rowsToInsert = bulkRows.filter(r => !r.canonical_key || !existingKeys.has(r.canonical_key));
+    const skipped = bulkRows.length - rowsToInsert.length;
+    if (rowsToInsert.length === 0) {
+      setSavingBulk(false);
+      showToast('Seçilen hizmetler zaten ekli.', 'err');
+      return;
+    }
+    const payload = rowsToInsert.map(r => ({
       shop_id: shop.id,
       name: r.name.trim(),
       price: parseFloat(r.price),
@@ -472,7 +481,7 @@ export default function Dashboard() {
       if (error.code === '23505') { showToast('Bazı hizmetler zaten eklenmiş.', 'err'); }
       else { showToast('Hata: ' + error.message, 'err'); }
     } else {
-      showToast(`${payload.length} hizmet eklendi.`);
+      showToast(`${payload.length} hizmet eklendi${skipped > 0 ? `, ${skipped} zaten ekliydi` : ''}.`);
       setIsBulkModalOpen(false);
       setBulkRows([]);
       fetchInitialData();
