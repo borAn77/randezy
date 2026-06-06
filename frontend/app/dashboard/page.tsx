@@ -11,6 +11,69 @@ import {
   ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent
 } from "lucide-react";
 
+// Berber hizmet kataloğu — tek kaynak (hem tekli ekleme modalı hem toplu ekleme modalı kullanır)
+type CatalogItem = { name: string; category: string; duration: number; canonical_key: string };
+const BERBER_CATALOG: Record<string, CatalogItem[]> = {
+  'Popüler': [
+    { name: 'Erkek Saç Kesimi',     category: 'Saç',         duration: 20, canonical_key: 'erkek_sac_kesimi' },
+    { name: 'Saç + Sakal',          category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
+    { name: 'Sakal Tıraşı',         category: 'Sakal',       duration: 20, canonical_key: 'sakal_tirasi' },
+    { name: 'Skin Fade',            category: 'Saç',         duration: 25, canonical_key: 'skin_fade' },
+    { name: 'Fade / Sadece Yanlar', category: 'Saç',         duration: 15, canonical_key: 'fade_yanlar' },
+    { name: 'Buzz Cut',             category: 'Saç',         duration: 15, canonical_key: 'buzz_cut' },
+  ],
+  'Saç': [
+    { name: 'Erkek Saç Kesimi',         category: 'Saç', duration: 20, canonical_key: 'erkek_sac_kesimi' },
+    { name: 'Klasik Saç Kesimi',        category: 'Saç', duration: 20, canonical_key: 'klasik_sac_kesimi' },
+    { name: 'Skin Fade',                category: 'Saç', duration: 25, canonical_key: 'skin_fade' },
+    { name: 'Fade Kesim',               category: 'Saç', duration: 20, canonical_key: 'fade_kesim' },
+    { name: 'Sadece Yanlar',            category: 'Saç', duration: 15, canonical_key: 'sadece_yanlar' },
+    { name: 'Buzz Cut / Makine Tıraşı', category: 'Saç', duration: 15, canonical_key: 'buzz_cut' },
+    { name: 'Makas Kesimi',             category: 'Saç', duration: 30, canonical_key: 'makas_kesimi' },
+    { name: 'Uzun Saç Kesimi',          category: 'Saç', duration: 30, canonical_key: 'uzun_sac_kesimi' },
+    { name: 'Çocuk Tıraşı',            category: 'Saç', duration: 20, canonical_key: 'cocuk_tirasi' },
+    { name: 'Öğrenci Saç Kesimi',       category: 'Saç', duration: 20, canonical_key: 'ogrenci_sac_kesimi' },
+    { name: 'Yan Desen',                category: 'Saç', duration: 10, canonical_key: 'yan_desen' },
+  ],
+  'Sakal': [
+    { name: 'Sakal Tıraşı',               category: 'Sakal', duration: 20, canonical_key: 'sakal_tirasi' },
+    { name: 'Sakal Kesimi',               category: 'Sakal', duration: 20, canonical_key: 'sakal_kesimi' },
+    { name: 'Sakal Şekillendirme',        category: 'Sakal', duration: 20, canonical_key: 'sakal_sekillendirme' },
+    { name: 'Sakal Kontür',              category: 'Sakal', duration: 15, canonical_key: 'sakal_kontur' },
+    { name: 'Hot Shave',                  category: 'Sakal', duration: 30, canonical_key: 'hot_shave' },
+    { name: 'Sıcak Havlulu Sakal Tıraşı', category: 'Sakal', duration: 30, canonical_key: 'sicak_havlulu_sakal' },
+  ],
+  'Saç + Sakal': [
+    { name: 'Saç + Sakal',                  category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
+    { name: 'Skin Fade + Sakal',            category: 'Saç + Sakal', duration: 45, canonical_key: 'skin_fade_sakal' },
+    { name: 'Uzun Saç + Sakal',            category: 'Saç + Sakal', duration: 50, canonical_key: 'uzun_sac_sakal' },
+    { name: 'Saç + Sakal + Sıcak Havlu',   category: 'Saç + Sakal', duration: 55, canonical_key: 'sac_sakal_sicak' },
+    { name: 'Saç + Sakal + Hot Shave',     category: 'Saç + Sakal', duration: 60, canonical_key: 'sac_sakal_hotshave' },
+    { name: 'Kafa Makine + Sakal',         category: 'Saç + Sakal', duration: 35, canonical_key: 'kafa_makine_sakal' },
+  ],
+  'Kafa Tıraşı': [
+    { name: 'Kafa Sıfır Tıraşı',               category: 'Kafa Tıraşı', duration: 20, canonical_key: 'kafa_sifir' },
+    { name: 'Kafa Makine Tıraşı',              category: 'Kafa Tıraşı', duration: 15, canonical_key: 'kafa_makine' },
+    { name: 'Ustura Kafa Tıraşı',              category: 'Kafa Tıraşı', duration: 25, canonical_key: 'ustura_kafa' },
+    { name: 'Ustura Kafa Tıraşı + Sıcak Havlu', category: 'Kafa Tıraşı', duration: 35, canonical_key: 'ustura_kafa_sicak' },
+  ],
+  'Boya / Kamuflaj': [
+    { name: 'Saç Boyama',               category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_boyama' },
+    { name: 'Sakal Boyama',             category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_boyama' },
+    { name: 'Saç Beyaz Kapama',        category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_beyaz_kapama' },
+    { name: 'Sakal Beyaz Kapama',      category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_beyaz_kapama' },
+    { name: 'Saç + Sakal Beyaz Kapama', category: 'Boya / Kamuflaj', duration: 60, canonical_key: 'sac_sakal_beyaz' },
+    { name: 'Koyu Renk Boyama',        category: 'Boya / Kamuflaj', duration: 40, canonical_key: 'koyu_renk_boyama' },
+  ],
+  'Ek Hizmetler': [
+    { name: 'Burun Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'burun_agda' },
+    { name: 'Kulak Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'kulak_agda' },
+    { name: 'Sıcak Havlu', category: 'Ek Hizmetler', duration:  5, canonical_key: 'sicak_havlu' },
+    { name: 'Saç Yıkama',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'sac_yikama' },
+    { name: 'Saç Bakımı',  category: 'Ek Hizmetler', duration: 20, canonical_key: 'sac_bakimi' },
+  ],
+};
+
 const cities = [
   "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin",
   "Aydın","Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur",
@@ -45,6 +108,12 @@ export default function Dashboard() {
   const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 });
   const [serviceModalMode, setServiceModalMode] = useState<'catalog' | 'manual'>('catalog');
   const [activeCatalogTab, setActiveCatalogTab] = useState('Popüler');
+  // Toplu hizmet ekleme
+  type BulkRow = { name: string; category: string; duration: string; price: string; canonical_key: string | null; is_custom: boolean };
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkTab, setBulkTab] = useState('Popüler');
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [savingBulk, setSavingBulk] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -91,6 +160,10 @@ export default function Dashboard() {
     setToasts(prev => [...prev, { id, msg, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   };
+
+  // Native confirm() yerine şık modal — Promise tabanlı
+  const [confirmState, setConfirmState] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+  const askConfirm = (message: string) => new Promise<boolean>(resolve => setConfirmState({ message, resolve }));
 
   const handleReviewReply = async (reviewId: string) => {
     if (!replyText.trim()) return;
@@ -349,6 +422,63 @@ export default function Dashboard() {
     }
   };
 
+  // ── Toplu hizmet ekleme ──
+  const openBulkModal = () => {
+    setBulkRows([]);
+    setBulkTab('Popüler');
+    setIsBulkModalOpen(true);
+  };
+
+  const toggleBulkItem = (item: CatalogItem) => {
+    setBulkRows(prev => {
+      const exists = prev.some(r => r.canonical_key === item.canonical_key);
+      if (exists) return prev.filter(r => r.canonical_key !== item.canonical_key);
+      return [...prev, { name: item.name, category: item.category, duration: String(item.duration), price: "", canonical_key: item.canonical_key, is_custom: false }];
+    });
+  };
+
+  const addCustomBulkRow = () => {
+    setBulkRows(prev => [...prev, { name: "", category: "Diğer", duration: "20", price: "", canonical_key: null, is_custom: true }]);
+  };
+
+  const updateBulkRow = (idx: number, patch: Partial<BulkRow>) => {
+    setBulkRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+  };
+
+  const removeBulkRow = (idx: number) => {
+    setBulkRows(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const bulkValid = bulkRows.length > 0 && bulkRows.every(r => r.name.trim() && parseFloat(r.price) > 0);
+
+  const handleBulkSubmit = async () => {
+    if (!shop?.id || !bulkValid) return;
+    setSavingBulk(true);
+    const payload = bulkRows.map(r => ({
+      shop_id: shop.id,
+      name: r.name.trim(),
+      price: parseFloat(r.price),
+      duration: parseInt(r.duration) || 0,
+      image_url: "",
+      category: r.category || 'Diğer',
+      canonical_key: r.canonical_key,
+      is_custom: r.is_custom,
+      description: null,
+      sort_order: 999,
+    }));
+    const { error } = await supabase.from('services').insert(payload);
+    setSavingBulk(false);
+    if (error) {
+      if (error.code === '23505') { showToast('Bazı hizmetler zaten eklenmiş.', 'err'); }
+      else { showToast('Hata: ' + error.message, 'err'); }
+    } else {
+      showToast(`${payload.length} hizmet eklendi.`);
+      setIsBulkModalOpen(false);
+      setBulkRows([]);
+      fetchInitialData();
+    }
+  };
+
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
     if (!error) {
@@ -448,7 +578,7 @@ export default function Dashboard() {
 
   const handleDetailDelete = async () => {
     if (!selectedApt) return;
-    if (!confirm('Bu randevuyu kalıcı olarak silmek istediğinize emin misiniz?')) return;
+    if (!(await askConfirm('Bu randevuyu kalıcı olarak silmek istediğinize emin misiniz?'))) return;
     const { error } = await supabase.from('appointments').delete().eq('id', selectedApt.id);
     if (error) { showToast('Silme hatası: ' + error.message, 'err'); return; }
     setSelectedApt(null);
@@ -570,7 +700,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (!confirm("Bu kampanya silinsin mi?")) return;
+    if (!(await askConfirm("Bu kampanya silinsin mi?"))) return;
     const { error } = await supabase.from('campaigns').delete().eq('id', id);
     if (error) { showToast('Silme hatası: ' + error.message, 'err'); return; }
     setCampaigns(prev => prev.filter(c => c.id !== id));
@@ -2109,10 +2239,18 @@ export default function Dashboard() {
                     <h1 className="text-[32px] font-bold uppercase tracking-tight text-[#0c0c0d]">Hizmetler</h1>
                     <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mt-1">{services.length} aktif hizmet</p>
                   </div>
-                  <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 }); setServiceModalMode(shop?.category === 'BERBER' ? 'catalog' : 'manual'); setActiveCatalogTab('Popüler'); setIsServiceModalOpen(true); }}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
-                    <Plus size={14}/> Yeni Hizmet
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {shop?.category === 'BERBER' && (
+                      <button onClick={openBulkModal}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#0c0c0d] text-[12px] font-semibold rounded-xl border border-[#ececea] hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all">
+                        <Package size={14}/> Toplu Ekle
+                      </button>
+                    )}
+                    <button onClick={() => { setEditingService(null); setServiceForm({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 }); setServiceModalMode(shop?.category === 'BERBER' ? 'catalog' : 'manual'); setActiveCatalogTab('Popüler'); setIsServiceModalOpen(true); }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-[#0c0c0d] text-white text-[12px] font-semibold rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                      <Plus size={14}/> Yeni Hizmet
+                    </button>
+                  </div>
                 </div>
                 {services.length === 0 ? (
                   <div className="py-16 text-center bg-white border border-dashed border-[#ececea] rounded-2xl">
@@ -2154,7 +2292,7 @@ export default function Dashboard() {
                               className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#7a7a7e] transition-all flex items-center justify-center gap-1">
                               <Edit3 size={12}/> Düzenle
                             </button>
-                            <button onClick={async () => { if(confirm("Silinsin mi?")) { await supabase.from('services').delete().eq('id',s.id); fetchInitialData(); } }}
+                            <button onClick={async () => { if (await askConfirm("Bu hizmet silinsin mi?")) { await supabase.from('services').delete().eq('id',s.id); fetchInitialData(); } }}
                               className="py-2 px-3 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[#7a7a7e] hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all">
                               <Trash2 size={13}/>
                             </button>
@@ -2316,7 +2454,7 @@ export default function Dashboard() {
                               { label: 'Takvim', icon: <Clock size={13}/>, action: () => { setCalFilterStaff(s.id); setActiveTab('appointments'); } },
                               { label: 'Kazanç', icon: <TrendingUp size={13}/>, action: () => setActiveTab('finance') },
                               { label: 'Düzenle', icon: <Edit3 size={13}/>, action: () => openStaffEdit(s) },
-                              { label: 'Sil', icon: <Trash2 size={13}/>, action: async () => { if(confirm('Personel silinsin mi?')) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }, danger: true },
+                              { label: 'Sil', icon: <Trash2 size={13}/>, action: async () => { if (await askConfirm('Personel silinsin mi?')) { await supabase.from('staff').delete().eq('id', s.id); fetchInitialData(); } }, danger: true },
                             ].map((btn, bi) => (
                               <button key={bi} onClick={btn.action}
                                 className={`flex flex-col items-center gap-1 py-2 rounded-lg transition-all ${(btn as any).danger ? 'bg-[#fafaf8] text-[#dc2626]/40 hover:bg-red-50 hover:text-[#dc2626]' : 'bg-[#fafaf8] hover:bg-[#e6f7f4] text-[#7a7a7e] hover:text-[#14b8a6]'}`}>
@@ -3258,67 +3396,7 @@ export default function Dashboard() {
 
       {/* SERVİS MODALI */}
       {isServiceModalOpen && (() => {
-        const BERBER_CATALOG: Record<string, Array<{ name: string; category: string; duration: number; canonical_key: string }>> = {
-          'Popüler': [
-            { name: 'Erkek Saç Kesimi',     category: 'Saç',         duration: 20, canonical_key: 'erkek_sac_kesimi' },
-            { name: 'Saç + Sakal',          category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
-            { name: 'Sakal Tıraşı',         category: 'Sakal',       duration: 20, canonical_key: 'sakal_tirasi' },
-            { name: 'Skin Fade',            category: 'Saç',         duration: 25, canonical_key: 'skin_fade' },
-            { name: 'Fade / Sadece Yanlar', category: 'Saç',         duration: 15, canonical_key: 'fade_yanlar' },
-            { name: 'Buzz Cut',             category: 'Saç',         duration: 15, canonical_key: 'buzz_cut' },
-          ],
-          'Saç': [
-            { name: 'Erkek Saç Kesimi',         category: 'Saç', duration: 20, canonical_key: 'erkek_sac_kesimi' },
-            { name: 'Klasik Saç Kesimi',        category: 'Saç', duration: 20, canonical_key: 'klasik_sac_kesimi' },
-            { name: 'Skin Fade',                category: 'Saç', duration: 25, canonical_key: 'skin_fade' },
-            { name: 'Fade Kesim',               category: 'Saç', duration: 20, canonical_key: 'fade_kesim' },
-            { name: 'Sadece Yanlar',            category: 'Saç', duration: 15, canonical_key: 'sadece_yanlar' },
-            { name: 'Buzz Cut / Makine Tıraşı', category: 'Saç', duration: 15, canonical_key: 'buzz_cut' },
-            { name: 'Makas Kesimi',             category: 'Saç', duration: 30, canonical_key: 'makas_kesimi' },
-            { name: 'Uzun Saç Kesimi',          category: 'Saç', duration: 30, canonical_key: 'uzun_sac_kesimi' },
-            { name: 'Çocuk Tıraşı',            category: 'Saç', duration: 20, canonical_key: 'cocuk_tirasi' },
-            { name: 'Öğrenci Saç Kesimi',       category: 'Saç', duration: 20, canonical_key: 'ogrenci_sac_kesimi' },
-            { name: 'Yan Desen',                category: 'Saç', duration: 10, canonical_key: 'yan_desen' },
-          ],
-          'Sakal': [
-            { name: 'Sakal Tıraşı',               category: 'Sakal', duration: 20, canonical_key: 'sakal_tirasi' },
-            { name: 'Sakal Kesimi',               category: 'Sakal', duration: 20, canonical_key: 'sakal_kesimi' },
-            { name: 'Sakal Şekillendirme',        category: 'Sakal', duration: 20, canonical_key: 'sakal_sekillendirme' },
-            { name: 'Sakal Kontür',              category: 'Sakal', duration: 15, canonical_key: 'sakal_kontur' },
-            { name: 'Hot Shave',                  category: 'Sakal', duration: 30, canonical_key: 'hot_shave' },
-            { name: 'Sıcak Havlulu Sakal Tıraşı', category: 'Sakal', duration: 30, canonical_key: 'sicak_havlulu_sakal' },
-          ],
-          'Saç + Sakal': [
-            { name: 'Saç + Sakal',                  category: 'Saç + Sakal', duration: 40, canonical_key: 'sac_sakal' },
-            { name: 'Skin Fade + Sakal',            category: 'Saç + Sakal', duration: 45, canonical_key: 'skin_fade_sakal' },
-            { name: 'Uzun Saç + Sakal',            category: 'Saç + Sakal', duration: 50, canonical_key: 'uzun_sac_sakal' },
-            { name: 'Saç + Sakal + Sıcak Havlu',   category: 'Saç + Sakal', duration: 55, canonical_key: 'sac_sakal_sicak' },
-            { name: 'Saç + Sakal + Hot Shave',     category: 'Saç + Sakal', duration: 60, canonical_key: 'sac_sakal_hotshave' },
-            { name: 'Kafa Makine + Sakal',         category: 'Saç + Sakal', duration: 35, canonical_key: 'kafa_makine_sakal' },
-          ],
-          'Kafa Tıraşı': [
-            { name: 'Kafa Sıfır Tıraşı',               category: 'Kafa Tıraşı', duration: 20, canonical_key: 'kafa_sifir' },
-            { name: 'Kafa Makine Tıraşı',              category: 'Kafa Tıraşı', duration: 15, canonical_key: 'kafa_makine' },
-            { name: 'Ustura Kafa Tıraşı',              category: 'Kafa Tıraşı', duration: 25, canonical_key: 'ustura_kafa' },
-            { name: 'Ustura Kafa Tıraşı + Sıcak Havlu', category: 'Kafa Tıraşı', duration: 35, canonical_key: 'ustura_kafa_sicak' },
-          ],
-          'Boya / Kamuflaj': [
-            { name: 'Saç Boyama',               category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_boyama' },
-            { name: 'Sakal Boyama',             category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_boyama' },
-            { name: 'Saç Beyaz Kapama',        category: 'Boya / Kamuflaj', duration: 45, canonical_key: 'sac_beyaz_kapama' },
-            { name: 'Sakal Beyaz Kapama',      category: 'Boya / Kamuflaj', duration: 25, canonical_key: 'sakal_beyaz_kapama' },
-            { name: 'Saç + Sakal Beyaz Kapama', category: 'Boya / Kamuflaj', duration: 60, canonical_key: 'sac_sakal_beyaz' },
-            { name: 'Koyu Renk Boyama',        category: 'Boya / Kamuflaj', duration: 40, canonical_key: 'koyu_renk_boyama' },
-          ],
-          'Ek Hizmetler': [
-            { name: 'Burun Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'burun_agda' },
-            { name: 'Kulak Ağda',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'kulak_agda' },
-            { name: 'Sıcak Havlu', category: 'Ek Hizmetler', duration:  5, canonical_key: 'sicak_havlu' },
-            { name: 'Saç Yıkama',  category: 'Ek Hizmetler', duration: 10, canonical_key: 'sac_yikama' },
-            { name: 'Saç Bakımı',  category: 'Ek Hizmetler', duration: 20, canonical_key: 'sac_bakimi' },
-          ],
-        };
-
+        // Katalog modül seviyesinde tek kaynaktan gelir (bkz. BERBER_CATALOG)
         const addedKeys = new Set(services.map((s: any) => s.canonical_key).filter(Boolean));
 
         const handleCatalogSelect = (item: typeof BERBER_CATALOG['Popüler'][0]) => {
@@ -3654,6 +3732,108 @@ export default function Dashboard() {
           </>
         );
       })()}
+      {/* TOPLU HİZMET EKLEME MODALI */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setIsBulkModalOpen(false)}>
+          <div className="bg-white w-full max-w-4xl rounded-3xl max-h-[90vh] flex flex-col overflow-hidden text-black" onClick={e => e.stopPropagation()}>
+            {/* Başlık */}
+            <div className="flex items-center justify-between px-7 py-5 border-b border-[#ececea]">
+              <div>
+                <h3 className="text-lg font-bold text-[#0c0c0d]">Toplu Hizmet Ekle</h3>
+                <p className="text-[11px] font-mono uppercase tracking-widest text-[#7a7a7e] mt-0.5">Hizmetleri seç, fiyatları gir, tek seferde ekle</p>
+              </div>
+              <button onClick={() => setIsBulkModalOpen(false)} className="text-gray-300 hover:text-black transition-colors"><X size={24}/></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-7 py-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* SOL: Katalog */}
+              <div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {Object.keys(BERBER_CATALOG).map(tab => (
+                    <button key={tab} onClick={() => setBulkTab(tab)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${bulkTab === tab ? 'bg-[#0c0c0d] text-white' : 'bg-[#f4f4f2] text-[#7a7a7e] hover:bg-[#ececea]'}`}>
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {BERBER_CATALOG[bulkTab]?.map(item => {
+                    const already = services.some((s: any) => s.canonical_key === item.canonical_key);
+                    const selected = bulkRows.some(r => r.canonical_key === item.canonical_key);
+                    return (
+                      <button key={item.canonical_key} disabled={already}
+                        onClick={() => toggleBulkItem(item)}
+                        className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition-all text-[12px]
+                          ${already ? 'bg-[#f4f4f2] border-[#ececea] text-gray-300 cursor-not-allowed'
+                            : selected ? 'bg-[#e6f7f4] border-[#14b8a6] text-[#0c0c0d]'
+                            : 'bg-white border-[#ececea] text-[#0c0c0d] hover:border-[#14b8a6]'}`}>
+                        <span className="font-semibold truncate">{item.name}</span>
+                        {already ? <span className="text-[10px] font-mono whitespace-nowrap">✓ Eklendi</span>
+                          : selected ? <CheckCircle2 size={15} className="text-[#14b8a6] flex-shrink-0"/>
+                          : <Plus size={15} className="text-gray-300 flex-shrink-0"/>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SAĞ: Seçilenler */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[11px] font-mono uppercase tracking-widest text-[#7a7a7e]">Seçilen Hizmetler ({bulkRows.length})</p>
+                  <button onClick={addCustomBulkRow} className="text-[11px] font-bold text-[#14b8a6] hover:text-[#0d9488] transition-colors uppercase tracking-wider">+ Hizmet burada yok</button>
+                </div>
+                {bulkRows.length === 0 ? (
+                  <div className="py-12 text-center border border-dashed border-[#ececea] rounded-2xl">
+                    <p className="text-[12px] text-[#7a7a7e]">Soldan hizmet seç veya kendi hizmetini ekle.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {bulkRows.map((r, idx) => (
+                      <div key={idx} className="flex items-center gap-2 bg-[#fafaf8] border border-[#ececea] rounded-xl p-2">
+                        <input
+                          value={r.name}
+                          onChange={e => updateBulkRow(idx, { name: e.target.value })}
+                          placeholder="Hizmet adı"
+                          className="flex-1 min-w-0 px-2 py-1.5 bg-white rounded-lg border border-[#ececea] text-[12px] outline-none focus:border-[#14b8a6]"
+                        />
+                        <input
+                          value={r.duration}
+                          onChange={e => updateBulkRow(idx, { duration: e.target.value.replace(/[^0-9]/g, '') })}
+                          placeholder="dk"
+                          className="w-12 px-1 py-1.5 bg-white rounded-lg border border-[#ececea] text-[12px] text-center outline-none focus:border-[#14b8a6]"
+                        />
+                        <div className="relative">
+                          <input
+                            value={r.price}
+                            onChange={e => updateBulkRow(idx, { price: e.target.value.replace(/[^0-9.]/g, '') })}
+                            placeholder="₺"
+                            className={`w-20 pl-5 pr-2 py-1.5 bg-white rounded-lg border text-[12px] outline-none ${parseFloat(r.price) > 0 ? 'border-[#ececea] focus:border-[#14b8a6]' : 'border-red-300 focus:border-red-400'}`}
+                          />
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-gray-400">₺</span>
+                        </div>
+                        <button onClick={() => removeBulkRow(idx)} className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"><Trash2 size={15}/></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-4 px-7 py-4 border-t border-[#ececea]">
+              <p className="text-[11px] text-[#7a7a7e]">{bulkValid ? 'Eklemeye hazır.' : 'Her hizmet için fiyat zorunlu.'}</p>
+              <button
+                onClick={handleBulkSubmit}
+                disabled={!bulkValid || savingBulk}
+                className={`px-6 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-widest transition-all ${bulkValid && !savingBulk ? 'bg-[#0c0c0d] text-white hover:bg-[#14b8a6]' : 'bg-[#ececea] text-gray-400 cursor-not-allowed'}`}>
+                {savingBulk ? 'Ekleniyor…' : `Seçilen Hizmetleri Ekle${bulkRows.length ? ` (${bulkRows.length})` : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOAST BİLDİRİMLER */}
       <div className="fixed bottom-6 right-6 z-[500] flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
@@ -3664,6 +3844,35 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* ONAY MODALI (native confirm yerine) */}
+      {confirmState && (
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { confirmState.resolve(false); setConfirmState(null); }}>
+          <div className="bg-white rounded-2xl p-7 max-w-sm w-full shadow-2xl border border-[#ececea]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertCircle size={20} className="text-[#dc2626]" />
+              </div>
+              <h3 className="text-[15px] font-bold text-[#0c0c0d]">Emin misiniz?</h3>
+            </div>
+            <p className="text-[13px] text-[#7a7a7e] leading-relaxed mb-6">{confirmState.message}</p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => { confirmState.resolve(false); setConfirmState(null); }}
+                className="px-4 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-widest text-[#7a7a7e] border border-[#ececea] hover:bg-[#fafaf8] transition-all"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={() => { confirmState.resolve(true); setConfirmState(null); }}
+                className="px-4 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-widest text-white bg-[#dc2626] hover:bg-[#b91c1c] transition-all"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
