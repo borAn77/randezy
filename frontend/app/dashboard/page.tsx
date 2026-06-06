@@ -13,6 +13,18 @@ import {
 
 // Berber hizmet kataloğu — tek kaynak (hem tekli ekleme modalı hem toplu ekleme modalı kullanır)
 type CatalogItem = { name: string; category: string; duration: number; canonical_key: string };
+// Manuel hizmet ekleme — işletme türüne göre kategori seçenekleri
+const CATEGORIES_BY_TYPE: Record<string, string[]> = {
+  'KUAFÖR': ['Saç Kesimi', 'Fön & Şekillendirme', 'Boya & Renklendirme', 'Röfle / Balyaj / Ombre', 'Bakım & Keratin', 'Topuz & Abiye', 'Perma & Düzleştirme', 'Gelin Saçı', 'Diğer'],
+  'BERBER': ['Saç', 'Sakal', 'Saç + Sakal', 'Kafa Tıraşı', 'Boya / Kamuflaj', 'Ek Hizmetler', 'Diğer'],
+  'GÜZELLİK MERKEZİ': ['Cilt Bakımı', 'Ağda & Epilasyon', 'Lazer Epilasyon', 'Makyaj', 'Kaş & Kirpik', 'Manikür & Pedikür', 'Cilt Terapileri', 'Paketler', 'Diğer'],
+  'TIRNAK': ['Manikür', 'Pedikür', 'Kalıcı Oje', 'Protez Tırnak', 'Jel & İnşa', 'Nail Art', 'Tırnak Bakımı', 'Diğer'],
+  'KAŞ VE KİRPİK': ['Kaş Tasarımı & Alımı', 'Kaş Laminasyon', 'Kaş Boyama', 'İpek Kirpik', 'Volume Kirpik', 'Kirpik Lifting', 'Microblading', 'Diğer'],
+  'MASAJ': ['Klasik / İsveç', 'Medikal Masaj', 'Spor Masajı', 'Aroma Terapi', 'Sıcak Taş', 'Refleksoloji', 'Bölgesel Masaj', 'Diğer'],
+  'FİZYOTERAPİ': ['Değerlendirme', 'Manuel Terapi', 'Egzersiz Terapisi', 'Elektroterapi', 'Masaj Terapisi', 'Rehabilitasyon', 'Spor Fizyoterapisi', 'Diğer'],
+  'DÖVME': ['Minimal Dövme', 'Küçük Dövme', 'Orta Dövme', 'Büyük / Kol', 'Renkli Dövme', 'Kapatma / Düzeltme', 'Piercing', 'Kalıcı Makyaj', 'Diğer'],
+};
+
 const BERBER_CATALOG: Record<string, CatalogItem[]> = {
   'Popüler': [
     { name: 'Erkek Saç Kesimi',     category: 'Saç',         duration: 20, canonical_key: 'erkek_sac_kesimi' },
@@ -3413,7 +3425,7 @@ export default function Dashboard() {
           setServiceModalMode('manual');
         };
 
-        const SERVICE_CATEGORY_OPTIONS = ['Saç', 'Sakal', 'Saç + Sakal', 'Kafa Tıraşı', 'Boya / Kamuflaj', 'Ek Hizmetler', 'Diğer'];
+        const SERVICE_CATEGORY_OPTIONS = CATEGORIES_BY_TYPE[shop?.category as string] ?? ['Diğer'];
 
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4">
