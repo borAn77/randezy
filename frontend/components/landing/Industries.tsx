@@ -25,7 +25,7 @@ const industries = [
 
 export function Industries() {
   return (
-    <section className="bg-white py-20 px-6 md:px-12 lg:px-24">
+    <section className="bg-white py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-24">
       <div className="max-w-[1400px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -34,7 +34,7 @@ export function Industries() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
             Her sektör için özel çözümler
           </h2>
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
@@ -42,7 +42,7 @@ export function Industries() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-8">
           {industries.map((industry, index) => (
             <motion.div
               key={index}
@@ -50,7 +50,7 @@ export function Industries() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
-              className="bg-gray-50 rounded-2xl p-8 hover:shadow-lg transition-shadow"
+              className="bg-gray-50 rounded-2xl p-5 sm:p-8 hover:shadow-lg transition-shadow"
             >
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center mb-5"
@@ -58,7 +58,7 @@ export function Industries() {
               >
                 <industry.icon className="w-7 h-7" style={{ color: industry.color }} />
               </div>
-              <h3 className="text-xl md:text-2xl font-bold mb-3 text-black">{industry.title}</h3>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 text-black">{industry.title}</h3>
               <p className="text-base text-gray-600 leading-relaxed">{industry.description}</p>
             </motion.div>
           ))}

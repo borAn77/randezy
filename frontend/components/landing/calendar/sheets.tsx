@@ -1,3 +1,4 @@
+"use client";
 // Alt sheet'ler / overlay'ler — Detay, Arama, Tarih seçici, Çalışan filtresi
 import React from "react";
 import { CAL, H as HELPERS, type Appointment, type Status } from "./data";

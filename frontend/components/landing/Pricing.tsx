@@ -14,7 +14,7 @@ const features = [
 
 export function Pricing({ onStart }: { onStart?: () => void }) {
   return (
-    <section className="bg-gray-50 py-20 px-6 md:px-12 lg:px-24">
+    <section className="bg-gray-50 py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-24">
       <div className="max-w-[1400px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -26,7 +26,7 @@ export function Pricing({ onStart }: { onStart?: () => void }) {
           <div className="inline-block bg-[#00A3AD]/10 border border-[#00A3AD]/30 text-[#00A3AD] px-4 py-2 rounded-full text-sm font-semibold mb-5">
             🎉 Lansma Kampanyası
           </div>
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
             Şimdi tam zamanı
           </h2>
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
@@ -41,12 +41,12 @@ export function Pricing({ onStart }: { onStart?: () => void }) {
           transition={{ duration: 0.6 }}
           className="max-w-3xl mx-auto"
         >
-          <div className="bg-white text-black rounded-2xl p-8 md:p-10 shadow-lg border border-gray-200">
+          <div className="bg-white text-black rounded-2xl p-5 sm:p-8 md:p-10 shadow-lg border border-gray-200">
             <div className="text-center mb-8">
               <h3 className="text-xl md:text-2xl font-bold mb-3 text-black">Randezy Pro</h3>
               <div className="flex items-end justify-center gap-3 mb-2">
-                <span className="text-6xl md:text-7xl font-bold text-black">₺0</span>
-                <span className="text-2xl md:text-3xl text-gray-400 line-through mb-3">₺299</span>
+                <span className="text-5xl sm:text-6xl md:text-7xl font-bold text-black">₺0</span>
+                <span className="text-xl sm:text-2xl md:text-3xl text-gray-400 line-through mb-3">₺299</span>
               </div>
               <p className="text-base md:text-lg text-gray-600">
                 Lansma süresince <span className="text-[#00A3AD] font-bold">tamamen ücretsiz</span>
@@ -75,7 +75,7 @@ export function Pricing({ onStart }: { onStart?: () => void }) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onStart}
-              className="w-full bg-black hover:bg-gray-800 text-white py-4 rounded-xl text-lg md:text-xl font-semibold transition-all"
+              className="w-full bg-black hover:bg-gray-800 text-white py-3.5 rounded-xl text-base md:text-lg font-semibold transition-all"
             >
               Hemen başla
             </motion.button>

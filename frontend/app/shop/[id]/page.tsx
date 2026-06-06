@@ -847,7 +847,7 @@ export default function ShopDetail() {
             <div id="services-section" className="mt-14">
               <div className="flex items-end justify-between mb-6">
                 <h2 className="text-[28px] font-bold tracking-tight inline-block" style={{ borderBottom: '3px solid #14b8a6', paddingBottom: '6px' }}>Hizmetlerimiz</h2>
-                <div className="font-mono text-[11px] text-gray-400 uppercase tracking-widest">{filteredServices.length} hizmet · Anlık randevu</div>
+                <div className="font-mono text-[11px] text-gray-500 uppercase tracking-widest">{filteredServices.length} hizmet · Anlık randevu</div>
               </div>
 
               {staff.length > 0 && (
@@ -881,7 +881,7 @@ export default function ShopDetail() {
                       {Object.keys(groupedServices).length > 1 && (
                         <div className="flex items-center gap-3 my-3">
                           <div className="h-px flex-1 bg-gray-100" />
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{category}</span>
+                          <span className="text-[10px] font-black text-[#0d9488] uppercase tracking-[0.2em]">{category}</span>
                           <div className="h-px flex-1 bg-gray-100" />
                         </div>
                       )}
@@ -897,11 +897,11 @@ export default function ShopDetail() {
                               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                             >
                               <div>
-                                <h3 className="text-base font-bold tracking-tight m-0 mb-1.5">{service.name}</h3>
-                                {service.description && <p className="text-[13px] text-gray-500 mb-2 max-w-[480px] m-0">{service.description}</p>}
-                                <div className="flex gap-4 font-mono text-[11px] text-gray-400 uppercase tracking-wider">
-                                  <span>⏱ {service.duration} dk</span>
-                                  {staff.length > 0 && <span>✦ {serviceStaffFilter ? serviceStaffFilter.first_name : 'Tüm Personel'}</span>}
+                                <h3 className="text-[15px] font-bold tracking-tight m-0 mb-1.5 text-[#0c0c0d]">{service.name}</h3>
+                                {service.description && <p className="text-[13px] text-gray-600 mb-2 max-w-[480px] m-0">{service.description}</p>}
+                                <div className="flex gap-4 font-mono text-[11px] text-gray-500 uppercase tracking-wider">
+                                  <span className="flex items-center gap-1"><Clock size={11} className="text-[#14b8a6]" /> {service.duration} dk</span>
+                                  {staff.length > 0 && <span className="flex items-center gap-1"><User size={11} className="text-[#14b8a6]" /> {serviceStaffFilter ? serviceStaffFilter.first_name : 'Tüm Personel'}</span>}
                                 </div>
                               </div>
                               {(() => {
@@ -918,7 +918,7 @@ export default function ShopDetail() {
                                     ) : (
                                       <div className="text-[22px] font-bold tracking-tight">{original} ₺</div>
                                     )}
-                                    <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-gray-400'}`}>
+                                    <div className={`font-mono text-[11px] uppercase tracking-wider mt-1.5 flex items-center gap-1 justify-end ${isExpanded ? 'text-[#0d9488]' : 'text-[#14b8a6]'}`}>
                                       {isExpanded ? 'Kapat' : 'Saat seç'}
                                       <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                     </div>

@@ -5,10 +5,8 @@ import { supabase } from "../../lib/supabase";
 import AuthModal from "../../components/layout/AuthModal";
 import Footer from "../../components/layout/Footer";
 import { Hero } from "../../components/landing/Hero";
-import { Stats } from "../../components/landing/Stats";
 import { Features } from "../../components/landing/Features";
 import { Industries } from "../../components/landing/Industries";
-import { MobilePreview } from "../../components/landing/MobilePreview";
 import { Pricing } from "../../components/landing/Pricing";
 
 export default function ProPage() {
@@ -70,9 +68,7 @@ export default function ProPage() {
       <Hero onStart={handleStart} />
 
       <section id="ozellikler">
-        <Stats />
         <Features />
-        <MobilePreview />
         <Industries />
       </section>
 

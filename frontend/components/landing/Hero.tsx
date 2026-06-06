@@ -1,23 +1,54 @@
 "use client";
 import { motion } from "motion/react";
+import { PhoneMockup } from "./PhoneMockup";
+
+const SCOPE_STYLE = `
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+.rdz-cal-scope {
+  --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --bg: oklch(0.985 0.004 70);
+  --surface: #ffffff;
+  --frame-bg: oklch(0.985 0.004 70);
+  --text: oklch(0.22 0.008 60);
+  --text-mut: oklch(0.50 0.006 60);
+  --text-sub: oklch(0.66 0.005 60);
+  --separator: oklch(0.92 0.005 60);
+  --separator-soft: oklch(0.95 0.005 60);
+  --now: oklch(0.62 0.20 28);
+
+  --primary: oklch(0.58 0.14 250);
+  --primary-soft: oklch(0.94 0.04 250);
+  --primary-tint: oklch(0.97 0.022 250);
+  --primary-text: oklch(0.35 0.13 250);
+  --primary-shadow: oklch(0.58 0.14 250 / 0.35);
+
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetFadeIn { from { opacity: 0; } to { opacity: 1; } }
+`;
 
 export function Hero({ onStart }: { onStart?: () => void }) {
   return (
-    <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 md:px-12 lg:px-24 pt-24 pb-32 overflow-hidden">
+    <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-4 sm:px-6 md:px-12 lg:px-24 pt-20 pb-16 md:pt-24 md:pb-32 overflow-hidden">
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-20 right-20 w-96 h-96 bg-[#00A3AD] rounded-full blur-3xl" />
         <div className="absolute bottom-20 left-20 w-96 h-96 bg-[#00A3AD] rounded-full blur-3xl" />
       </div>
 
       <div className="max-w-[1400px] mx-auto relative z-10">
-        <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-24 items-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="space-y-8"
           >
-            <h1 className="text-[2.5rem] md:text-[3.5rem] lg:text-[4.5rem] leading-[1.1] tracking-tight font-bold">
+            <h1 className="text-[2rem] sm:text-[2.5rem] md:text-[3.5rem] lg:text-[4.5rem] leading-[1.1] tracking-tight font-bold">
               Telefonu kapat,
               <br />
               işini büyüt.
@@ -31,7 +62,7 @@ export function Hero({ onStart }: { onStart?: () => void }) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onStart}
-              className="bg-white text-black px-10 py-4 rounded-xl text-lg font-semibold hover:shadow-2xl transition-all"
+              className="bg-white text-black px-8 py-3 md:px-10 md:py-4 rounded-xl text-base md:text-lg font-semibold hover:shadow-2xl transition-all"
             >
               Ücretsiz dene
             </motion.button>
@@ -45,58 +76,10 @@ export function Hero({ onStart }: { onStart?: () => void }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-            className="relative flex justify-center lg:justify-end"
+            className="rdz-cal-scope relative w-full"
           >
-            <div className="relative w-full max-w-sm">
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-[3rem] p-3 shadow-2xl border border-gray-700">
-                <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl">
-                  <div className="p-6 space-y-5">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-gray-500 text-xs mb-1">Bugün</p>
-                        <h2 className="text-2xl font-bold text-black">8 Randevu</h2>
-                      </div>
-                      <div className="bg-[#00A3AD] w-10 h-10 rounded-xl flex items-center justify-center text-xl">
-                        📅
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-[#00A3AD] to-[#008A94] rounded-2xl p-5 text-white shadow-lg">
-                      <p className="text-white/80 text-xs mb-1">Bu Ay Ciro</p>
-                      <p className="text-3xl font-bold mb-3">₺24,850</p>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="bg-white/20 px-2 py-1 rounded-full">↗ %32</span>
-                        <span className="text-white/80">geçen aya göre</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {[
-                        { time: "14:00", name: "Ahmet Yılmaz", service: "Saç Kesimi" },
-                        { time: "15:30", name: "Mehmet Demir", service: "Sakal Tıraşı" },
-                        { time: "17:00", name: "Can Öztürk", service: "Saç + Sakal" },
-                      ].map((apt, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.5 + i * 0.1 }}
-                          className="bg-gray-50 rounded-xl p-3 flex items-center gap-3"
-                        >
-                          <div className="bg-[#00A3AD]/10 text-[#00A3AD] px-2 py-1 rounded-lg text-xs font-medium">
-                            {apt.time}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-xs text-black">{apt.name}</p>
-                            <p className="text-gray-500 text-[10px]">{apt.service}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <style>{SCOPE_STYLE}</style>
+            <PhoneMockup />
           </motion.div>
         </div>
       </div>

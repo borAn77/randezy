@@ -19,16 +19,16 @@ const features = [
 
 export function Features() {
   return (
-    <section className="bg-white py-20 px-6 md:px-12 lg:px-24">
+    <section className="bg-white py-12 md:py-20 px-4 sm:px-6 md:px-12 lg:px-24">
       <div className="max-w-[1400px] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-20"
+          className="text-center mb-10 md:mb-20"
         >
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
             İşletmeniz için her şey dahil
           </h2>
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
@@ -36,7 +36,7 @@ export function Features() {
           </p>
         </motion.div>
 
-        <div className="space-y-24 lg:space-y-32">
+        <div className="space-y-12 md:space-y-24 lg:space-y-32">
           {features.map((feature, index) => (
             <motion.div
               key={index}
@@ -44,18 +44,18 @@ export function Features() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
+              className="grid lg:grid-cols-2 gap-6 lg:gap-20 items-center"
             >
               <div className={`space-y-5 ${index % 2 === 1 ? "lg:order-2" : ""}`}>
                 <div className="inline-flex items-center justify-center bg-[#00A3AD]/10 w-14 h-14 rounded-xl">
                   <feature.icon className="w-7 h-7 text-[#00A3AD]" />
                 </div>
-                <h3 className="text-2xl md:text-3xl font-bold text-black">{feature.title}</h3>
+                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-black">{feature.title}</h3>
                 <p className="text-base md:text-lg text-gray-600 leading-relaxed">{feature.description}</p>
               </div>
 
               <div className={`${index % 2 === 1 ? "lg:order-1" : ""}`}>
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 md:p-8">
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-4 md:p-8">
                   <div className="bg-white rounded-xl shadow-xl p-5 md:p-6 space-y-4">
                     {feature.mockupType === "calendar" && (
                       <>

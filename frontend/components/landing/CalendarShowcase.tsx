@@ -1,3 +1,4 @@
+"use client";
 import { PhoneMockup } from "./PhoneMockup";
 
 // Randezy Takvim prototipi bölümü — HTML prototipinin birebir karşılığı:
