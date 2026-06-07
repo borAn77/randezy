@@ -165,7 +165,6 @@ const CATALOG_BY_TYPE: Record<string, Record<string, { name: string; canonical_k
       { name: 'Makine Tıraşı', canonical_key: 'berber_sac_makine_tirasi' },
       { name: 'Fade Kesim', canonical_key: 'berber_sac_fade_kesim' },
       { name: 'Skin Fade', canonical_key: 'berber_sac_skin_fade' },
-      { name: 'Çocuk Saç Kesimi', canonical_key: 'berber_sac_cocuk_sac_kesimi' },
       { name: 'Öğrenci Kesimi', canonical_key: 'berber_sac_ogrenci_kesimi' },
     ],
     'Sakal': [
