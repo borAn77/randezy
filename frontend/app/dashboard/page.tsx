@@ -86,6 +86,426 @@ const BERBER_CATALOG: Record<string, CatalogItem[]> = {
   ],
 };
 
+// Toplu Ekle hazır hizmet kataloğu — tüm işletme türleri. Kategori adları CATEGORIES_BY_TYPE ile birebir.
+// Katalogda fiyat/süre YOK; işletme sahibi seçtikten sonra fiyat + süreyi kendisi girer.
+const CATALOG_BY_TYPE: Record<string, Record<string, { name: string; canonical_key: string }[]>> = {
+  'KUAFÖR': {
+    'Kesim': [
+      { name: 'Kadın Saç Kesimi', canonical_key: 'kuafor_kesim_kadin_sac_kesimi' },
+      { name: 'Erkek Saç Kesimi', canonical_key: 'kuafor_kesim_erkek_sac_kesimi' },
+      { name: 'Çocuk Saç Kesimi', canonical_key: 'kuafor_kesim_cocuk_sac_kesimi' },
+      { name: 'Uç Alma', canonical_key: 'kuafor_kesim_uc_alma' },
+      { name: 'Kahkül Kesimi', canonical_key: 'kuafor_kesim_kahkul_kesimi' },
+      { name: 'Katlı Kesim', canonical_key: 'kuafor_kesim_katli_kesim' },
+      { name: 'Küt Kesim', canonical_key: 'kuafor_kesim_kut_kesim' },
+      { name: 'Bob Kesim', canonical_key: 'kuafor_kesim_bob_kesim' },
+    ],
+    'Fön & Şekillendirme': [
+      { name: 'Fön', canonical_key: 'kuafor_fon_fon' },
+      { name: 'Düz Fön', canonical_key: 'kuafor_fon_duz_fon' },
+      { name: 'Dalgalı Fön', canonical_key: 'kuafor_fon_dalgali_fon' },
+      { name: 'Maşa', canonical_key: 'kuafor_fon_masa' },
+      { name: 'Su Dalgası', canonical_key: 'kuafor_fon_su_dalgasi' },
+      { name: 'Örgü Modeli', canonical_key: 'kuafor_fon_orgu_modeli' },
+      { name: 'Geçici Düzleştirme', canonical_key: 'kuafor_fon_gecici_duzlestirme' },
+    ],
+    'Boya & Renklendirme': [
+      { name: 'Dip Boya', canonical_key: 'kuafor_boya_dip_boya' },
+      { name: 'Komple Boya', canonical_key: 'kuafor_boya_komple_boya' },
+      { name: 'Tek Renk Boya', canonical_key: 'kuafor_boya_tek_renk_boya' },
+      { name: 'Beyaz Kapatma', canonical_key: 'kuafor_boya_beyaz_kapatma' },
+      { name: 'Cila', canonical_key: 'kuafor_boya_cila' },
+      { name: 'Tonlama', canonical_key: 'kuafor_boya_tonlama' },
+      { name: 'Renk Değişimi', canonical_key: 'kuafor_boya_renk_degisimi' },
+    ],
+    'Röfle / Balyaj / Ombre': [
+      { name: 'Röfle', canonical_key: 'kuafor_rofle_rofle' },
+      { name: 'Balyaj', canonical_key: 'kuafor_rofle_balyaj' },
+      { name: 'Ombre', canonical_key: 'kuafor_rofle_ombre' },
+      { name: 'Sombre', canonical_key: 'kuafor_rofle_sombre' },
+      { name: 'Gölgelendirme', canonical_key: 'kuafor_rofle_golgelendirme' },
+      { name: 'Airtouch', canonical_key: 'kuafor_rofle_airtouch' },
+    ],
+    'Saç Bakımı & Keratin': [
+      { name: 'Keratin Bakımı', canonical_key: 'kuafor_bakim_keratin_bakimi' },
+      { name: 'Brezilya Fönü', canonical_key: 'kuafor_bakim_brezilya_fonu' },
+      { name: 'Saç Botoksu', canonical_key: 'kuafor_bakim_sac_botoksu' },
+      { name: 'Nem Bakımı', canonical_key: 'kuafor_bakim_nem_bakimi' },
+      { name: 'Protein Bakımı', canonical_key: 'kuafor_bakim_protein_bakimi' },
+      { name: 'Onarıcı Saç Bakımı', canonical_key: 'kuafor_bakim_onarici_sac_bakimi' },
+      { name: 'Saç Maskesi', canonical_key: 'kuafor_bakim_sac_maskesi' },
+    ],
+    'Topuz & Özel Gün': [
+      { name: 'Topuz', canonical_key: 'kuafor_topuz_topuz' },
+      { name: 'Abiye Saçı', canonical_key: 'kuafor_topuz_abiye_saci' },
+      { name: 'Maşalı Topuz', canonical_key: 'kuafor_topuz_masali_topuz' },
+      { name: 'Örgülü Topuz', canonical_key: 'kuafor_topuz_orgulu_topuz' },
+      { name: 'Nişan Saçı', canonical_key: 'kuafor_topuz_nisan_saci' },
+      { name: 'Mezuniyet Saçı', canonical_key: 'kuafor_topuz_mezuniyet_saci' },
+    ],
+    'Gelin Saçı': [
+      { name: 'Gelin Saçı', canonical_key: 'kuafor_gelin_gelin_saci' },
+      { name: 'Gelin Saçı Provası', canonical_key: 'kuafor_gelin_gelin_saci_provasi' },
+      { name: 'Gelin Topuzu', canonical_key: 'kuafor_gelin_gelin_topuzu' },
+      { name: 'Duvak Yerleştirme', canonical_key: 'kuafor_gelin_duvak_yerlestirme' },
+    ],
+    'Kaynak & Saç Uzatma': [
+      { name: 'Mikro Kaynak', canonical_key: 'kuafor_kaynak_mikro_kaynak' },
+      { name: 'Boncuk Kaynak', canonical_key: 'kuafor_kaynak_boncuk_kaynak' },
+      { name: 'Bant Kaynak', canonical_key: 'kuafor_kaynak_bant_kaynak' },
+      { name: 'Keratin Kaynak', canonical_key: 'kuafor_kaynak_keratin_kaynak' },
+      { name: 'Kaynak Bakımı', canonical_key: 'kuafor_kaynak_kaynak_bakimi' },
+      { name: 'Kaynak Sökümü', canonical_key: 'kuafor_kaynak_kaynak_sokumu' },
+    ],
+  },
+  'BERBER': {
+    'Saç': [
+      { name: 'Erkek Saç Kesimi', canonical_key: 'berber_sac_erkek_sac_kesimi' },
+      { name: 'Makas Kesimi', canonical_key: 'berber_sac_makas_kesimi' },
+      { name: 'Makine Tıraşı', canonical_key: 'berber_sac_makine_tirasi' },
+      { name: 'Fade Kesim', canonical_key: 'berber_sac_fade_kesim' },
+      { name: 'Skin Fade', canonical_key: 'berber_sac_skin_fade' },
+      { name: 'Çocuk Saç Kesimi', canonical_key: 'berber_sac_cocuk_sac_kesimi' },
+      { name: 'Öğrenci Kesimi', canonical_key: 'berber_sac_ogrenci_kesimi' },
+    ],
+    'Sakal': [
+      { name: 'Sakal Tıraşı', canonical_key: 'berber_sakal_sakal_tirasi' },
+      { name: 'Sakal Kesimi', canonical_key: 'berber_sakal_sakal_kesimi' },
+      { name: 'Sakal Şekillendirme', canonical_key: 'berber_sakal_sakal_sekillendirme' },
+      { name: 'Ustura Tıraşı', canonical_key: 'berber_sakal_ustura_tirasi' },
+      { name: 'Sıcak Havlu Sakal Tıraşı', canonical_key: 'berber_sakal_sicak_havlu_sakal_tirasi' },
+    ],
+    'Saç + Sakal': [
+      { name: 'Saç + Sakal', canonical_key: 'berber_sacsakal_sac_sakal' },
+      { name: 'Fade Kesim + Sakal', canonical_key: 'berber_sacsakal_fade_kesim_sakal' },
+      { name: 'Saç + Sakal + Yıkama', canonical_key: 'berber_sacsakal_sac_sakal_yikama' },
+      { name: 'Saç + Sakal + Sıcak Havlu', canonical_key: 'berber_sacsakal_sac_sakal_sicak_havlu' },
+    ],
+    'Çocuk': [
+      { name: 'Çocuk Saç Kesimi', canonical_key: 'berber_cocuk_cocuk_sac_kesimi' },
+      { name: 'Çocuk Makine Tıraşı', canonical_key: 'berber_cocuk_cocuk_makine_tirasi' },
+      { name: 'Çocuk Saç Şekillendirme', canonical_key: 'berber_cocuk_cocuk_sac_sekillendirme' },
+    ],
+    'Boya & Kamuflaj': [
+      { name: 'Saç Boyama', canonical_key: 'berber_boya_sac_boyama' },
+      { name: 'Sakal Boyama', canonical_key: 'berber_boya_sakal_boyama' },
+      { name: 'Beyaz Kapatma', canonical_key: 'berber_boya_beyaz_kapatma' },
+      { name: 'Saç Kamuflajı', canonical_key: 'berber_boya_sac_kamuflaji' },
+      { name: 'Sakal Kamuflajı', canonical_key: 'berber_boya_sakal_kamuflaji' },
+    ],
+    'Cilt Bakımı': [
+      { name: 'Yüz Maskesi', canonical_key: 'berber_cilt_yuz_maskesi' },
+      { name: 'Siyah Nokta Bakımı', canonical_key: 'berber_cilt_siyah_nokta_bakimi' },
+      { name: 'Cilt Temizliği', canonical_key: 'berber_cilt_cilt_temizligi' },
+      { name: 'Kaş Düzeltme', canonical_key: 'berber_cilt_kas_duzeltme' },
+    ],
+    'Ek Hizmetler': [
+      { name: 'Saç Yıkama', canonical_key: 'berber_ek_sac_yikama' },
+      { name: 'Fön', canonical_key: 'berber_ek_fon' },
+      { name: 'Burun Ağda', canonical_key: 'berber_ek_burun_agda' },
+      { name: 'Kulak Ağda', canonical_key: 'berber_ek_kulak_agda' },
+      { name: 'Ense Tıraşı', canonical_key: 'berber_ek_ense_tirasi' },
+      { name: 'Sıcak Havlu', canonical_key: 'berber_ek_sicak_havlu' },
+    ],
+  },
+  'GÜZELLİK MERKEZİ': {
+    'Cilt Bakımı': [
+      { name: 'Klasik Cilt Bakımı', canonical_key: 'guzellik_cilt_klasik_cilt_bakimi' },
+      { name: 'Derin Cilt Temizliği', canonical_key: 'guzellik_cilt_derin_cilt_temizligi' },
+      { name: 'Hydrofacial Cilt Bakımı', canonical_key: 'guzellik_cilt_hydrofacial_cilt_bakimi' },
+      { name: 'Leke Bakımı', canonical_key: 'guzellik_cilt_leke_bakimi' },
+      { name: 'Akne Bakımı', canonical_key: 'guzellik_cilt_akne_bakimi' },
+      { name: 'Yaşlanma Karşıtı Bakım', canonical_key: 'guzellik_cilt_yaslanma_karsiti_bakim' },
+      { name: 'Karbon Peeling', canonical_key: 'guzellik_cilt_karbon_peeling' },
+      { name: 'Nem Bakımı', canonical_key: 'guzellik_cilt_nem_bakimi' },
+    ],
+    'Lazer Epilasyon': [
+      { name: 'Tüm Vücut Lazer', canonical_key: 'guzellik_lazer_tum_vucut_lazer' },
+      { name: 'Yüz Lazer', canonical_key: 'guzellik_lazer_yuz_lazer' },
+      { name: 'Koltuk Altı Lazer', canonical_key: 'guzellik_lazer_koltuk_alti_lazer' },
+      { name: 'Kol Lazer', canonical_key: 'guzellik_lazer_kol_lazer' },
+      { name: 'Bacak Lazer', canonical_key: 'guzellik_lazer_bacak_lazer' },
+      { name: 'Bikini Lazer', canonical_key: 'guzellik_lazer_bikini_lazer' },
+      { name: 'Sırt Lazer', canonical_key: 'guzellik_lazer_sirt_lazer' },
+      { name: 'Göğüs Lazer', canonical_key: 'guzellik_lazer_gogus_lazer' },
+    ],
+    'Ağda': [
+      { name: 'Tüm Vücut Ağda', canonical_key: 'guzellik_agda_tum_vucut_agda' },
+      { name: 'Bacak Ağda', canonical_key: 'guzellik_agda_bacak_agda' },
+      { name: 'Kol Ağda', canonical_key: 'guzellik_agda_kol_agda' },
+      { name: 'Yüz Ağda', canonical_key: 'guzellik_agda_yuz_agda' },
+      { name: 'Bikini Ağda', canonical_key: 'guzellik_agda_bikini_agda' },
+      { name: 'Koltuk Altı Ağda', canonical_key: 'guzellik_agda_koltuk_alti_agda' },
+      { name: 'Kaş Ağda', canonical_key: 'guzellik_agda_kas_agda' },
+      { name: 'Sir Ağda', canonical_key: 'guzellik_agda_sir_agda' },
+    ],
+    'Bölgesel İncelme': [
+      { name: 'G5 Masajı', canonical_key: 'guzellik_incelme_g5_masaji' },
+      { name: 'Bölgesel İncelme Seansı', canonical_key: 'guzellik_incelme_bolgesel_incelme_seansi' },
+      { name: 'Selülit Bakımı', canonical_key: 'guzellik_incelme_selulit_bakimi' },
+      { name: 'Lenf Drenaj', canonical_key: 'guzellik_incelme_lenf_drenaj' },
+      { name: 'Kavitasyon', canonical_key: 'guzellik_incelme_kavitasyon' },
+      { name: 'Vakum Terapi', canonical_key: 'guzellik_incelme_vakum_terapi' },
+    ],
+    'Kaş & Kirpik': [
+      { name: 'Kaş Alımı', canonical_key: 'guzellik_kaskirpik_kas_alimi' },
+      { name: 'Kaş Tasarımı', canonical_key: 'guzellik_kaskirpik_kas_tasarimi' },
+      { name: 'Kaş Boyama', canonical_key: 'guzellik_kaskirpik_kas_boyama' },
+      { name: 'Kaş Laminasyonu', canonical_key: 'guzellik_kaskirpik_kas_laminasyonu' },
+      { name: 'Kirpik Lifting', canonical_key: 'guzellik_kaskirpik_kirpik_lifting' },
+      { name: 'İpek Kirpik', canonical_key: 'guzellik_kaskirpik_ipek_kirpik' },
+      { name: 'Kaş ve Kirpik Boyama', canonical_key: 'guzellik_kaskirpik_kas_kirpik_boyama' },
+    ],
+    'Kalıcı Makyaj': [
+      { name: 'Microblading', canonical_key: 'guzellik_kalici_microblading' },
+      { name: 'Pudra Kaş', canonical_key: 'guzellik_kalici_pudra_kas' },
+      { name: 'Dipliner', canonical_key: 'guzellik_kalici_dipliner' },
+      { name: 'Eyeliner', canonical_key: 'guzellik_kalici_eyeliner' },
+      { name: 'Dudak Renklendirme', canonical_key: 'guzellik_kalici_dudak_renklendirme' },
+      { name: 'Kalıcı Makyaj Rötuşu', canonical_key: 'guzellik_kalici_kalici_makyaj_rotusu' },
+    ],
+    'Makyaj': [
+      { name: 'Gündüz Makyajı', canonical_key: 'guzellik_makyaj_gunduz_makyaji' },
+      { name: 'Gece Makyajı', canonical_key: 'guzellik_makyaj_gece_makyaji' },
+      { name: 'Abiye Makyajı', canonical_key: 'guzellik_makyaj_abiye_makyaji' },
+      { name: 'Gelin Makyajı', canonical_key: 'guzellik_makyaj_gelin_makyaji' },
+      { name: 'Nişan Makyajı', canonical_key: 'guzellik_makyaj_nisan_makyaji' },
+      { name: 'Profesyonel Makyaj', canonical_key: 'guzellik_makyaj_profesyonel_makyaj' },
+    ],
+    'Paketler': [
+      { name: 'Cilt Bakım Paketi', canonical_key: 'guzellik_paket_cilt_bakim_paketi' },
+      { name: 'Lazer Epilasyon Paketi', canonical_key: 'guzellik_paket_lazer_epilasyon_paketi' },
+      { name: 'Gelin Hazırlık Paketi', canonical_key: 'guzellik_paket_gelin_hazirlik_paketi' },
+      { name: 'Kaş & Kirpik Paketi', canonical_key: 'guzellik_paket_kas_kirpik_paketi' },
+    ],
+  },
+  'TIRNAK': {
+    'Manikür': [
+      { name: 'Klasik Manikür', canonical_key: 'tirnak_manikur_klasik_manikur' },
+      { name: 'Spa Manikür', canonical_key: 'tirnak_manikur_spa_manikur' },
+      { name: 'Fransız Manikür', canonical_key: 'tirnak_manikur_fransiz_manikur' },
+      { name: 'Erkek Manikür', canonical_key: 'tirnak_manikur_erkek_manikur' },
+      { name: 'Parafin Manikür', canonical_key: 'tirnak_manikur_parafin_manikur' },
+    ],
+    'Pedikür': [
+      { name: 'Klasik Pedikür', canonical_key: 'tirnak_pedikur_klasik_pedikur' },
+      { name: 'Spa Pedikür', canonical_key: 'tirnak_pedikur_spa_pedikur' },
+      { name: 'Fransız Pedikür', canonical_key: 'tirnak_pedikur_fransiz_pedikur' },
+      { name: 'Medikal Pedikür', canonical_key: 'tirnak_pedikur_medikal_pedikur' },
+      { name: 'Parafin Pedikür', canonical_key: 'tirnak_pedikur_parafin_pedikur' },
+    ],
+    'Kalıcı Oje': [
+      { name: 'Kalıcı Oje', canonical_key: 'tirnak_oje_kalici_oje' },
+      { name: 'Fransız Kalıcı Oje', canonical_key: 'tirnak_oje_fransiz_kalici_oje' },
+      { name: 'El Kalıcı Oje', canonical_key: 'tirnak_oje_el_kalici_oje' },
+      { name: 'Ayak Kalıcı Oje', canonical_key: 'tirnak_oje_ayak_kalici_oje' },
+      { name: 'El + Ayak Kalıcı Oje', canonical_key: 'tirnak_oje_el_ayak_kalici_oje' },
+      { name: 'Kalıcı Oje Çıkarma', canonical_key: 'tirnak_oje_kalici_oje_cikarma' },
+    ],
+    'Protez Tırnak': [
+      { name: 'Protez Tırnak', canonical_key: 'tirnak_protez_protez_tirnak' },
+      { name: 'Akrilik Protez', canonical_key: 'tirnak_protez_akrilik_protez' },
+      { name: 'Jel Protez', canonical_key: 'tirnak_protez_jel_protez' },
+      { name: 'Protez Dolum', canonical_key: 'tirnak_protez_protez_dolum' },
+      { name: 'Tek Tırnak Protez', canonical_key: 'tirnak_protez_tek_tirnak_protez' },
+      { name: 'Protez Çıkarma', canonical_key: 'tirnak_protez_protez_cikarma' },
+    ],
+    'Jel Tırnak': [
+      { name: 'Jel Tırnak', canonical_key: 'tirnak_jel_jel_tirnak' },
+      { name: 'Jel Dolum', canonical_key: 'tirnak_jel_jel_dolum' },
+      { name: 'Sert Jel', canonical_key: 'tirnak_jel_sert_jel' },
+      { name: 'Jel Çıkarma', canonical_key: 'tirnak_jel_jel_cikarma' },
+    ],
+    'Nail Art': [
+      { name: 'Tek Tırnak Tasarım', canonical_key: 'tirnak_nailart_tek_tirnak_tasarim' },
+      { name: 'Taş Süsleme', canonical_key: 'tirnak_nailart_tas_susleme' },
+      { name: 'Kedi Gözü', canonical_key: 'tirnak_nailart_kedi_gozu' },
+      { name: 'Ombre Tırnak', canonical_key: 'tirnak_nailart_ombre_tirnak' },
+      { name: 'El Çizimi', canonical_key: 'tirnak_nailart_el_cizimi' },
+      { name: 'Simli Tasarım', canonical_key: 'tirnak_nailart_simli_tasarim' },
+    ],
+    'Bakım & Onarım': [
+      { name: 'Tırnak Bakımı', canonical_key: 'tirnak_bakim_tirnak_bakimi' },
+      { name: 'Kütikül Bakımı', canonical_key: 'tirnak_bakim_kutikul_bakimi' },
+      { name: 'Kırık Tırnak Onarımı', canonical_key: 'tirnak_bakim_kirik_tirnak_onarimi' },
+      { name: 'Tırnak Güçlendirme', canonical_key: 'tirnak_bakim_tirnak_guclendirme' },
+      { name: 'Tırnak Şekillendirme', canonical_key: 'tirnak_bakim_tirnak_sekillendirme' },
+    ],
+  },
+  'KAŞ VE KİRPİK': {
+    'Kaş': [
+      { name: 'Kaş Alımı', canonical_key: 'kas_kirpik_kas_kas_alimi' },
+      { name: 'Kaş Tasarımı', canonical_key: 'kas_kirpik_kas_kas_tasarimi' },
+      { name: 'Kaş Alımı İp', canonical_key: 'kas_kirpik_kas_kas_alimi_ip' },
+      { name: 'Kaş Alımı Ağda', canonical_key: 'kas_kirpik_kas_kas_alimi_agda' },
+      { name: 'Kaş Boyama', canonical_key: 'kas_kirpik_kas_kas_boyama' },
+      { name: 'Kaş Bakımı', canonical_key: 'kas_kirpik_kas_kas_bakimi' },
+    ],
+    'Kirpik': [
+      { name: 'Kirpik Boyama', canonical_key: 'kas_kirpik_kirpik_kirpik_boyama' },
+      { name: 'Kirpik Bakımı', canonical_key: 'kas_kirpik_kirpik_kirpik_bakimi' },
+      { name: 'Kirpik Sökümü', canonical_key: 'kas_kirpik_kirpik_kirpik_sokumu' },
+    ],
+    'Kaş Laminasyonu': [
+      { name: 'Kaş Laminasyonu', canonical_key: 'kas_kirpik_laminasyon_kas_laminasyonu' },
+      { name: 'Kaş Laminasyonu + Boya', canonical_key: 'kas_kirpik_laminasyon_kas_laminasyonu_boya' },
+    ],
+    'Kirpik Lifting': [
+      { name: 'Kirpik Lifting', canonical_key: 'kas_kirpik_lifting_kirpik_lifting' },
+      { name: 'Kirpik Lifting + Boya', canonical_key: 'kas_kirpik_lifting_kirpik_lifting_boya' },
+    ],
+    'İpek Kirpik': [
+      { name: 'İpek Kirpik', canonical_key: 'kas_kirpik_ipek_ipek_kirpik' },
+      { name: 'Klasik İpek Kirpik', canonical_key: 'kas_kirpik_ipek_klasik_ipek_kirpik' },
+      { name: 'Volume Kirpik', canonical_key: 'kas_kirpik_ipek_volume_kirpik' },
+      { name: 'Hibrit Kirpik', canonical_key: 'kas_kirpik_ipek_hibrit_kirpik' },
+      { name: 'Mega Volume Kirpik', canonical_key: 'kas_kirpik_ipek_mega_volume_kirpik' },
+      { name: 'Kirpik Dolum', canonical_key: 'kas_kirpik_ipek_kirpik_dolum' },
+    ],
+    'Kalıcı Makyaj': [
+      { name: 'Pudra Kaş', canonical_key: 'kas_kirpik_kalici_pudra_kas' },
+      { name: 'Dipliner', canonical_key: 'kas_kirpik_kalici_dipliner' },
+      { name: 'Eyeliner', canonical_key: 'kas_kirpik_kalici_eyeliner' },
+      { name: 'Dudak Renklendirme', canonical_key: 'kas_kirpik_kalici_dudak_renklendirme' },
+    ],
+    'Microblading': [
+      { name: 'Microblading', canonical_key: 'kas_kirpik_mb_microblading' },
+      { name: 'Microblading Rötuş', canonical_key: 'kas_kirpik_mb_microblading_rotus' },
+      { name: 'Kıl Tekniği Kaş', canonical_key: 'kas_kirpik_mb_kil_teknigi_kas' },
+    ],
+  },
+  'MASAJ': {
+    'Klasik Masaj': [
+      { name: 'Klasik Masaj', canonical_key: 'masaj_klasik_klasik_masaj' },
+      { name: 'İsveç Masajı', canonical_key: 'masaj_klasik_isvec_masaji' },
+      { name: 'Rahatlama Masajı', canonical_key: 'masaj_klasik_rahatlama_masaji' },
+      { name: 'Sırt ve Boyun Masajı', canonical_key: 'masaj_klasik_sirt_boyun_masaji' },
+      { name: 'Tüm Vücut Masajı', canonical_key: 'masaj_klasik_tum_vucut_masaji' },
+    ],
+    'Medikal Masaj': [
+      { name: 'Medikal Masaj', canonical_key: 'masaj_medikal_medikal_masaj' },
+      { name: 'Derin Doku Masajı', canonical_key: 'masaj_medikal_derin_doku_masaji' },
+      { name: 'Tetik Nokta Masajı', canonical_key: 'masaj_medikal_tetik_nokta_masaji' },
+      { name: 'Boyun ve Bel Masajı', canonical_key: 'masaj_medikal_boyun_bel_masaji' },
+    ],
+    'Spor Masajı': [
+      { name: 'Spor Masajı', canonical_key: 'masaj_spor_spor_masaji' },
+      { name: 'Sporcu Masajı', canonical_key: 'masaj_spor_sporcu_masaji' },
+      { name: 'Maç Öncesi Masaj', canonical_key: 'masaj_spor_mac_oncesi_masaj' },
+      { name: 'Maç Sonrası Masaj', canonical_key: 'masaj_spor_mac_sonrasi_masaj' },
+    ],
+    'Aromaterapi': [
+      { name: 'Aromaterapi Masajı', canonical_key: 'masaj_aroma_aromaterapi_masaji' },
+      { name: 'Aromatik Yağ Masajı', canonical_key: 'masaj_aroma_aromatik_yag_masaji' },
+      { name: 'Rahatlatıcı Yağ Masajı', canonical_key: 'masaj_aroma_rahatlatici_yag_masaji' },
+    ],
+    'Sıcak Taş Masajı': [
+      { name: 'Sıcak Taş Masajı', canonical_key: 'masaj_sicaktas_sicak_tas_masaji' },
+      { name: 'Sıcak Taş + Aromaterapi Masajı', canonical_key: 'masaj_sicaktas_sicak_tas_aromaterapi_masaji' },
+    ],
+    'Refleksoloji': [
+      { name: 'Ayak Refleksoloji', canonical_key: 'masaj_refleks_ayak_refleksoloji' },
+      { name: 'El Refleksoloji', canonical_key: 'masaj_refleks_el_refleksoloji' },
+    ],
+    'Bölgesel Masaj': [
+      { name: 'Sırt Masajı', canonical_key: 'masaj_bolgesel_sirt_masaji' },
+      { name: 'Boyun ve Omuz Masajı', canonical_key: 'masaj_bolgesel_boyun_omuz_masaji' },
+      { name: 'Bacak Masajı', canonical_key: 'masaj_bolgesel_bacak_masaji' },
+      { name: 'Baş Masajı', canonical_key: 'masaj_bolgesel_bas_masaji' },
+      { name: 'Bel Masajı', canonical_key: 'masaj_bolgesel_bel_masaji' },
+    ],
+  },
+  'FİZYOTERAPİ': {
+    'Ön Değerlendirme': [
+      { name: 'Fizyoterapi Değerlendirmesi', canonical_key: 'fizyoterapi_degerlendirme_fizyoterapi_degerlendirmesi' },
+      { name: 'Postür Analizi', canonical_key: 'fizyoterapi_degerlendirme_postur_analizi' },
+      { name: 'Duruş Değerlendirmesi', canonical_key: 'fizyoterapi_degerlendirme_durus_degerlendirmesi' },
+      { name: 'Hareket Değerlendirmesi', canonical_key: 'fizyoterapi_degerlendirme_hareket_degerlendirmesi' },
+    ],
+    'Manuel Terapi': [
+      { name: 'Manuel Terapi Seansı', canonical_key: 'fizyoterapi_manuel_manuel_terapi_seansi' },
+      { name: 'Eklem Mobilizasyonu', canonical_key: 'fizyoterapi_manuel_eklem_mobilizasyonu' },
+      { name: 'Yumuşak Doku Uygulamaları', canonical_key: 'fizyoterapi_manuel_yumusak_doku_uygulamalari' },
+    ],
+    'Egzersiz Terapisi': [
+      { name: 'Egzersiz Seansı', canonical_key: 'fizyoterapi_egzersiz_egzersiz_seansi' },
+      { name: 'Klinik Pilates', canonical_key: 'fizyoterapi_egzersiz_klinik_pilates' },
+      { name: 'Denge Egzersizleri', canonical_key: 'fizyoterapi_egzersiz_denge_egzersizleri' },
+      { name: 'Kor Güçlendirme', canonical_key: 'fizyoterapi_egzersiz_kor_guclendirme' },
+      { name: 'Esneme Egzersizleri', canonical_key: 'fizyoterapi_egzersiz_esneme_egzersizleri' },
+    ],
+    'Rehabilitasyon': [
+      { name: 'Ortopedik Rehabilitasyon', canonical_key: 'fizyoterapi_rehab_ortopedik_rehabilitasyon' },
+      { name: 'Ameliyat Sonrası Rehabilitasyon', canonical_key: 'fizyoterapi_rehab_ameliyat_sonrasi_rehabilitasyon' },
+      { name: 'Nörolojik Rehabilitasyon', canonical_key: 'fizyoterapi_rehab_norolojik_rehabilitasyon' },
+      { name: 'Günlük Yaşam Egzersizleri', canonical_key: 'fizyoterapi_rehab_gunluk_yasam_egzersizleri' },
+    ],
+    'Spor Fizyoterapisi': [
+      { name: 'Sporcu Değerlendirmesi', canonical_key: 'fizyoterapi_spor_sporcu_degerlendirmesi' },
+      { name: 'Sporcu Rehabilitasyon Seansı', canonical_key: 'fizyoterapi_spor_sporcu_rehabilitasyon_seansi' },
+      { name: 'Kinesio Bantlama', canonical_key: 'fizyoterapi_spor_kinesio_bantlama' },
+      { name: 'Performans Egzersizleri', canonical_key: 'fizyoterapi_spor_performans_egzersizleri' },
+    ],
+    'Medikal Masaj': [
+      { name: 'Medikal Masaj', canonical_key: 'fizyoterapi_medikal_medikal_masaj' },
+      { name: 'Derin Doku Masajı', canonical_key: 'fizyoterapi_medikal_derin_doku_masaji' },
+      { name: 'Bölgesel Masaj', canonical_key: 'fizyoterapi_medikal_bolgesel_masaj' },
+    ],
+    'Elektroterapi': [
+      { name: 'Elektroterapi Seansı', canonical_key: 'fizyoterapi_elektro_elektroterapi_seansi' },
+      { name: 'TENS Seansı', canonical_key: 'fizyoterapi_elektro_tens_seansi' },
+      { name: 'Ultrason Seansı', canonical_key: 'fizyoterapi_elektro_ultrason_seansi' },
+    ],
+  },
+  'DÖVME': {
+    'Minimal Dövme': [
+      { name: 'Minimal Dövme', canonical_key: 'dovme_minimal_minimal_dovme' },
+      { name: 'Küçük Dövme', canonical_key: 'dovme_minimal_kucuk_dovme' },
+      { name: 'Fine Line Dövme', canonical_key: 'dovme_minimal_fine_line_dovme' },
+      { name: 'Sembol Dövme', canonical_key: 'dovme_minimal_sembol_dovme' },
+    ],
+    'Yazı Dövme': [
+      { name: 'Yazı Dövme', canonical_key: 'dovme_yazi_yazi_dovme' },
+      { name: 'İsim Dövme', canonical_key: 'dovme_yazi_isim_dovme' },
+      { name: 'Tarih Dövme', canonical_key: 'dovme_yazi_tarih_dovme' },
+      { name: 'El Yazısı Dövme', canonical_key: 'dovme_yazi_el_yazisi_dovme' },
+    ],
+    'Renkli Dövme': [
+      { name: 'Renkli Dövme', canonical_key: 'dovme_renkli_renkli_dovme' },
+      { name: 'Suluboya Dövme', canonical_key: 'dovme_renkli_suluboya_dovme' },
+      { name: 'Old School Dövme', canonical_key: 'dovme_renkli_old_school_dovme' },
+    ],
+    'Gerçekçi Dövme': [
+      { name: 'Gerçekçi Dövme', canonical_key: 'dovme_gercekci_gercekci_dovme' },
+      { name: 'Portre Dövme', canonical_key: 'dovme_gercekci_portre_dovme' },
+      { name: 'Realizm Dövme', canonical_key: 'dovme_gercekci_realizm_dovme' },
+      { name: 'Gölgeli Dövme', canonical_key: 'dovme_gercekci_golgeli_dovme' },
+    ],
+    'Kapatma & Düzeltme': [
+      { name: 'Dövme Kapatma', canonical_key: 'dovme_kapatma_dovme_kapatma' },
+      { name: 'Dövme Rötuş', canonical_key: 'dovme_kapatma_dovme_rotus' },
+      { name: 'Eski Dövme Yenileme', canonical_key: 'dovme_kapatma_eski_dovme_yenileme' },
+      { name: 'Dövme Düzeltme', canonical_key: 'dovme_kapatma_dovme_duzeltme' },
+    ],
+    'Piercing': [
+      { name: 'Kulak Piercing', canonical_key: 'dovme_piercing_kulak_piercing' },
+      { name: 'Kulak Memesi Piercing', canonical_key: 'dovme_piercing_kulak_memesi_piercing' },
+      { name: 'Helix Piercing', canonical_key: 'dovme_piercing_helix_piercing' },
+      { name: 'Septum Piercing', canonical_key: 'dovme_piercing_septum_piercing' },
+      { name: 'Burun Piercing', canonical_key: 'dovme_piercing_burun_piercing' },
+      { name: 'Göbek Piercing', canonical_key: 'dovme_piercing_gobek_piercing' },
+      { name: 'Dudak Piercing', canonical_key: 'dovme_piercing_dudak_piercing' },
+    ],
+    'Kalıcı Makyaj': [
+      { name: 'Microblading', canonical_key: 'dovme_kalici_microblading' },
+      { name: 'Pudra Kaş', canonical_key: 'dovme_kalici_pudra_kas' },
+      { name: 'Dipliner', canonical_key: 'dovme_kalici_dipliner' },
+      { name: 'Eyeliner', canonical_key: 'dovme_kalici_eyeliner' },
+      { name: 'Dudak Renklendirme', canonical_key: 'dovme_kalici_dudak_renklendirme' },
+    ],
+  },
+};
+
 const cities = [
   "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin",
   "Aydın","Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur",
@@ -435,22 +855,25 @@ export default function Dashboard() {
   };
 
   // ── Toplu hizmet ekleme ──
+  // Seçili işletme türünün hazır kataloğu (yoksa null → Toplu Ekle gizli)
+  const bulkCatalog = (shop?.category && CATALOG_BY_TYPE[shop.category]) || null;
+
   const openBulkModal = () => {
     setBulkRows([]);
-    setBulkTab('Popüler');
+    setBulkTab(bulkCatalog ? Object.keys(bulkCatalog)[0] ?? '' : '');
     setIsBulkModalOpen(true);
   };
 
-  const toggleBulkItem = (item: CatalogItem) => {
+  const toggleBulkItem = (item: { name: string; canonical_key: string }, category: string) => {
     setBulkRows(prev => {
       const exists = prev.some(r => r.canonical_key === item.canonical_key);
       if (exists) return prev.filter(r => r.canonical_key !== item.canonical_key);
-      return [...prev, { name: item.name, category: item.category, duration: String(item.duration), price: "", canonical_key: item.canonical_key, is_custom: false }];
+      return [...prev, { name: item.name, category, duration: "", price: "", canonical_key: item.canonical_key, is_custom: false }];
     });
   };
 
   const addCustomBulkRow = () => {
-    setBulkRows(prev => [...prev, { name: "", category: "Diğer", duration: "20", price: "", canonical_key: null, is_custom: true }]);
+    setBulkRows(prev => [...prev, { name: "", category: "Diğer", duration: "", price: "", canonical_key: null, is_custom: true }]);
   };
 
   const updateBulkRow = (idx: number, patch: Partial<BulkRow>) => {
@@ -461,7 +884,7 @@ export default function Dashboard() {
     setBulkRows(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const bulkValid = bulkRows.length > 0 && bulkRows.every(r => r.name.trim() && parseFloat(r.price) > 0);
+  const bulkValid = bulkRows.length > 0 && bulkRows.every(r => r.name.trim() && parseFloat(r.price) > 0 && parseInt(r.duration) > 0);
 
   const handleBulkSubmit = async () => {
     if (!shop?.id || !bulkValid) return;
@@ -2261,7 +2684,7 @@ export default function Dashboard() {
                     <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mt-1">{services.length} aktif hizmet</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {shop?.category === 'BERBER' && (
+                    {bulkCatalog && Object.keys(bulkCatalog).length > 0 && (
                       <button onClick={openBulkModal}
                         className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#0c0c0d] text-[12px] font-semibold rounded-xl border border-[#ececea] hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all">
                         <Package size={14}/> Toplu Ekle
@@ -3770,7 +4193,7 @@ export default function Dashboard() {
               {/* SOL: Katalog */}
               <div>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.keys(BERBER_CATALOG).map(tab => (
+                  {Object.keys(bulkCatalog ?? {}).map(tab => (
                     <button key={tab} onClick={() => setBulkTab(tab)}
                       className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${bulkTab === tab ? 'bg-[#0c0c0d] text-white' : 'bg-[#f4f4f2] text-[#7a7a7e] hover:bg-[#ececea]'}`}>
                       {tab}
@@ -3778,12 +4201,12 @@ export default function Dashboard() {
                   ))}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {BERBER_CATALOG[bulkTab]?.map(item => {
+                  {(bulkCatalog?.[bulkTab] ?? []).map((item: { name: string; canonical_key: string }) => {
                     const already = services.some((s: any) => s.canonical_key === item.canonical_key);
                     const selected = bulkRows.some(r => r.canonical_key === item.canonical_key);
                     return (
                       <button key={item.canonical_key} disabled={already}
-                        onClick={() => toggleBulkItem(item)}
+                        onClick={() => toggleBulkItem(item, bulkTab)}
                         className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border text-left transition-all text-[12px]
                           ${already ? 'bg-[#f4f4f2] border-[#ececea] text-gray-300 cursor-not-allowed'
                             : selected ? 'bg-[#e6f7f4] border-[#14b8a6] text-[#0c0c0d]'
@@ -3822,7 +4245,7 @@ export default function Dashboard() {
                           value={r.duration}
                           onChange={e => updateBulkRow(idx, { duration: e.target.value.replace(/[^0-9]/g, '') })}
                           placeholder="dk"
-                          className="w-12 px-1 py-1.5 bg-white rounded-lg border border-[#ececea] text-[12px] text-center outline-none focus:border-[#14b8a6]"
+                          className={`w-14 px-1 py-1.5 bg-white rounded-lg border text-[12px] text-center outline-none ${parseInt(r.duration) > 0 ? 'border-[#ececea] focus:border-[#14b8a6]' : 'border-red-300 focus:border-red-400'}`}
                         />
                         <div className="relative">
                           <input
