@@ -15,14 +15,14 @@ import {
 type CatalogItem = { name: string; category: string; duration: number; canonical_key: string };
 // Manuel hizmet ekleme — işletme türüne göre kategori seçenekleri
 const CATEGORIES_BY_TYPE: Record<string, string[]> = {
-  'KUAFÖR': ['Saç Kesimi', 'Fön & Şekillendirme', 'Boya & Renklendirme', 'Röfle / Balyaj / Ombre', 'Bakım & Keratin', 'Topuz & Abiye', 'Perma & Düzleştirme', 'Gelin Saçı', 'Diğer'],
-  'BERBER': ['Saç', 'Sakal', 'Saç + Sakal', 'Kafa Tıraşı', 'Boya / Kamuflaj', 'Ek Hizmetler', 'Diğer'],
-  'GÜZELLİK MERKEZİ': ['Cilt Bakımı', 'Ağda & Epilasyon', 'Lazer Epilasyon', 'Makyaj', 'Kaş & Kirpik', 'Manikür & Pedikür', 'Cilt Terapileri', 'Paketler', 'Diğer'],
-  'TIRNAK': ['Manikür', 'Pedikür', 'Kalıcı Oje', 'Protez Tırnak', 'Jel & İnşa', 'Nail Art', 'Tırnak Bakımı', 'Diğer'],
-  'KAŞ VE KİRPİK': ['Kaş Tasarımı & Alımı', 'Kaş Laminasyon', 'Kaş Boyama', 'İpek Kirpik', 'Volume Kirpik', 'Kirpik Lifting', 'Microblading', 'Diğer'],
-  'MASAJ': ['Klasik / İsveç', 'Medikal Masaj', 'Spor Masajı', 'Aroma Terapi', 'Sıcak Taş', 'Refleksoloji', 'Bölgesel Masaj', 'Diğer'],
-  'FİZYOTERAPİ': ['Değerlendirme', 'Manuel Terapi', 'Egzersiz Terapisi', 'Elektroterapi', 'Masaj Terapisi', 'Rehabilitasyon', 'Spor Fizyoterapisi', 'Diğer'],
-  'DÖVME': ['Minimal Dövme', 'Küçük Dövme', 'Orta Dövme', 'Büyük / Kol', 'Renkli Dövme', 'Kapatma / Düzeltme', 'Piercing', 'Kalıcı Makyaj', 'Diğer'],
+  'KUAFÖR': ['Kesim', 'Fön & Şekillendirme', 'Boya & Renklendirme', 'Röfle / Balyaj / Ombre', 'Saç Bakımı & Keratin', 'Topuz & Özel Gün', 'Gelin Saçı', 'Kaynak & Saç Uzatma', 'Diğer'],
+  'BERBER': ['Saç', 'Sakal', 'Saç + Sakal', 'Çocuk', 'Boya & Kamuflaj', 'Cilt Bakımı', 'Ek Hizmetler', 'Diğer'],
+  'GÜZELLİK MERKEZİ': ['Cilt Bakımı', 'Lazer Epilasyon', 'Ağda', 'Bölgesel İncelme', 'Kaş & Kirpik', 'Kalıcı Makyaj', 'Makyaj', 'Paketler', 'Diğer'],
+  'TIRNAK': ['Manikür', 'Pedikür', 'Kalıcı Oje', 'Protez Tırnak', 'Jel Tırnak', 'Nail Art', 'Bakım & Onarım', 'Diğer'],
+  'KAŞ VE KİRPİK': ['Kaş', 'Kirpik', 'Kaş Laminasyonu', 'Kirpik Lifting', 'İpek Kirpik', 'Kalıcı Makyaj', 'Microblading', 'Diğer'],
+  'MASAJ': ['Klasik Masaj', 'Medikal Masaj', 'Spor Masajı', 'Aromaterapi', 'Sıcak Taş Masajı', 'Refleksoloji', 'Bölgesel Masaj', 'Diğer'],
+  'FİZYOTERAPİ': ['Ön Değerlendirme', 'Manuel Terapi', 'Egzersiz Terapisi', 'Rehabilitasyon', 'Spor Fizyoterapisi', 'Medikal Masaj', 'Elektroterapi', 'Diğer'],
+  'DÖVME': ['Minimal Dövme', 'Yazı Dövme', 'Renkli Dövme', 'Gerçekçi Dövme', 'Kapatma & Düzeltme', 'Piercing', 'Kalıcı Makyaj', 'Diğer'],
 };
 
 const BERBER_CATALOG: Record<string, CatalogItem[]> = {
