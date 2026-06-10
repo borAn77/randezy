@@ -215,6 +215,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
           body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
         });
         await api.sendEmailVerification(email);
+        await supabase.auth.signOut();
       } catch (err: any) {
         setLoading(false);
         console.error("[signup post-session step failed]", err);
