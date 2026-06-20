@@ -236,16 +236,15 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
   );
 }
 
-function QuickActions({ onGoFinans }: { onGoFinans: () => void }) {
+function QuickActions({ onGoFinans, onGoKampanya }: { onGoFinans: () => void; onGoKampanya: () => void }) {
   const handleShare = async () => {
     await Share.share({ message: 'Randezy ile kolayca randevu alın: https://randezy.com' });
   };
-  const handleKampanya = () => Alert.alert('Kampanya', 'Kampanya özelliği yakında aktif olacak.');
 
   const items = [
-    { icon: 'star'        as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)', onPress: handleKampanya },
-    { icon: 'share-2'     as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)', onPress: handleShare    },
-    { icon: 'dollar-sign' as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)',  onPress: onGoFinans     },
+    { icon: 'star'        as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)', onPress: onGoKampanya },
+    { icon: 'share-2'     as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)', onPress: handleShare  },
+    { icon: 'dollar-sign' as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)',  onPress: onGoFinans   },
   ];
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 18, flexDirection: 'row', gap: 10 }}>
@@ -397,9 +396,10 @@ export default function HomeScreen() {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const goCalendar  = () => navigation.navigate('Takvim');
-  const goSettings  = () => navigation.navigate('Profil');
-  const goFinans    = () => navigation.navigate('Isletme');
+  const goCalendar   = () => navigation.navigate('Takvim');
+  const goSettings   = () => navigation.navigate('Profil');
+  const goFinans     = () => navigation.navigate('Isletme');
+  const goKampanya   = () => navigation.navigate('Isletme', { initialTab: 'campaigns' });
 
   const handleStatusChange = useCallback(async (aptId: string, newStatus: string) => {
     await supabase.from('appointments').update({ status: newStatus }).eq('id', aptId);
@@ -496,7 +496,7 @@ export default function HomeScreen() {
         <HomeHeader ownerName={ownerName} shopName={shopName} onGoCalendar={goCalendar} onGoSettings={goSettings} />
         <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} />
         {nextUp && <NextUpCard apt={nextUp} onStatusChange={handleStatusChange} />}
-        <QuickActions onGoFinans={goFinans} />
+        <QuickActions onGoFinans={goFinans} onGoKampanya={goKampanya} />
 
         <SectionHeader
           title="Bugünün programı"
