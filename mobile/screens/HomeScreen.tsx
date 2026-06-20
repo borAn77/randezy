@@ -42,7 +42,9 @@ type DbApt = {
   status: string;
   price: number | null;
   duration_snapshot: number | null;
-  profiles?: { full_name?: string | null; phone?: string | null } | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  profiles?: { full_name?: string | null; phone?: string | null; email?: string | null } | null;
 };
 type DispStatus = 'done' | 'now' | 'confirmed' | 'pending';
 type AptDisplay = DbApt & { dispStatus: DispStatus };
@@ -140,8 +142,8 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
 function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: (id: string, status: string) => void }) {
   const isNow     = apt.dispStatus === 'now';
   const isPending = apt.dispStatus === 'pending';
-  const name      = apt.profiles?.full_name || 'Misafir';
-  const phone     = apt.profiles?.phone;
+  const name      = apt.guest_name || apt.profiles?.full_name || apt.profiles?.email || 'Misafir';
+  const phone     = apt.guest_phone || apt.profiles?.phone;
 
   const confirm = () =>
     Alert.alert('Randevuyu onayla', `${name} için randevuyu onaylıyor musun?`, [
@@ -284,7 +286,7 @@ function ScheduleTimeline({ items, onPress }: { items: AptDisplay[]; onPress?: (
       {items.map((a, i) => {
         const meta = STATUS_META[a.dispStatus];
         const dim  = a.dispStatus === 'done';
-        const name = a.profiles?.full_name || 'Misafir';
+        const name = a.guest_name || a.profiles?.full_name || a.profiles?.email || 'Misafir';
         return (
           <TouchableOpacity key={a.id} onPress={onPress} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
             <View style={{ width: 46, alignItems: 'flex-start', paddingTop: 4 }}>

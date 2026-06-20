@@ -5,6 +5,24 @@ export type AppointmentStatus =
   | 'Tamamlandı'
   | 'Gelmedi';
 
+export interface ServiceItem {
+  id: number;
+  name: string;
+  price: number;
+  duration: number;
+}
+
+export interface CreateAppointmentParams {
+  guestName: string;
+  guestPhone?: string;
+  serviceName: string;
+  price: number;
+  duration: number;
+  appointmentDate: string;
+  appointmentTime: string;
+  staffId?: string | null;
+}
+
 export interface Appointment {
   id: string;
   user_id?: string;
@@ -17,6 +35,8 @@ export interface Appointment {
   staff_id?: string | null;
   cancel_reason?: string | null;
   created_at?: string;
+  guest_name?: string | null;
+  guest_phone?: string | null;
   profiles?: {
     full_name?: string | null;
     phone?: string | null;

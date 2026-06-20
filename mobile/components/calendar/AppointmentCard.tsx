@@ -76,7 +76,7 @@ export default function AppointmentCard({ apt, col, cols, totalWidth, onPress, d
             ]}
             numberOfLines={1}
           >
-            {apt.profiles?.full_name || apt.profiles?.email || 'Misafir'}
+            {apt.guest_name || apt.profiles?.full_name || apt.profiles?.email || 'Misafir'}
           </Text>
         )}
 

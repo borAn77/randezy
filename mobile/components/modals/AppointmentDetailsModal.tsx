@@ -22,9 +22,9 @@ export default function AppointmentDetailsModal({ apt, onClose }: Props) {
   if (!apt) return null;
 
   const cc = CATEGORY_COLORS[getCategoryForService(apt.service_name)];
-  const customerName = apt.profiles?.full_name || apt.profiles?.email || 'Misafir';
+  const customerName = apt.guest_name || apt.profiles?.full_name || apt.profiles?.email || 'Misafir';
   const initials = customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-  const phone = apt.profiles?.phone;
+  const phone = apt.guest_phone || apt.profiles?.phone;
   const aptDate = parseDateStr(apt.appointment_date);
   const staffName = apt.staff
     ? `${apt.staff.first_name ?? ''} ${apt.staff.last_name ?? ''}`.trim()

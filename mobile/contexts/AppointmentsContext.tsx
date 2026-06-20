@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Appointment, AppointmentStatus, StaffMember } from '../types/appointment';
+import { Appointment, AppointmentStatus, StaffMember, ServiceItem, CreateAppointmentParams } from '../types/appointment';
 import {
   fetchDayAppointments, fetchWeekAppointments, fetchRangeAppointments, fetchStaff,
   updateStatus, reschedule, deleteAppointment, clearShopCache,
+  fetchServicesList, createAppointment,
 } from '../services/appointments';
 import { toDateStr, getWeekDays, getMonthStart, getMonthEnd, addDays } from '../utils/date';
 
@@ -21,12 +22,14 @@ interface AppointmentsCtx {
   appointments: Appointment[];       // single-day (gun / calisan)
   rangeAppointments: Appointment[];  // week / month / list range
   staff: StaffMember[];
+  services: ServiceItem[];
   stats: DailyStats;
   loading: boolean; error: string | null;
   refresh: () => void;
   doUpdateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
   doReschedule: (id: string, date: string, time: string) => Promise<void>;
   doDelete: (id: string) => Promise<void>;
+  doCreate: (params: CreateAppointmentParams) => Promise<void>;
 }
 
 const Ctx = createContext<AppointmentsCtx | null>(null);
@@ -52,6 +55,7 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [rangeAppointments, setRangeAppointments] = useState<Appointment[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const token = useRef(0);
@@ -60,8 +64,11 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
     setLoading(true); setError(null);
     const t = ++token.current;
     try {
-      const [staffData] = await Promise.all([fetchStaff()]);
-      if (t === token.current) setStaff(staffData);
+      const [staffData, servicesData] = await Promise.all([fetchStaff(), fetchServicesList()]);
+      if (t === token.current) {
+        setStaff(staffData);
+        setServices(servicesData);
+      }
 
       if (viewMode === 'gun' || viewMode === 'calisan') {
         const data = await fetchDayAppointments(toDateStr(date));
@@ -113,14 +120,19 @@ export function AppointmentsProvider({ children }: { children: React.ReactNode }
     await deleteAppointment(id);
   }, []);
 
+  const doCreate = useCallback(async (params: CreateAppointmentParams) => {
+    await createAppointment(params);
+    refresh();
+  }, [refresh]);
+
   return (
     <Ctx.Provider value={{
       viewMode, setViewMode,
       selectedDate, setSelectedDate,
       selectedStaffId, setSelectedStaffId,
       appointments: visibleApts, rangeAppointments,
-      staff, stats, loading, error, refresh,
-      doUpdateStatus, doReschedule, doDelete,
+      staff, services, stats, loading, error, refresh,
+      doUpdateStatus, doReschedule, doDelete, doCreate,
     }}>
       {children}
     </Ctx.Provider>
