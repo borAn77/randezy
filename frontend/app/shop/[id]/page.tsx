@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   Clock, ArrowLeft, X, Calendar as CalIcon,
   ChevronLeft, ChevronRight, CheckCircle2, MapPin, Star, Image as ImageIcon, Share2, Heart,
-  Phone, Mail, AtSign, ChevronDown, Users, User, Search
+  Phone, Mail, AtSign, ChevronDown, Users, User, Search, Link2
 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import AuthModal from "../../../components/layout/AuthModal";
@@ -12,6 +12,14 @@ import AuthModal from "../../../components/layout/AuthModal";
 function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+const normalizePhone = (raw: string): string | null => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('90') && digits.length === 12 && digits[2] === '5') return '+' + digits;
+  if (digits.startsWith('0') && digits.length === 11 && digits[1] === '5') return '+90' + digits.slice(1);
+  if (digits.startsWith('5') && digits.length === 10) return '+90' + digits;
+  return null;
+};
 
 function generateTimeSlots(openTime: string, closeTime: string, duration: number): string[] {
   const [openH, openM] = openTime.split(':').map(Number);
@@ -68,15 +76,13 @@ interface CartItemBase { service: any; date: Date; time: string; staff: any | nu
 interface CartItem extends CartItemBase { discountedPrice: number; campaign: any | null; }
 
 function InlineBookingPanel({
-  service, shopHours, staff, shopId, currentUserId, onAdd, onAuthRequired, onError, allServices, cartItems
+  service, shopHours, staff, shopId, onAdd, onError, allServices, cartItems
 }: {
   service: any;
   shopHours: any[];
   staff: any[];
   shopId: number;
-  currentUserId: string | null;
   onAdd: (item: CartItemBase) => void;
-  onAuthRequired: () => void;
   onError: (msg: string) => void;
   allServices: any[];
   cartItems: CartItem[];
@@ -323,7 +329,7 @@ function InlineBookingPanel({
         <button
           disabled={!canAdd}
           onClick={() => {
-            if (!currentUserId) { onAuthRequired(); return; }
+            // Misafirler de sepete ekleyebilir — kimlik, onay adımında (misafir formu / giriş) alınır.
             if (!availableSlots.includes(selectedTime)) { onError("Bu saat artık müsait değil."); return; }
             onAdd({ service, date: selectedDay!, time: selectedTime, staff: selectedStaff });
           }}
@@ -384,6 +390,15 @@ export default function ShopDetail() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [lastConfirmed, setLastConfirmed] = useState<CartItem | null>(null);
+
+  // Misafir (hesapsız) randevu akışı
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestError, setGuestError] = useState<string | null>(null);
+  const [guestLinks, setGuestLinks] = useState<{ token: string; label: string }[]>([]);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const heroRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -559,16 +574,12 @@ export default function ShopDetail() {
     setSubmittingReview(false);
   };
 
-  const handleCartConfirm = async () => {
-    if (cart.length === 0) return;
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); setIsAuthOpen(true); return; }
-
+  // Pre-insert overlap check: sepetteki her öğeyi DB'deki mevcut randevulara karşı doğrular.
+  // Çakışan öğeyi sepetten düşürüp toast gösterir ve false döner.
+  // Hem giriş yapmış hem misafir akışı bu kontrolden geçer (asıl güvence DB trigger'ında).
+  const verifyCartAvailability = async (): Promise<boolean> => {
     const _toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
     const _BUF = 5;
-
-    // Pre-insert overlap check: verify each cart item against existing DB appointments
     for (const item of cart) {
       const dateStr = localDateStr(item.date);
       const staffId = item.staff?.id || null;
@@ -590,11 +601,21 @@ export default function ShopDetail() {
             (c.staff?.id || null) === staffId
           )));
           setToast(`${item.time} saati az önce doldu. ${item.service.name} sepetten kaldırıldı.`);
-          setLoading(false);
-          return;
+          return false;
         }
       }
     }
+    return true;
+  };
+
+  const handleCartConfirm = async () => {
+    if (cart.length === 0) return;
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    // Hesapsız akış: AuthModal yerine misafir bilgi formu açılır.
+    if (!session) { setLoading(false); setGuestError(null); setShowGuestForm(true); return; }
+
+    if (!(await verifyCartAvailability())) { setLoading(false); return; }
 
     const { data: profileData } = await supabase
       .from('profiles')
@@ -632,6 +653,64 @@ export default function ShopDetail() {
       setShowSuccess(true);
     } else {
       setToast("Rezervasyon hatası: " + error.message);
+    }
+    setLoading(false);
+  };
+
+  // Misafir randevusu: doğrulama → overlap ön kontrolü → /api/guest-appointments.
+  // Insert service_role ile server'da yapılır (RLS anon'a kapalı kalır),
+  // işletme bildirimi de server tarafında tetiklenir.
+  const handleGuestConfirm = async () => {
+    const name = guestName.trim().replace(/\s+/g, ' ');
+    if (name.length < 2 || /^\d+$/.test(name)) { setGuestError('Geçerli bir ad soyad girin.'); return; }
+    const phone = normalizePhone(guestPhone);
+    if (!phone) { setGuestError('Geçerli bir Türkiye cep telefonu girin. Örnek: 05321234567'); return; }
+    const email = guestEmail.trim();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) { setGuestError('Geçerli bir e-posta girin veya boş bırakın.'); return; }
+
+    setGuestError(null);
+    setLoading(true);
+
+    if (!(await verifyCartAvailability())) { setLoading(false); setShowGuestForm(false); return; }
+
+    try {
+      const res = await fetch('/api/guest-appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopId,
+          guest: { name, phone, email: email || undefined },
+          items: cart.map(item => ({
+            serviceId: item.service.id,
+            price: item.discountedPrice,
+            date: localDateStr(item.date),
+            time: item.time,
+            staffId: item.staff?.id || null,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 409) {
+          setShowGuestForm(false);
+          setToast(data.detail || 'Seçtiğin saatlerden biri az önce doldu. Lütfen tekrar dene.');
+        } else {
+          setGuestError(data.detail || 'Randevu oluşturulamadı. Lütfen tekrar deneyin.');
+        }
+        setLoading(false);
+        return;
+      }
+      setGuestLinks((data.appointments || []).map((a: any, idx: number) => ({
+        token: a.guest_token,
+        label: cart[idx]?.service?.name || 'Randevu',
+      })).filter((l: any) => l.token));
+      setLastConfirmed(cart[0]);
+      setCart([]);
+      setExpandedServiceId(null);
+      setShowGuestForm(false);
+      setShowSuccess(true);
+    } catch {
+      setGuestError('Bağlantı hatası. Lütfen tekrar deneyin.');
     }
     setLoading(false);
   };
@@ -735,11 +814,55 @@ export default function ShopDetail() {
                 )}
               </div>
             </div>
+            {/* Misafir randevusu: şifresiz takip linki */}
+            {guestLinks.length > 0 && (
+              <div className="rounded-3xl p-6 mb-8 text-left guest-sheet-in" style={{ background: '#0c0c0d' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Link2 size={13} style={{ color: '#14b8a6' }} />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em]" style={{ color: '#14b8a6' }}>Randevu Takip Linkin</p>
+                </div>
+                <p className="text-[11px] leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  Bu link sana özel — randevunu buradan görüntüleyebilir ve gerekirse iptal edebilirsin.
+                  {guestEmail.trim() ? ' E-postana da gönderdik.' : ' Kaydetmeyi unutma.'}
+                </p>
+                {guestLinks.map((l) => (
+                  <div key={l.token} className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-2 last:mb-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <span className="font-mono text-[11px] truncate flex-1" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                      {`${window.location.origin}/randevu/${l.token}`}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/randevu/${l.token}`)
+                          .then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); })
+                          .catch(() => {});
+                      }}
+                      className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all"
+                      style={{ background: linkCopied ? '#14b8a6' : 'rgba(255,255,255,0.1)', color: linkCopied ? '#04221d' : '#fff' }}
+                    >
+                      {linkCopied ? '✓ Kopyalandı' : 'Kopyala'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <button onClick={() => router.push('/')} className="bg-[#0c0c0d] text-white px-12 py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-[#14b8a6] transition-all text-sm">
               Keşfetmeye Devam Et
             </button>
+            {guestLinks.length > 0 && (
+              <button
+                onClick={() => setIsAuthOpen(true)}
+                className="block mx-auto mt-5 text-[11px] font-bold text-gray-400 hover:text-[#14b8a6] transition-colors"
+              >
+                Randevularını tek yerden takip etmek ister misin? <span className="font-black underline">Hesap oluştur</span>
+              </button>
+            )}
           </div>
         </div>
+        <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+        <style>{`
+          @keyframes guestSheetIn { from { opacity: 0; transform: translateY(28px) scale(0.98); } to { opacity: 1; transform: none; } }
+          .guest-sheet-in { animation: guestSheetIn .38s cubic-bezier(0.16, 1, 0.3, 1); }
+        `}</style>
       </div>
     );
   }
@@ -947,7 +1070,6 @@ export default function ShopDetail() {
                                 shopHours={shopHours}
                                 staff={serviceStaffFilter ? [serviceStaffFilter] : staff}
                                 shopId={shopId!}
-                                currentUserId={currentUserId}
                                 allServices={services}
                                 cartItems={cart}
                                 onError={setToast}
@@ -977,7 +1099,6 @@ export default function ShopDetail() {
                   setToast(`${item.service.name} sepete eklendi`);
                   setExpandedServiceId(null);
                 }}
-                                onAuthRequired={() => setIsAuthOpen(true)}
                               />
                             )}
                           </div>
@@ -1325,7 +1446,8 @@ export default function ShopDetail() {
           </div>
           <button
             onClick={() => {
-              if (cart.length > 0 && currentUserId) { setShowConfirmModal(true); }
+              // Misafirler de onaylayabilir — session kontrolü handleCartConfirm içinde yapılır.
+              if (cart.length > 0) { setShowConfirmModal(true); }
               else { document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' }); }
             }}
             className="flex-shrink-0 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
@@ -1345,6 +1467,112 @@ export default function ShopDetail() {
       )}
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+
+      {/* Guest details sheet — üyeliksiz hızlı randevu */}
+      {showGuestForm && (
+        <div
+          className="fixed inset-0 z-[260] flex items-end sm:items-center justify-center p-0 sm:p-6 guest-overlay-in"
+          style={{ background: 'rgba(12,12,13,0.55)', backdropFilter: 'blur(8px)' }}
+          onClick={() => !loading && setShowGuestForm(false)}
+        >
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden guest-sheet-in" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-7 pt-7 pb-5 relative">
+              <button
+                onClick={() => !loading && setShowGuestForm(false)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full border border-gray-200 grid place-items-center hover:bg-gray-50 transition-colors"
+              >
+                <X size={15} />
+              </button>
+              <div className="inline-flex items-center gap-1.5 bg-[#e6f7f4] text-[#0d9488] text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full mb-3">
+                ⚡ Üyeliksiz Hızlı Randevu
+              </div>
+              <h3 className="text-2xl font-black uppercase tracking-tighter text-[#0c0c0d] leading-none">Son Bir Adım</h3>
+              <p className="text-[12px] text-gray-400 font-medium mt-2 leading-relaxed">
+                Hesap oluşturmana gerek yok — adını ve numaranı bırak, randevun hazır.
+              </p>
+            </div>
+
+            {/* Mini cart summary */}
+            <div className="mx-7 mb-5 rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: '#0c0c0d' }}>
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] truncate" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                {cart.length} hizmet{cart[0] ? ` · ${cart[0].date.getDate()} ${MONTHS_SHORT[cart[0].date.getMonth()]} · ${cart[0].time}` : ''}
+              </span>
+              <span className="font-mono font-bold text-sm flex-shrink-0 ml-3" style={{ color: '#14b8a6' }}>{cartTotal} ₺</span>
+            </div>
+
+            {/* Inputs */}
+            <div className="px-7 space-y-3.5">
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1.5 block">Ad Soyad</label>
+                <input
+                  value={guestName}
+                  onChange={e => { setGuestName(e.target.value); setGuestError(null); }}
+                  placeholder="örn. Deniz Yılmaz"
+                  autoComplete="name"
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1.5 block">Telefon</label>
+                <input
+                  type="tel"
+                  value={guestPhone}
+                  onChange={e => { setGuestPhone(e.target.value); setGuestError(null); }}
+                  placeholder="05XX XXX XX XX"
+                  autoComplete="tel"
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1.5 block">
+                  E-posta <span className="text-gray-300 normal-case tracking-normal font-bold">(isteğe bağlı — takip linkini gönderelim)</span>
+                </label>
+                <input
+                  type="email"
+                  value={guestEmail}
+                  onChange={e => { setGuestEmail(e.target.value); setGuestError(null); }}
+                  placeholder="ornek@eposta.com"
+                  autoComplete="email"
+                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                />
+              </div>
+              {guestError && (
+                <p className="text-[12px] font-bold text-red-500 bg-red-50 rounded-xl px-4 py-3">{guestError}</p>
+              )}
+            </div>
+
+            {/* Submit + login link */}
+            <div className="px-7 pt-5 pb-7">
+              <button
+                onClick={handleGuestConfirm}
+                disabled={loading}
+                className="w-full rounded-xl py-4 font-bold text-sm transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: '#14b8a6', color: '#04221d' }}
+              >
+                {loading ? 'Randevun oluşturuluyor...' : 'Randevuyu Tamamla →'}
+              </button>
+              <p className="text-[9px] text-gray-300 text-center leading-relaxed mt-3">
+                Randevu oluşturarak ad, iletişim ve randevu bilgilerinizin ilgili işletme ile paylaşılmasını kabul etmiş sayılırsınız.
+              </p>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-gray-100" />
+                <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">veya</span>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+              <p className="text-center text-[11px] font-bold text-gray-400">
+                Zaten hesabın var mı?{' '}
+                <button
+                  onClick={() => { setShowGuestForm(false); setIsAuthOpen(true); }}
+                  className="text-[#14b8a6] font-black hover:underline"
+                >
+                  Giriş yap
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm booking modal */}
       {showConfirmModal && (
@@ -1427,7 +1655,13 @@ export default function ShopDetail() {
         </div>
       )}
 
-      <style>{`@keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(21,128,61,0.25);}50%{box-shadow:0 0 0 7px rgba(21,128,61,0);} }`}</style>
+      <style>{`
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(21,128,61,0.25);}50%{box-shadow:0 0 0 7px rgba(21,128,61,0);} }
+        @keyframes guestOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes guestSheetIn { from { opacity: 0; transform: translateY(28px) scale(0.98); } to { opacity: 1; transform: none; } }
+        .guest-overlay-in { animation: guestOverlayIn .25s ease-out; }
+        .guest-sheet-in { animation: guestSheetIn .38s cubic-bezier(0.16, 1, 0.3, 1); }
+      `}</style>
     </div>
   );
 }

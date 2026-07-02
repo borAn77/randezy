@@ -500,8 +500,18 @@ export default function HesabimPage() {
                       <p className="text-lg">{apt.appointment_time?.slice(0,5)}</p>
                     </div>
                     <div>
-                      <h3 className="text-lg font-black uppercase text-black">{apt.profiles?.full_name || apt.profiles?.email || "Misafir"}</h3>
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{apt.service_name} • {apt.appointment_date}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-lg font-black uppercase text-black">
+                          {apt.profiles?.full_name || apt.profiles?.email || apt.guest_name || "Misafir"}
+                        </h3>
+                        {!apt.user_id && (apt.guest_name || apt.guest_phone) && (
+                          <span className="text-[8px] font-black uppercase tracking-widest bg-[#E6F6F7] text-[#00A3AD] px-2 py-0.5 rounded-full">⚡ Misafir</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                        {apt.service_name} • {apt.appointment_date}
+                        {!apt.user_id && apt.guest_phone ? ` • ${apt.guest_phone}` : ''}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">

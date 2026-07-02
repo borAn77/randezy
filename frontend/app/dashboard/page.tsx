@@ -705,6 +705,8 @@ export default function Dashboard() {
   };
 
   const getCustomerName = useCallback((apt: any): string => {
+    // Misafir (hesapsız) randevu: kimlik guest_name'de tutulur
+    if (!apt.user_id && apt.guest_name) return String(apt.guest_name).trim();
     const userId = apt.user_id;
     const ownedByUser = customerShopNames.get(userId) || new Set<string>();
     const currentShopLower = (shop?.name || '').toLowerCase();
@@ -2115,11 +2117,16 @@ export default function Dashboard() {
                                   </div>
                                   <div className="w-px h-10 bg-gray-100 flex-shrink-0"/>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-black text-black truncate">{getCustomerName(apt)}</p>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <p className="text-sm font-black text-black truncate">{getCustomerName(apt)}</p>
+                                      {!apt.user_id && (apt.guest_name || apt.guest_phone) && (
+                                        <span className="text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0">⚡ Misafir</span>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                       <span className="text-[11px] font-bold text-gray-500 truncate">{apt.service_name}</span>
                                       {apt.staff && <span className="text-[11px] font-bold text-[#00A3AD] truncate">· {apt.staff.first_name} {apt.staff.last_name}</span>}
-                                      {apt.profiles?.phone && <span className="text-[11px] text-gray-400 truncate">· {apt.profiles.phone}</span>}
+                                      {(apt.profiles?.phone || apt.guest_phone) && <span className="text-[11px] text-gray-400 truncate">· {apt.profiles?.phone || apt.guest_phone}</span>}
                                     </div>
                                   </div>
                                   <p className="text-sm font-black text-black flex-shrink-0 hidden md:block">₺{apt.price || 0}</p>
@@ -2128,8 +2135,8 @@ export default function Dashboard() {
                                     {apt.status === 'Beklemede' && (
                                       <button onClick={e=>{e.stopPropagation();updateAppointmentStatus(apt.id,'Onaylandı');}} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-all" title="Onayla"><CheckCircle2 size={14}/></button>
                                     )}
-                                    {apt.profiles?.phone && (
-                                      <a href={`tel:${apt.profiles.phone}`} onClick={e=>e.stopPropagation()} className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-all"><Phone size={14}/></a>
+                                    {(apt.profiles?.phone || apt.guest_phone) && (
+                                      <a href={`tel:${apt.profiles?.phone || apt.guest_phone}`} onClick={e=>e.stopPropagation()} className="p-2 bg-gray-50 text-gray-500 rounded-lg hover:bg-gray-100 transition-all"><Phone size={14}/></a>
                                     )}
                                   </div>
                                   <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0"/>
@@ -4056,15 +4063,22 @@ export default function Dashboard() {
                   <span className="text-white font-black text-lg">{initials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-lg font-black text-black truncate">{getCustomerName(selectedApt)}</h4>
-                  {selectedApt.profiles?.email && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h4 className="text-lg font-black text-black truncate">{getCustomerName(selectedApt)}</h4>
+                    {!selectedApt.user_id && (selectedApt.guest_name || selectedApt.guest_phone) && (
+                      <span className="text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0">⚡ Misafir</span>
+                    )}
+                  </div>
+                  {selectedApt.profiles?.email ? (
                     <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.profiles.email}</p>
-                  )}
+                  ) : selectedApt.guest_email ? (
+                    <p className="text-[11px] text-gray-400 font-medium truncate">{selectedApt.guest_email}</p>
+                  ) : null}
                 </div>
-                {(selectedApt.profiles?.phone || selectedApt.customer_phone) && (
+                {(selectedApt.profiles?.phone || selectedApt.customer_phone || selectedApt.guest_phone) && (
                   <div className="flex gap-2 flex-shrink-0">
                     {(() => {
-                      const phone = (selectedApt.profiles?.phone || selectedApt.customer_phone) as string;
+                      const phone = (selectedApt.profiles?.phone || selectedApt.customer_phone || selectedApt.guest_phone) as string;
                       return (
                         <>
                           <a href={`tel:${phone}`} className="w-10 h-10 flex items-center justify-center bg-black text-white rounded-xl hover:bg-[#00A3AD] transition-all" title="Ara">
