@@ -612,8 +612,9 @@ export default function ShopDetail() {
     if (cart.length === 0) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    // Hesapsız akış: AuthModal yerine misafir bilgi formu açılır.
-    if (!session) { setLoading(false); setGuestError(null); setShowGuestForm(true); return; }
+    // Üyelik öncelikli akış: önce AuthModal açılır; misafir yolu modaldaki
+    // "Üye olmadan randevu al" (onGuestContinue) ile ikincil seçenek olarak sunulur.
+    if (!session) { setLoading(false); setIsAuthOpen(true); return; }
 
     if (!(await verifyCartAvailability())) { setLoading(false); return; }
 
@@ -1467,7 +1468,11 @@ export default function ShopDetail() {
         </div>
       )}
 
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onGuestContinue={cart.length > 0 ? () => { setGuestError(null); setShowGuestForm(true); } : undefined}
+      />
 
       {/* Guest details sheet — üyeliksiz hızlı randevu */}
       {showGuestForm && (

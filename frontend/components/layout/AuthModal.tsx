@@ -18,12 +18,13 @@ const normalizePhone = (raw: string): string | null => {
 
 const inp = "w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300";
 
-export default function AuthModal({ isOpen, onClose, verificationOnly = false, redirectAfterVerify, initialEmail }: {
+export default function AuthModal({ isOpen, onClose, verificationOnly = false, redirectAfterVerify, initialEmail, onGuestContinue }: {
   isOpen: boolean;
   onClose: () => void;
   verificationOnly?: boolean;     // giriş yapmış ama doğrulanmamış kullanıcıya direkt OTP ekranı
   redirectAfterVerify?: string;   // doğrulama sonrası gidilecek route
   initialEmail?: string;          // verificationOnly modunda kullanılacak e-posta
+  onGuestContinue?: () => void;   // verilirse başlangıç ekranında "Üye olmadan randevu al" seçeneği gösterilir
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('start');
@@ -412,6 +413,15 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
               </button>
               <Divider />
               <GoogleBtn />
+              {onGuestContinue && (
+                <button
+                  type="button"
+                  onClick={() => { handleClose(); onGuestContinue(); }}
+                  className="w-full mt-3 py-4 border-2 border-gray-100 rounded-2xl hover:bg-gray-50 transition-all font-black text-[11px] uppercase tracking-widest text-gray-400 hover:text-gray-600"
+                >
+                  Üye Olmadan Randevu Al
+                </button>
+              )}
             </form>
           )}
 
