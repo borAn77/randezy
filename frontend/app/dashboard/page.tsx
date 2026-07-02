@@ -2120,7 +2120,7 @@ export default function Dashboard() {
                                     <div className="flex items-center gap-2 min-w-0">
                                       <p className="text-sm font-black text-black truncate">{getCustomerName(apt)}</p>
                                       {!apt.user_id && (apt.guest_name || apt.guest_phone) && (
-                                        <span className="text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0">⚡ Misafir</span>
+                                        <span className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0"><span className="w-1 h-1 rounded-full bg-[#0d9488]" />Misafir</span>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -4066,7 +4066,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2 min-w-0">
                     <h4 className="text-lg font-black text-black truncate">{getCustomerName(selectedApt)}</h4>
                     {!selectedApt.user_id && (selectedApt.guest_name || selectedApt.guest_phone) && (
-                      <span className="text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0">⚡ Misafir</span>
+                      <span className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-[#e6f7f4] text-[#0d9488] px-2 py-0.5 rounded-full flex-shrink-0"><span className="w-1 h-1 rounded-full bg-[#0d9488]" />Misafir</span>
                     )}
                   </div>
                   {selectedApt.profiles?.email ? (

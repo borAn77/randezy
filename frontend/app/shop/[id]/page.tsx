@@ -816,18 +816,18 @@ export default function ShopDetail() {
             </div>
             {/* Misafir randevusu: şifresiz takip linki */}
             {guestLinks.length > 0 && (
-              <div className="rounded-3xl p-6 mb-8 text-left guest-sheet-in" style={{ background: '#0c0c0d' }}>
+              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 mb-8 text-left guest-sheet-in">
                 <div className="flex items-center gap-2 mb-2">
-                  <Link2 size={13} style={{ color: '#14b8a6' }} />
-                  <p className="font-mono text-[10px] uppercase tracking-[0.18em]" style={{ color: '#14b8a6' }}>Randevu Takip Linkin</p>
+                  <Link2 size={13} className="text-[#14b8a6]" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Randevu Takip Linkin</p>
                 </div>
-                <p className="text-[11px] leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                <p className="text-[11px] leading-relaxed mb-4 text-gray-400">
                   Bu link sana özel — randevunu buradan görüntüleyebilir ve gerekirse iptal edebilirsin.
                   {guestEmail.trim() ? ' E-postana da gönderdik.' : ' Kaydetmeyi unutma.'}
                 </p>
                 {guestLinks.map((l) => (
-                  <div key={l.token} className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-2 last:mb-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <span className="font-mono text-[11px] truncate flex-1" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                  <div key={l.token} className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-2.5 mb-2 last:mb-0">
+                    <span className="font-mono text-[11px] truncate flex-1 text-gray-600">
                       {`${window.location.origin}/randevu/${l.token}`}
                     </span>
                     <button
@@ -836,8 +836,9 @@ export default function ShopDetail() {
                           .then(() => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); })
                           .catch(() => {});
                       }}
-                      className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all"
-                      style={{ background: linkCopied ? '#14b8a6' : 'rgba(255,255,255,0.1)', color: linkCopied ? '#04221d' : '#fff' }}
+                      className={`flex-shrink-0 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${
+                        linkCopied ? 'bg-[#14b8a6] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                     >
                       {linkCopied ? '✓ Kopyalandı' : 'Kopyala'}
                     </button>
@@ -1484,21 +1485,21 @@ export default function ShopDetail() {
               >
                 <X size={15} />
               </button>
-              <div className="inline-flex items-center gap-1.5 bg-[#e6f7f4] text-[#0d9488] text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full mb-3">
-                ⚡ Üyeliksiz Hızlı Randevu
+              <div className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-500 rounded-full px-3 py-1 text-[10px] font-bold tracking-widest uppercase mb-3">
+                <User size={12} /> Misafir Randevusu
               </div>
-              <h3 className="text-2xl font-black uppercase tracking-tighter text-[#0c0c0d] leading-none">Son Bir Adım</h3>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900 leading-none">Son Bir Adım</h3>
               <p className="text-[12px] text-gray-400 font-medium mt-2 leading-relaxed">
                 Hesap oluşturmana gerek yok — adını ve numaranı bırak, randevun hazır.
               </p>
             </div>
 
             {/* Mini cart summary */}
-            <div className="mx-7 mb-5 rounded-2xl px-4 py-3 flex items-center justify-between" style={{ background: '#0c0c0d' }}>
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] truncate" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <div className="mx-7 mb-5 bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-600 truncate">
                 {cart.length} hizmet{cart[0] ? ` · ${cart[0].date.getDate()} ${MONTHS_SHORT[cart[0].date.getMonth()]} · ${cart[0].time}` : ''}
               </span>
-              <span className="font-mono font-bold text-sm flex-shrink-0 ml-3" style={{ color: '#14b8a6' }}>{cartTotal} ₺</span>
+              <span className="text-lg font-black text-gray-900 flex-shrink-0 ml-3">{cartTotal} ₺</span>
             </div>
 
             {/* Inputs */}
@@ -1510,7 +1511,7 @@ export default function ShopDetail() {
                   onChange={e => { setGuestName(e.target.value); setGuestError(null); }}
                   placeholder="örn. Deniz Yılmaz"
                   autoComplete="name"
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                  className="w-full bg-white border border-gray-200 focus:border-[#14b8a6] rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-900 transition-all placeholder:text-gray-300"
                 />
               </div>
               <div>
@@ -1521,7 +1522,7 @@ export default function ShopDetail() {
                   onChange={e => { setGuestPhone(e.target.value); setGuestError(null); }}
                   placeholder="05XX XXX XX XX"
                   autoComplete="tel"
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                  className="w-full bg-white border border-gray-200 focus:border-[#14b8a6] rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-900 transition-all placeholder:text-gray-300"
                 />
               </div>
               <div>
@@ -1534,7 +1535,7 @@ export default function ShopDetail() {
                   onChange={e => { setGuestEmail(e.target.value); setGuestError(null); }}
                   placeholder="ornek@eposta.com"
                   autoComplete="email"
-                  className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#14b8a6] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300"
+                  className="w-full bg-white border border-gray-200 focus:border-[#14b8a6] rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-900 transition-all placeholder:text-gray-300"
                 />
               </div>
               {guestError && (

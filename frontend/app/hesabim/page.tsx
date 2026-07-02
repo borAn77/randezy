@@ -505,7 +505,7 @@ export default function HesabimPage() {
                           {apt.profiles?.full_name || apt.profiles?.email || apt.guest_name || "Misafir"}
                         </h3>
                         {!apt.user_id && (apt.guest_name || apt.guest_phone) && (
-                          <span className="text-[8px] font-black uppercase tracking-widest bg-[#E6F6F7] text-[#00A3AD] px-2 py-0.5 rounded-full">⚡ Misafir</span>
+                          <span className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest bg-[#E6F6F7] text-[#00A3AD] px-2 py-0.5 rounded-full"><span className="w-1 h-1 rounded-full bg-[#00A3AD]" />Misafir</span>
                         )}
                       </div>
                       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">
