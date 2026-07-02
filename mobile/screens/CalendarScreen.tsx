@@ -3,7 +3,7 @@ import {
   View, StyleSheet, SafeAreaView, TouchableOpacity, Text,
   ScrollView, Modal, TextInput, FlatList,
 } from 'react-native';
-import { AppointmentsProvider, useAppointments, ViewMode } from '../contexts/AppointmentsContext';
+import { useAppointments, ViewMode } from '../contexts/AppointmentsContext';
 import DayView from '../components/calendar/DayView';
 import WeekView from '../components/calendar/WeekView';
 import MonthView from '../components/calendar/MonthView';
@@ -101,7 +101,7 @@ function AgendaListView({ onPressAppointment }: { onPressAppointment: (a: Appoin
                       ]}
                       numberOfLines={1}
                     >
-                      {ap.profiles?.full_name || ap.profiles?.email || 'Misafir'}
+                      {ap.guest_name || ap.profiles?.full_name || ap.profiles?.email || 'Misafir'}
                     </Text>
                     <Text style={[styles.agendaService, { color: cc.text }]} numberOfLines={1}>
                       {ap.service_name}
@@ -321,11 +321,7 @@ function CalendarContent() {
 }
 
 export default function CalendarScreen() {
-  return (
-    <AppointmentsProvider>
-      <CalendarContent />
-    </AppointmentsProvider>
-  );
+  return <CalendarContent />;
 }
 
 const styles = StyleSheet.create({

@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { api, setAuthToken } from '../lib/api';
-import { Appointment, AppointmentStatus, StaffMember } from '../types/appointment';
+import { Appointment, AppointmentStatus, StaffMember, ServiceItem, CreateAppointmentParams } from '../types/appointment';
 import { DEFAULT_DURATION } from '../constants/layout';
 
 let cachedShopId: number | null = null;
@@ -129,5 +129,30 @@ export async function reschedule(id: string, date: string, time: string): Promis
 
 export async function deleteAppointment(id: string): Promise<void> {
   const { error } = await supabase.from('appointments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchServicesList(): Promise<ServiceItem[]> {
+  const { shopId } = await getShopContext();
+  const { data, error } = await supabase
+    .from('services').select('id, name, price, duration').eq('shop_id', shopId).order('name');
+  if (error) throw error;
+  return (data || []) as ServiceItem[];
+}
+
+export async function createAppointment(params: CreateAppointmentParams): Promise<void> {
+  const { shopId } = await getShopContext();
+  const { error } = await supabase.from('appointments').insert({
+    shop_id: shopId,
+    guest_name: params.guestName,
+    guest_phone: params.guestPhone || null,
+    service_name: params.serviceName,
+    price: params.price,
+    appointment_date: params.appointmentDate,
+    appointment_time: params.appointmentTime,
+    staff_id: params.staffId || null,
+    status: 'Onaylandı',
+    duration_snapshot: params.duration,
+  });
   if (error) throw error;
 }

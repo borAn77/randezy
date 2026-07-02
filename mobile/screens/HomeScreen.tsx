@@ -42,7 +42,9 @@ type DbApt = {
   status: string;
   price: number | null;
   duration_snapshot: number | null;
-  profiles?: { full_name?: string | null; phone?: string | null } | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  profiles?: { full_name?: string | null; phone?: string | null; email?: string | null } | null;
 };
 type DispStatus = 'done' | 'now' | 'confirmed' | 'pending';
 type AptDisplay = DbApt & { dispStatus: DispStatus };
@@ -140,8 +142,8 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
 function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: (id: string, status: string) => void }) {
   const isNow     = apt.dispStatus === 'now';
   const isPending = apt.dispStatus === 'pending';
-  const name      = apt.profiles?.full_name || 'Misafir';
-  const phone     = apt.profiles?.phone;
+  const name      = apt.guest_name || apt.profiles?.full_name || apt.profiles?.email || 'Misafir';
+  const phone     = apt.guest_phone || apt.profiles?.phone;
 
   const confirm = () =>
     Alert.alert('Randevuyu onayla', `${name} için randevuyu onaylıyor musun?`, [
@@ -234,16 +236,15 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
   );
 }
 
-function QuickActions({ onGoFinans }: { onGoFinans: () => void }) {
+function QuickActions({ onGoFinans, onGoKampanya }: { onGoFinans: () => void; onGoKampanya: () => void }) {
   const handleShare = async () => {
     await Share.share({ message: 'Randezy ile kolayca randevu alın: https://randezy.com' });
   };
-  const handleKampanya = () => Alert.alert('Kampanya', 'Kampanya özelliği yakında aktif olacak.');
 
   const items = [
-    { icon: 'star'        as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)', onPress: handleKampanya },
-    { icon: 'share-2'     as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)', onPress: handleShare    },
-    { icon: 'dollar-sign' as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)',  onPress: onGoFinans     },
+    { icon: 'star'        as const, label: 'Kampanya', color: WARN,    bg: 'rgba(245,165,36,0.14)', onPress: onGoKampanya },
+    { icon: 'share-2'     as const, label: 'Paylaş',   color: OK,      bg: 'rgba(27,183,110,0.12)', onPress: handleShare  },
+    { icon: 'dollar-sign' as const, label: 'Finans',   color: PRIMARY, bg: 'rgba(91,91,247,0.10)',  onPress: onGoFinans   },
   ];
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 18, flexDirection: 'row', gap: 10 }}>
@@ -284,7 +285,7 @@ function ScheduleTimeline({ items, onPress }: { items: AptDisplay[]; onPress?: (
       {items.map((a, i) => {
         const meta = STATUS_META[a.dispStatus];
         const dim  = a.dispStatus === 'done';
-        const name = a.profiles?.full_name || 'Misafir';
+        const name = a.guest_name || a.profiles?.full_name || a.profiles?.email || 'Misafir';
         return (
           <TouchableOpacity key={a.id} onPress={onPress} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
             <View style={{ width: 46, alignItems: 'flex-start', paddingTop: 4 }}>
@@ -395,9 +396,10 @@ export default function HomeScreen() {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const goCalendar  = () => navigation.navigate('Takvim');
-  const goSettings  = () => navigation.navigate('Profil');
-  const goFinans    = () => navigation.navigate('Isletme');
+  const goCalendar   = () => navigation.navigate('Takvim');
+  const goSettings   = () => navigation.navigate('Profil');
+  const goFinans     = () => navigation.navigate('Isletme');
+  const goKampanya   = () => navigation.navigate('Isletme', { initialTab: 'campaigns' });
 
   const handleStatusChange = useCallback(async (aptId: string, newStatus: string) => {
     await supabase.from('appointments').update({ status: newStatus }).eq('id', aptId);
@@ -494,7 +496,7 @@ export default function HomeScreen() {
         <HomeHeader ownerName={ownerName} shopName={shopName} onGoCalendar={goCalendar} onGoSettings={goSettings} />
         <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} />
         {nextUp && <NextUpCard apt={nextUp} onStatusChange={handleStatusChange} />}
-        <QuickActions onGoFinans={goFinans} />
+        <QuickActions onGoFinans={goFinans} onGoKampanya={goKampanya} />
 
         <SectionHeader
           title="Bugünün programı"

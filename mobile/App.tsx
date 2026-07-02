@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Session } from '@supabase/supabase-js';
 import { StatusBar } from 'expo-status-bar';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Platform, Alert,
+  View, Text, TouchableOpacity, StyleSheet, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from './lib/supabase';
@@ -17,6 +17,8 @@ import CalendarScreen from './screens/CalendarScreen';
 import BusinessScreen from './screens/BusinessScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { BRAND } from './constants/colors';
+import { AppointmentsProvider, useAppointments } from './contexts/AppointmentsContext';
+import NewAppointmentModal from './components/modals/NewAppointmentModal';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -35,11 +37,7 @@ const TABS: {
 ];
 
 // ─── Custom Tab Bar ────────────────────────────────────────────────────────────
-function CustomTabBar({ state, navigation }: BottomTabBarProps) {
-  const handleFab = () => {
-    Alert.alert('Yeni Randevu', 'Yakında eklenecek.');
-  };
-
+function CustomTabBar({ state, navigation, onFab }: BottomTabBarProps & { onFab: () => void }) {
   const leftTabs = [0, 1];
   const rightTabs = [2, 3];
 
@@ -70,19 +68,19 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   return (
     <View style={tabBarStyles.container}>
       <View style={tabBarStyles.inner}>
-        {/* Left tabs */}
+        {/* Sol sekmeler */}
         <View style={tabBarStyles.side}>
           {leftTabs.map(renderTab)}
         </View>
 
         {/* FAB */}
         <View style={tabBarStyles.fabWrap}>
-          <TouchableOpacity style={tabBarStyles.fab} onPress={handleFab} activeOpacity={0.85}>
+          <TouchableOpacity style={tabBarStyles.fab} onPress={onFab} activeOpacity={0.85}>
             <Ionicons name="add" size={32} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Right tabs */}
+        {/* Sağ sekmeler */}
         <View style={tabBarStyles.side}>
           {rightTabs.map(renderTab)}
         </View>
@@ -163,16 +161,32 @@ const tabBarStyles = StyleSheet.create({
 // ─── Main tabs navigator ───────────────────────────────────────────────────────
 function MainTabs() {
   usePushNotifications();
+  const [newAptVisible, setNewAptVisible] = useState(false);
+  const { services, staff, doCreate, selectedDate } = useAppointments();
+
   return (
-    <Tab.Navigator
-      screenOptions={{ headerShown: false }}
-      tabBar={props => <CustomTabBar {...props} />}
-    >
-      <Tab.Screen name="Ana"     component={HomeScreen} />
-      <Tab.Screen name="Takvim"  component={CalendarScreen} />
-      <Tab.Screen name="Isletme" component={BusinessScreen} />
-      <Tab.Screen name="Profil"  component={SettingsScreen} />
-    </Tab.Navigator>
+    <>
+      <Tab.Navigator
+        screenOptions={{ headerShown: false }}
+        tabBar={props => (
+          <CustomTabBar {...props} onFab={() => setNewAptVisible(true)} />
+        )}
+      >
+        <Tab.Screen name="Ana"     component={HomeScreen} />
+        <Tab.Screen name="Takvim"  component={CalendarScreen} />
+        <Tab.Screen name="Isletme" component={BusinessScreen} />
+        <Tab.Screen name="Profil"  component={SettingsScreen} />
+      </Tab.Navigator>
+
+      <NewAppointmentModal
+        visible={newAptVisible}
+        services={services}
+        staff={staff}
+        defaultDate={selectedDate}
+        onClose={() => setNewAptVisible(false)}
+        onSave={doCreate}
+      />
+    </>
   );
 }
 
@@ -201,7 +215,13 @@ export default function App() {
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <Stack.Screen name="Main">
+            {() => (
+              <AppointmentsProvider>
+                <MainTabs />
+              </AppointmentsProvider>
+            )}
+          </Stack.Screen>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
