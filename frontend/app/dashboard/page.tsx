@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { api } from "../../lib/api";
+import AuthModal from "../../components/layout/AuthModal";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
@@ -527,6 +528,9 @@ const isValidPersonName = (name: string | null | undefined): boolean => {
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  // Kapı: panel yalnız session + profiles.email_verified===true ise açılır
+  const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
+  const [gateEmail, setGateEmail] = useState('');
   const [activeTab, setActiveTab] = useState("overview");
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
@@ -723,15 +727,25 @@ export default function Dashboard() {
   const fetchInitialData = useCallback(async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !user.email_confirmed_at) { router.replace('/'); return; }
+    if (!user) { setGate('auth'); setLoading(false); return; }
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, email_verified')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
+
+    // e-posta OTP doğrulaması tamamlanmadan panel açılmaz
+    // (email_confirmed_at kontrolü işe yaramıyordu — confirm email kapalıyken hep dolu)
+    if (profile?.email_verified !== true) {
+      setGateEmail(user.email || '');
+      setGate('verify');
+      setLoading(false);
+      return;
+    }
 
     if (profile?.role !== 'business_owner') { router.replace('/'); return; }
+    setGate('ok');
 
     const { data: shopList } = await supabase
       .from('shops')
@@ -797,7 +811,13 @@ export default function Dashboard() {
     setLoading(false);
   }, [router]);
 
-  useEffect(() => { fetchInitialData(); }, [fetchInitialData]);
+  useEffect(() => {
+    fetchInitialData();
+    // Doğrulama tamamlanınca (AuthModal 'profile-updated' sinyali) kapıyı tekrar kontrol et
+    const onProfileUpdated = () => fetchInitialData();
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
+  }, [fetchInitialData]);
 
   // Realtime subscription for appointments
   useEffect(() => {
@@ -1469,6 +1489,24 @@ export default function Dashboard() {
     colId === '__unassigned'
       ? calCurrentDayApts.filter((a: any) => !a.staff_id)
       : calCurrentDayApts.filter((a: any) => a.staff_id === colId);
+
+  // Kontrol bitene / doğrulanana kadar paneli HİÇ gösterme
+  if (gate !== 'ok') {
+    return (
+      <div className="h-screen bg-[#0c0c0d] flex items-center justify-center px-6 text-center">
+        <p className="text-sm font-semibold tracking-widest" style={{ color: gate === 'checking' ? '#14b8a6' : 'rgba(255,255,255,0.5)' }}>
+          {gate === 'checking' ? 'Yükleniyor...' : 'Panele erişmek için e-posta doğrulaması gerekli.'}
+        </p>
+        <AuthModal
+          isOpen={gate === 'auth' || gate === 'verify'}
+          onClose={() => router.replace('/')}
+          verificationOnly={gate === 'verify'}
+          initialEmail={gateEmail}
+          redirectAfterVerify="/dashboard"
+        />
+      </div>
+    );
+  }
 
   if (loading) return <div className="h-screen bg-[#0c0c0d] flex items-center justify-center text-[#14b8a6] font-semibold tracking-widest text-sm">Yükleniyor...</div>;
 
