@@ -9,7 +9,8 @@ import {
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
   Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
   Star, MessageSquare, Phone, Search,
-  ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent
+  ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent,
+  Copy, RefreshCw, KeyRound
 } from "lucide-react";
 
 // Berber hizmet kataloğu — tek kaynak (hem tekli ekleme modalı hem toplu ekleme modalı kullanır)
@@ -531,6 +532,9 @@ export default function Dashboard() {
   // Kapı: panel yalnız session + profiles.email_verified===true ise açılır
   const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
   const [gateEmail, setGateEmail] = useState('');
+  // Personel giriş kodları (staff_access_codes — owner-only RLS)
+  const [staffCodes, setStaffCodes] = useState<Record<string, string>>({});
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
@@ -597,8 +601,8 @@ export default function Dashboard() {
   };
 
   // Native confirm() yerine şık modal — Promise tabanlı
-  const [confirmState, setConfirmState] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
-  const askConfirm = (message: string) => new Promise<boolean>(resolve => setConfirmState({ message, resolve }));
+  const [confirmState, setConfirmState] = useState<{ message: string; confirmLabel?: string; resolve: (v: boolean) => void } | null>(null);
+  const askConfirm = (message: string, confirmLabel?: string) => new Promise<boolean>(resolve => setConfirmState({ message, confirmLabel, resolve }));
 
   const handleReviewReply = async (reviewId: string) => {
     if (!replyText.trim()) return;
@@ -782,6 +786,13 @@ export default function Dashboard() {
 
       setReviews(reviewsRes.data || []);
       setStaff(staffRes.data || []);
+
+      // Personel giriş kodları — RLS zaten owner'ın personeliyle sınırlar.
+      // Tablo henüz oluşturulmadıysa (migration çalıştırılmadıysa) sessizce boş kalır.
+      const { data: codesData } = await supabase.from('staff_access_codes').select('staff_id, code');
+      const codeMap: Record<string, string> = {};
+      (codesData || []).forEach((c: any) => { codeMap[c.staff_id] = c.code; });
+      setStaffCodes(codeMap);
 
       const campaignsRes = await supabase.from('campaigns').select('*').eq('shop_id', shopData.id).order('created_at', { ascending: false });
       setCampaigns(campaignsRes.data || []);
@@ -1242,6 +1253,39 @@ export default function Dashboard() {
       fetchInitialData();
     }
     setSavingStaff(false);
+  };
+
+  // ── Personel giriş kodu yönetimi ────────────────────────────────────
+  // Karışan karakterler hariç (0/O, 1/I/L yok) — telefonda okuması/yazması kolay.
+  // 8 rastgele karakter = 31^8 ≈ 852 milyar kombinasyon; brute-force pratikte imkânsız.
+  const generateAccessCode = (): string => {
+    const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    const chars = Array.from(arr, b => CODE_CHARS[b % CODE_CHARS.length]);
+    return `RDZ-${chars.slice(0, 4).join('')}-${chars.slice(4).join('')}`;
+  };
+
+  const regenerateStaffCode = async (staffId: string) => {
+    // Mevcut kod varsa yenileme = eski kodun anında iptali; onay iste
+    if (staffCodes[staffId] && !(await askConfirm('Kod yenilensin mi? Eski kod anında geçersiz olur ve personelin tekrar giriş yapması gerekir.', 'Yenile'))) return;
+    const code = generateAccessCode();
+    const { error } = await supabase.from('staff_access_codes').upsert(
+      { staff_id: staffId, code, updated_at: new Date().toISOString() },
+      { onConflict: 'staff_id' }
+    );
+    if (error) { showToast('Kod oluşturulamadı: ' + error.message, 'err'); return; }
+    setStaffCodes(prev => ({ ...prev, [staffId]: code }));
+    showToast(staffCodes[staffId] ? 'Yeni giriş kodu oluşturuldu. Eski kod geçersiz.' : 'Giriş kodu oluşturuldu.');
+  };
+
+  const copyStaffCode = (staffId: string) => {
+    const code = staffCodes[staffId];
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCodeId(staffId);
+      setTimeout(() => setCopiedCodeId(null), 2000);
+    }).catch(() => showToast('Kopyalanamadı.', 'err'));
   };
 
   const openStaffEdit = (s: any) => {
@@ -2936,6 +2980,36 @@ export default function Dashboard() {
                               ))}
                             </div>
                           )}
+                          {/* Personel giriş kodu */}
+                          <div className="bg-[#fafaf8] border border-[#ececea] rounded-xl px-3 py-2.5 mb-4 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[9px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-0.5 flex items-center gap-1"><KeyRound size={9}/> Giriş Kodu</p>
+                              {staffCodes[s.id] ? (
+                                <p className="text-[13px] font-mono font-bold text-[#0c0c0d] tracking-wide truncate">{staffCodes[s.id]}</p>
+                              ) : (
+                                <p className="text-[11px] font-mono text-[#7a7a7e]">Henüz oluşturulmadı</p>
+                              )}
+                            </div>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              {staffCodes[s.id] && (
+                                <button
+                                  onClick={() => copyStaffCode(s.id)}
+                                  title="Kodu kopyala"
+                                  className={`p-2 rounded-lg transition-all ${copiedCodeId === s.id ? 'bg-[#14b8a6] text-white' : 'bg-white border border-[#ececea] text-[#7a7a7e] hover:text-[#14b8a6] hover:border-[#14b8a6]'}`}
+                                >
+                                  {copiedCodeId === s.id ? <CheckCircle2 size={13}/> : <Copy size={13}/>}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => regenerateStaffCode(s.id)}
+                                title={staffCodes[s.id] ? 'Kodu yenile (eskisi geçersiz olur)' : 'Kod oluştur'}
+                                className="p-2 rounded-lg bg-white border border-[#ececea] text-[#7a7a7e] hover:text-[#14b8a6] hover:border-[#14b8a6] transition-all flex items-center gap-1"
+                              >
+                                <RefreshCw size={13}/>
+                                {!staffCodes[s.id] && <span className="text-[9px] font-mono uppercase tracking-widest">Oluştur</span>}
+                              </button>
+                            </div>
+                          </div>
                           {/* Actions */}
                           <div className="grid grid-cols-4 gap-1.5">
                             {[
@@ -4362,7 +4436,7 @@ export default function Dashboard() {
                 onClick={() => { confirmState.resolve(true); setConfirmState(null); }}
                 className="px-4 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-widest text-white bg-[#dc2626] hover:bg-[#b91c1c] transition-all"
               >
-                Sil
+                {confirmState.confirmLabel || 'Sil'}
               </button>
             </div>
           </div>
