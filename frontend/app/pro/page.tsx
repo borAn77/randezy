@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import AuthModal from "../../components/layout/AuthModal";
@@ -12,24 +12,29 @@ import { Pricing } from "../../components/landing/Pricing";
 export default function ProPage() {
   const router = useRouter();
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const pendingRedirect = useRef(false);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session && pendingRedirect.current) {
-        pendingRedirect.current = false;
-        router.push("/isletme-ekle");
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [router]);
+  const [verifyMode, setVerifyMode] = useState(false);
+  const [verifyEmail, setVerifyEmail] = useState("");
 
   const handleStart = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    if (!session?.user) {
+      // Giriş yok → normal kayıt/giriş; doğrulama sonrası /isletme-ekle'ye gider
+      setVerifyMode(false);
+      setVerifyEmail("");
+      setIsAuthOpen(true);
+      return;
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email_verified')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    if (profile?.email_verified === true) {
       router.push("/isletme-ekle");
     } else {
-      pendingRedirect.current = true;
+      // Giriş var ama OTP doğrulanmamış → doğrudan doğrulama ekranı
+      setVerifyMode(true);
+      setVerifyEmail(session.user.email || "");
       setIsAuthOpen(true);
     }
   };
@@ -77,7 +82,13 @@ export default function ProPage() {
       </section>
 
       <Footer />
-      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        verificationOnly={verifyMode}
+        initialEmail={verifyEmail}
+        redirectAfterVerify="/isletme-ekle"
+      />
     </div>
   );
 }

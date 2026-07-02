@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../../components/layout/Navbar";
+import AuthModal from "../../components/layout/AuthModal";
 import { supabase } from "../../lib/supabase";
 
 // ── Supabase row type ─────────────────────────────────────────────────────────
@@ -151,6 +152,9 @@ export default function Randevularim() {
   const [rateTarget, setRateTarget]     = useState<AptRow | null>(null);
   const [localRatings, setLocalRatings] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  // Kapı: sayfa yalnız session + profiles.email_verified===true ise açılır
+  const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
+  const [gateEmail, setGateEmail] = useState('');
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -159,7 +163,14 @@ export default function Randevularim() {
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { router.replace('/'); return; }
+    if (!user) { setGate('auth'); return; }
+    const { data: prof } = await supabase.from('profiles').select('email_verified').eq('id', user.id).maybeSingle();
+    if (prof?.email_verified !== true) {
+      setGateEmail(user.email || '');
+      setGate('verify');
+      return;
+    }
+    setGate('ok');
     const [{ data: apts }, { data: reviewsData }] = await Promise.all([
       supabase.from('appointments').select('*, shops(name, city, district), staff(first_name, last_name)').eq('user_id', user.id).order('appointment_date', { ascending: false }),
       supabase.from('reviews').select('shop_id, rating').eq('user_id', user.id),
@@ -172,9 +183,14 @@ export default function Randevularim() {
     aptRows.forEach(a => { if (shopRatings[a.shop_id]) initialRatings[a.id] = shopRatings[a.shop_id]; });
     setLocalRatings(initialRatings);
     setLoading(false);
-  }, [router]);
+  }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const onProfileUpdated = () => load();
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
+  }, [load]);
 
   const upcoming  = appointments.filter(a => classifyApt(a) === 'upcoming').sort((a, b) => +aptDateTime(a) - +aptDateTime(b));
   const past      = appointments.filter(a => classifyApt(a) === 'past').sort((a, b) => +aptDateTime(b) - +aptDateTime(a));
@@ -221,6 +237,26 @@ export default function Randevularim() {
   ];
 
   const listMap = { upcoming, past, cancelled };
+
+  if (gate !== 'ok') {
+    return (
+      <main style={{ minHeight: '100vh', background: '#f8fafc' }}>
+        <Navbar />
+        <div style={{ height: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, textAlign: 'center', padding: '0 24px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: gate === 'checking' ? 2 : 1 }}>
+            {gate === 'checking' ? 'Yükleniyor…' : 'Randevularını görmek için e-posta doğrulaması gerekli.'}
+          </p>
+        </div>
+        <AuthModal
+          isOpen={gate === 'auth' || gate === 'verify'}
+          onClose={() => router.replace('/')}
+          verificationOnly={gate === 'verify'}
+          initialEmail={gateEmail}
+          redirectAfterVerify="/randevularim"
+        />
+      </main>
+    );
+  }
 
   return (
     <main style={{ minHeight: '100vh', background: '#f8fafc' }}>

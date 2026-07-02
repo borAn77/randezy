@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import Navbar from "../../components/layout/Navbar";
+import AuthModal from "../../components/layout/AuthModal";
 import {
   User, Calendar, Shield, Trash2, ChevronRight,
   Store, TrendingUp, Users, Settings, PlusCircle, Heart
@@ -48,67 +49,77 @@ export default function HesabimPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Kapı: sayfa yalnız session + profiles.email_verified===true ise açılır
+  const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
+  const [gateEmail, setGateEmail] = useState('');
 
   useEffect(() => {
     const getInitialData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user || !session.user.email_confirmed_at) {
-        router.replace('/');
+      if (!session?.user) { setGate('auth'); setLoading(false); return; }
+
+      setUser(session.user);
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (prof?.email_verified !== true) {
+        setGateEmail(session.user.email || '');
+        setGate('verify');
+        setLoading(false);
         return;
       }
-      if (session?.user) {
-        setUser(session.user);
-        const { data: prof } = await supabase
-          .from('profiles')
+      setProfile(prof);
+
+      const { data: aptData } = await supabase
+        .from('appointments')
+        .select('*, shops(name, city, district)')
+        .eq('user_id', session.user.id)
+        .order('appointment_date', { ascending: true });
+      setUserAppointments(aptData || []);
+
+      const { data: favData } = await supabase
+        .from('favorites')
+        .select('shop_id')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+      const shopIds = (favData || []).map((f: any) => f.shop_id).filter(Boolean);
+      if (shopIds.length > 0) {
+        const { data: shopData } = await supabase
+          .from('shops')
+          .select('id, name, city, district, image_url, score, category')
+          .in('id', shopIds);
+        const shopMap = Object.fromEntries((shopData || []).map((s: any) => [s.id, s]));
+        setFavorites(shopIds.map((id: any) => shopMap[id]).filter(Boolean));
+      } else {
+        setFavorites([]);
+      }
+
+      if (prof?.role === 'business_owner') {
+        const { data: shopRes } = await supabase
+          .from('shops')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('owner_id', session.user.id)
           .single();
-        setProfile(prof);
-
-        const { data: aptData } = await supabase
-          .from('appointments')
-          .select('*, shops(name, city, district)')
-          .eq('user_id', session.user.id)
-          .order('appointment_date', { ascending: true });
-        setUserAppointments(aptData || []);
-
-        const { data: favData } = await supabase
-          .from('favorites')
-          .select('shop_id')
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false });
-        const shopIds = (favData || []).map((f: any) => f.shop_id).filter(Boolean);
-        if (shopIds.length > 0) {
-          const { data: shopData } = await supabase
-            .from('shops')
-            .select('id, name, city, district, image_url, score, category')
-            .in('id', shopIds);
-          const shopMap = Object.fromEntries((shopData || []).map((s: any) => [s.id, s]));
-          setFavorites(shopIds.map((id: any) => shopMap[id]).filter(Boolean));
-        } else {
-          setFavorites([]);
-        }
-
-        if (prof?.role === 'business_owner') {
-          const { data: shopRes } = await supabase
-            .from('shops')
-            .select('*')
-            .eq('owner_id', session.user.id)
-            .single();
-          setShopData(shopRes);
-          if (shopRes) {
-            const { data: shopAptData } = await supabase
-              .from('appointments')
-              .select('*, profiles(full_name, phone, email)')
-              .eq('shop_id', shopRes.id)
-              .order('appointment_date', { ascending: false });
-            setShopAppointments(shopAptData || []);
-          }
+        setShopData(shopRes);
+        if (shopRes) {
+          const { data: shopAptData } = await supabase
+            .from('appointments')
+            .select('*, profiles(full_name, phone, email)')
+            .eq('shop_id', shopRes.id)
+            .order('appointment_date', { ascending: false });
+          setShopAppointments(shopAptData || []);
         }
       }
+      setGate('ok');
       setLoading(false);
     };
     getInitialData();
+    const onProfileUpdated = () => getInitialData();
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
   }, []);
 
   const isOwner = profile?.role === 'business_owner';
@@ -185,8 +196,29 @@ export default function HesabimPage() {
     window.location.href = '/';
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center font-black uppercase tracking-widest text-gray-400 italic animate-pulse">Yükleniyor...</div>;
-  if (!user) { router.replace("/"); return null; }
+  if (gate !== 'ok') {
+    return (
+      <main className="min-h-screen bg-[#F9F9F9] text-[#111]">
+        <Navbar />
+        <div className="h-[70vh] flex flex-col items-center justify-center gap-3 px-6 text-center">
+          {gate === 'checking' ? (
+            <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 italic animate-pulse">Yükleniyor...</p>
+          ) : (
+            <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+              Hesabına erişmek için e-posta doğrulaması gerekli.
+            </p>
+          )}
+        </div>
+        <AuthModal
+          isOpen={gate === 'auth' || gate === 'verify'}
+          onClose={() => router.replace('/')}
+          verificationOnly={gate === 'verify'}
+          initialEmail={gateEmail}
+          redirectAfterVerify="/hesabim"
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F9F9F9] text-[#111]">

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { api } from "../../lib/api";
@@ -17,7 +18,14 @@ const normalizePhone = (raw: string): string | null => {
 
 const inp = "w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-[#00A3AD] outline-none font-bold text-sm text-black transition-all placeholder:text-gray-300";
 
-export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export default function AuthModal({ isOpen, onClose, verificationOnly = false, redirectAfterVerify, initialEmail }: {
+  isOpen: boolean;
+  onClose: () => void;
+  verificationOnly?: boolean;     // giriş yapmış ama doğrulanmamış kullanıcıya direkt OTP ekranı
+  redirectAfterVerify?: string;   // doğrulama sonrası gidilecek route
+  initialEmail?: string;          // verificationOnly modunda kullanılacak e-posta
+}) {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>('start');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -53,6 +61,26 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       resetAll();
     }
   }, [isOpen]);
+
+  // verificationOnly: giriş yapmış ama doğrulanmamış kullanıcıya doğrudan OTP ekranını aç + kod gönder.
+  // Mevcut OTP gönderme/doğrulama fonksiyonlarını reuse eder; OTP route'larına dokunmaz.
+  useEffect(() => {
+    if (!isOpen || !verificationOnly) return;
+    let cancelled = false;
+    (async () => {
+      let mail = initialEmail;
+      if (!mail) {
+        const { data: { user } } = await supabase.auth.getUser();
+        mail = user?.email || '';
+      }
+      if (cancelled) return;
+      setIsNewUser(false);
+      setEmail(mail);
+      setMode('otp');
+      try { await api.sendEmailVerification(mail); } catch { /* sessiz */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, verificationOnly, initialEmail]);
 
   if (!isOpen) return null;
 
@@ -104,7 +132,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
         : "Giriş yapılamadı. Tekrar deneyin.");
       return;
     }
-    const { data: profile } = await supabase.from('profiles').select('email_verified').eq('id', data.user.id).single();
+    const { data: profile } = await supabase.from('profiles').select('email_verified').eq('id', data.user.id).maybeSingle();
     setLoading(false);
     if (!profile?.email_verified) {
       try { await api.sendEmailVerification(email); } catch { /* ignore */ }
@@ -114,6 +142,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
       return;
     }
     handleClose();
+    if (redirectAfterVerify) router.push(redirectAfterVerify);
   };
 
   // ── Signup validate → Consents ────────────────────────────────────────
@@ -283,12 +312,13 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClos
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${finalSession.access_token}` },
         body: JSON.stringify({ documents, marketing_consent: marketingConsent }),
       }).catch(() => {});
-
-      window.dispatchEvent(new CustomEvent('profile-updated'));
     }
 
     setLoading(false);
+    // Doğrulama tamamlandı — sayfaların email_verified durumunu tazelemesi için sinyal
+    window.dispatchEvent(new CustomEvent('profile-updated'));
     handleClose();
+    if (redirectAfterVerify) router.push(redirectAfterVerify);
   };
 
   // ── Şifremi unuttum ─────────────────────────────────────────────────

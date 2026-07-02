@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "../../components/layout/Navbar";
 import { ChevronDown, CheckCircle2, ArrowRight, Store, Phone, MapPin } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import AuthModal from "../../components/layout/AuthModal";
 
 const cities = [
   "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin",
@@ -33,6 +34,9 @@ export default function IsletmeEkle() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [businessTermsConsent, setBusinessTermsConsent] = useState(false);
+  // Kapı: form yalnız session + profiles.email_verified===true ise açılır
+  const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
+  const [gateEmail, setGateEmail] = useState('');
 
   const [form, setForm] = useState({
     category: "",
@@ -43,13 +47,32 @@ export default function IsletmeEkle() {
     street: "",
   });
 
+  // Kapı kontrolü: oturum + e-posta OTP doğrulaması (profiles.email_verified). Sadece okuma.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user || !session.user.email_confirmed_at) {
-        router.replace('/');
+    let cancelled = false;
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (!session?.user) { setGate('auth'); return; }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email_verified')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      if (profile?.email_verified === true) {
+        setGate('ok');
+      } else {
+        setGateEmail(session.user.email || '');
+        setGate('verify');
       }
-    });
-  }, [router]);
+    };
+    check();
+    // Doğrulama tamamlanınca (AuthModal sinyali) tekrar kontrol et
+    const onProfileUpdated = () => check();
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => { cancelled = true; window.removeEventListener('profile-updated', onProfileUpdated); };
+  }, []);
 
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 
@@ -62,6 +85,16 @@ export default function IsletmeEkle() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Oturum bulunamadı. Lütfen giriş yapın.");
+
+      // Son kapı: e-posta OTP doğrulaması tamamlanmış olmalı (sadece okuma)
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('email_verified')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (prof?.email_verified !== true) {
+        throw new Error("İşletme eklemek için önce e-posta adresinizi doğrulamanız gerekir.");
+      }
 
       const { error: shopError } = await supabase.from('shops').insert([{
         owner_id: user.id,
@@ -83,6 +116,32 @@ export default function IsletmeEkle() {
       setLoading(false);
     }
   };
+
+  // Kontrol bitene kadar / doğrulanana kadar formu HİÇ gösterme (flash yok).
+  if (gate !== 'ok') {
+    return (
+      <main className="min-h-screen bg-[#F9F9F9] text-[#111]">
+        <Navbar />
+        <div className="h-[70vh] flex flex-col items-center justify-center gap-3 px-6 text-center">
+          {gate === 'checking' ? (
+            <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 italic animate-pulse">Yükleniyor...</p>
+          ) : (
+            <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">
+              İşletme eklemek için e-posta doğrulaması gerekli.
+            </p>
+          )}
+        </div>
+        {/* Giriş yok → kayıt/giriş; giriş var ama doğrulanmamış → OTP. Kapatınca ana sayfaya. */}
+        <AuthModal
+          isOpen={gate === 'auth' || gate === 'verify'}
+          onClose={() => router.replace('/')}
+          verificationOnly={gate === 'verify'}
+          initialEmail={gateEmail}
+          redirectAfterVerify="/isletme-ekle"
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F9F9F9] text-[#111] pb-24">
