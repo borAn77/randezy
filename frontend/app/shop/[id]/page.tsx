@@ -670,7 +670,7 @@ export default function ShopDetail() {
     const phone = normalizePhone(guestPhone);
     if (!phone) { setGuestError('Geçerli bir Türkiye cep telefonu girin. Örnek: 05321234567'); return; }
     const email = guestEmail.trim();
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) { setGuestError('Geçerli bir e-posta girin veya boş bırakın.'); return; }
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) { setGuestError('Geçerli bir e-posta girin.'); return; }
     if (!guestKvkkConsent || !guestTransferConsent) { setGuestError('Devam etmek için zorunlu onayları işaretleyin.'); return; }
 
     setGuestError(null);
@@ -828,8 +828,7 @@ export default function ShopDetail() {
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Randevu Takip Linkin</p>
                 </div>
                 <p className="text-[11px] leading-relaxed mb-4 text-gray-400">
-                  Bu link sana özel — randevunu buradan görüntüleyebilir ve gerekirse iptal edebilirsin.
-                  {guestEmail.trim() ? ' E-postana da gönderdik.' : ' Kaydetmeyi unutma.'}
+                  Bu link sana özel — randevunu buradan görüntüleyebilir ve gerekirse iptal edebilirsin. E-postana da gönderdik.
                 </p>
                 {guestLinks.map((l) => (
                   <div key={l.token} className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-2.5 mb-2 last:mb-0">
@@ -1537,10 +1536,11 @@ export default function ShopDetail() {
               </div>
               <div>
                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1.5 block">
-                  E-posta <span className="text-gray-300 normal-case tracking-normal font-bold">(isteğe bağlı — takip linkini gönderelim)</span>
+                  E-posta <span className="text-gray-300 normal-case tracking-normal font-bold">(onay ve takip linki buraya gelecek)</span>
                 </label>
                 <input
                   type="email"
+                  required
                   value={guestEmail}
                   onChange={e => { setGuestEmail(e.target.value); setGuestError(null); }}
                   placeholder="ornek@eposta.com"

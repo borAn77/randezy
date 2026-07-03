@@ -977,6 +977,13 @@ export default function Dashboard() {
               appointmentTime: apt.appointment_time?.slice(0, 5),
             }),
           }).catch(() => {});
+          if (!apt.user_id && (apt.guest_phone || apt.guest_email)) {
+            fetch('/api/guest-appointments/notify-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
+              body: JSON.stringify({ appointmentId: apt.id, status: 'confirmed' }),
+            }).catch(() => {});
+          }
         }
       }
     }
@@ -1011,6 +1018,13 @@ export default function Dashboard() {
           reason: rejectReason.trim(),
         }),
       }).catch(() => {});
+      if (!apt.user_id && (apt.guest_phone || apt.guest_email)) {
+        fetch('/api/guest-appointments/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
+          body: JSON.stringify({ appointmentId: apt.id, status: 'rejected', reason: rejectReason.trim() }),
+        }).catch(() => {});
+      }
     }
   };
 
@@ -1050,6 +1064,13 @@ export default function Dashboard() {
         reason: detailRejectReason.trim(),
       }),
     }).catch(() => {});
+    if (!apt.user_id && (apt.guest_phone || apt.guest_email)) {
+      fetch('/api/guest-appointments/notify-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(notifySession ? { Authorization: `Bearer ${notifySession.access_token}` } : {}) },
+        body: JSON.stringify({ appointmentId: apt.id, status: 'rejected', reason: detailRejectReason.trim() }),
+      }).catch(() => {});
+    }
   };
 
   const handleDetailDelete = async () => {

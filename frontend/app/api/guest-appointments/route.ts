@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { sendSms } from "@/lib/sms";
 
 // Misafir (hesapsız) randevu oluşturma.
 // RLS anon insert'e bilinçli olarak kapalı — bu route service_role ile çalışır ve
@@ -75,10 +76,10 @@ export async function POST(req: NextRequest) {
   }
 
   const emailRaw = String(body?.guest?.email ?? "").trim();
-  if (emailRaw && (!/^\S+@\S+\.\S+$/.test(emailRaw) || emailRaw.length > 120)) {
-    return NextResponse.json({ detail: "Geçerli bir e-posta girin veya boş bırakın." }, { status: 400 });
+  if (!emailRaw || !/^\S+@\S+\.\S+$/.test(emailRaw) || emailRaw.length > 120) {
+    return NextResponse.json({ detail: "Geçerli bir e-posta girin." }, { status: 400 });
   }
-  const guestEmail = emailRaw || null;
+  const guestEmail = emailRaw;
 
   // KVKK: aydınlatma + yurt dışı aktarım rızası server'da da zorunlu —
   // UI atlansa bile rızasız misafir randevusu oluşturulamaz.
@@ -227,6 +228,12 @@ export async function POST(req: NextRequest) {
     }
   } catch (e) { console.error("[guest-appointments] guest email failed:", e); }
 
+  try {
+    if ((inserted?.length ?? 0) > 0) {
+      await sendGuestConfirmationSms(phone, name, shop.name, inserted!);
+    }
+  } catch (e) { console.error("[guest-appointments] guest sms failed:", e); }
+
   return NextResponse.json(
     { ok: true, appointments: (inserted || []).map((a) => ({ id: a.id, guest_token: a.guest_token })) },
     { status: 201 }
@@ -331,6 +338,22 @@ async function sendGuestConfirmationEmail(
       ctaUrl: `https://randezy.com/randevu/${first.guest_token}`,
     }),
   });
+}
+
+async function sendGuestConfirmationSms(
+  phone: string,
+  guestName: string,
+  shopName: string,
+  appointments: { guest_token: string; service_name: string; appointment_date: string; appointment_time: string }[]
+) {
+  const first = appointments[0];
+  const dateStr = formatDate(first.appointment_date);
+  const trackUrl = `https://randezy.com/randevu/${first.guest_token}`;
+  const msg =
+    appointments.length > 1
+      ? `Sayın ${guestName}, ${shopName} için ${appointments.length} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`
+      : `Sayın ${guestName}, ${shopName} - ${first.service_name} - ${dateStr} ${first.appointment_time?.slice(0, 5)} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`;
+  await sendSms(phone, msg);
 }
 
 function formatDate(dateStr: string): string {
