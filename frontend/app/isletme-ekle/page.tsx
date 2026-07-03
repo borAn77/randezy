@@ -96,6 +96,20 @@ export default function IsletmeEkle() {
         throw new Error("İşletme eklemek için önce e-posta adresinizi doğrulamanız gerekir.");
       }
 
+      // İşletme Sözleşmesi onayını İSPAT için logla — shop oluşturmadan ÖNCE
+      // (rızası kayıt altına alınamayan işlem yaratılmaz; misafir akışıyla aynı ilke).
+      // API idempotent: daha önce onaylandıysa ilk kayıt korunur, hata dönmez.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Oturum bulunamadı. Lütfen giriş yapın.");
+      const consentRes = await fetch('/api/legal-consents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ documents: ['isletme_sozlesmesi_v1'] }),
+      });
+      if (!consentRes.ok) {
+        throw new Error("Sözleşme onayı kaydedilemedi. Lütfen tekrar deneyin.");
+      }
+
       const { error: shopError } = await supabase.from('shops').insert([{
         owner_id: user.id,
         name: form.shopName.trim(),

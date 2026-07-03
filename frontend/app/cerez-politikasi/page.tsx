@@ -18,7 +18,7 @@ export default function CerezPolitikasiPage() {
 
 Oturum çerezleri: Giriş yaptığınızda kimliğinizi doğrulamak ve oturumunuzu aktif tutmak için gereklidir. Bu çerezler olmadan platforma giriş yapılamaz.
 
-Supabase auth: Güvenli kimlik doğrulama ve oturum yönetimi için zorunlu teknik çerezler. Bu çerezler, güvenlik amacıyla cihazınızda oturumunuz açık kaldığı sürece veya maksimum 30 gün boyunca tutulur ve sonrasında otomatik olarak silinir.
+Supabase auth: Güvenli kimlik doğrulama ve oturum yönetimi için zorunlu teknik kayıtlar. Bu oturum bilgileri, güvenli kimlik doğrulama amacıyla cihazınızın yerel depolama alanında (localStorage), oturumunuz sonlanana veya siz çıkış yapana kadar tutulur.
 
 Bu çerezler üçüncü taraflarla paylaşılmaz ve yalnızca platformun temel işlevselliği için kullanılır.`,
         },

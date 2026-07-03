@@ -25,6 +25,7 @@ Web sitesi: randezy.com
 • Telefon numarası (opsiyonel olarak girilen)
 • Randevu bilgileri (tarih, saat, hizmet türü, işletme bilgisi)
 • Hesap giriş ve oturum bilgileri
+• IP adresi ve tarayıcı/cihaz bilgileri (onay ve işlem kayıtlarının ispatı amacıyla)
 • İşletme sahipleri için: işletme adı, adres, iletişim bilgileri, hizmet listesi`,
         },
         {
@@ -36,6 +37,7 @@ Web sitesi: randezy.com
 • Randevu hatırlatma e-postalarının gönderilmesi (KVKK md. 5/2-c)
 • İşletme ile müşteri arasındaki randevu koordinasyonunun sağlanması (KVKK md. 5/2-c)
 • Yasal yükümlülüklerin yerine getirilmesi (KVKK md. 5/2-ç)
+• İspat yükümlülüğünün yerine getirilmesi ve hukuki uyuşmazlıkların çözümü (KVKK md. 5/2-ç)
 • Ticari elektronik ileti gönderimi — yalnızca açık rıza verenlere (KVKK md. 5/1)`,
         },
         {

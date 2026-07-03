@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
     'kvkk_v1',
     'yurtdisi_aktarim_v1',
     'ticari_ileti_v1',
+    'isletme_sozlesmesi_v1',
   ]);
 
   const { documents = [], marketing_consent = false } = body;
@@ -91,7 +92,11 @@ export async function POST(req: NextRequest) {
     ip_address:        ipAddress,
   }));
 
-  const { error } = await supabaseAdmin.from("legal_consents").insert(records);
+  // İdempotent: aynı belge+versiyon daha önce onaylandıysa İLK kayıt korunur
+  // (ilk kabul anının zaman damgası ispat açısından esastır) — tekrar gönderim 500 üretmez.
+  const { error } = await supabaseAdmin
+    .from("legal_consents")
+    .upsert(records, { onConflict: "user_id,document_key,document_version", ignoreDuplicates: true });
   if (error) {
     console.error("[legal-consents] insert error:", error);
     return NextResponse.json({ ok: false, reason: error.message }, { status: 500 });
