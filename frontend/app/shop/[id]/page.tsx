@@ -1536,7 +1536,7 @@ export default function ShopDetail() {
               </div>
               <div>
                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1.5 block">
-                  E-posta <span className="text-gray-300 normal-case tracking-normal font-bold">(onay ve takip linki buraya gelecek)</span>
+                  E-posta <span className="text-red-400">*</span> <span className="text-gray-300 normal-case tracking-normal font-bold">(onay ve takip linki buraya gelecek)</span>
                 </label>
                 <input
                   type="email"
@@ -1584,7 +1584,7 @@ export default function ShopDetail() {
             <div className="px-7 pt-5 pb-7">
               <button
                 onClick={handleGuestConfirm}
-                disabled={loading || !guestKvkkConsent || !guestTransferConsent}
+                disabled={loading || !guestEmail.trim() || !guestKvkkConsent || !guestTransferConsent}
                 className="w-full rounded-xl py-4 font-bold text-sm transition-all hover:opacity-90 disabled:opacity-50"
                 style={{ background: '#14b8a6', color: '#04221d' }}
               >
