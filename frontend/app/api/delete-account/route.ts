@@ -118,7 +118,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: "step_failed:profiles_delete" }, { status: 500 });
     }
 
+    // Step 8.5: Rıza kayıtlarına kimlik çıpası garantisi — auth silinince
+    // user_id SET NULL'a düşer; e-postası olmayan eski satır kalmasın
+    // (ispat kayıtları yasal zamanaşımı süresince saklanır, Gizlilik md.5)
+    const { error: consentAnchorError } = await supabaseAdmin
+      .from("legal_consents")
+      .update({ user_email: user.email ?? null })
+      .eq("user_id", userId)
+      .is("user_email", null);
+
+    if (consentAnchorError) {
+      console.error("[delete-account] step:consent_anchor failed:", consentAnchorError);
+      return NextResponse.json({ ok: false, reason: "step_failed:consent_anchor" }, { status: 500 });
+    }
+
     // Step 9: Auth user sil EN SON → CASCADE: favorites (user_id → auth.users)
+    // legal_consents ise CASCADE DEĞİL, SET NULL — ispat kayıtları kalır
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (authDeleteError) {

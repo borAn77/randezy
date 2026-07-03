@@ -81,6 +81,9 @@ export async function POST(req: NextRequest) {
 
   const records = documents.map((doc: string) => ({
     user_id:           user.id,
+    // Kimlik çıpası: hesap silinirse user_id SET NULL olur, e-posta ile
+    // kaydın kime ait olduğu ispatlanabilir kalır (yasal zamanaşımı saklaması)
+    user_email:        user.email ?? null,
     document_key:      doc,
     document_version:  "2026-06-01",
     marketing_consent: doc === "ticari_ileti_v1" ? marketing_consent : false,
