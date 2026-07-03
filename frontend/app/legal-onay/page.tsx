@@ -7,7 +7,9 @@ import { supabase } from '../../lib/supabase';
 export default function LegalOnayPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [kvkkConsent, setKvkkConsent] = useState(false);
+  // KVKK Tebliğ md.5/1-g: aydınlatma metni onaylatılmaz; "okudum" beyanı
+  // sözleşme kabul kutusuna gömülür. Açık rıza (yurt dışı) ayrı kutudur.
+  const [termsConsent, setTermsConsent] = useState(false);
   const [internationalConsent, setInternationalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [error, setError] = useState('');
@@ -27,7 +29,7 @@ export default function LegalOnayPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!kvkkConsent || !internationalConsent) {
+    if (!termsConsent || !internationalConsent) {
       setError('Zorunlu onay kutucuklarını işaretleyin.');
       return;
     }
@@ -91,13 +93,13 @@ export default function LegalOnayPage() {
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={kvkkConsent}
-                onChange={e => setKvkkConsent(e.target.checked)}
+                checked={termsConsent}
+                onChange={e => setTermsConsent(e.target.checked)}
                 className="mt-0.5 flex-shrink-0 accent-[#00A3AD]"
               />
               <span className="text-[13px] font-medium text-gray-600 leading-relaxed">
-                <Link href="/kullanici-sozlesmesi" target="_blank" className="font-black text-[#00A3AD] hover:underline">Kullanıcı Sözleşmesi</Link>'ni kabul ediyorum ve{" "}
-                <Link href="/kvkk" target="_blank" className="font-black text-[#00A3AD] hover:underline">KVKK Aydınlatma Metni</Link>'ni okudum. <span className="text-red-400">*</span>
+                <Link href="/kullanici-sozlesmesi" target="_blank" className="font-black text-[#00A3AD] hover:underline">Kullanıcı Sözleşmesi</Link>'ni ve{" "}
+                <Link href="/kvkk" target="_blank" className="font-black text-[#00A3AD] hover:underline">KVKK Aydınlatma Metni</Link>'ni okudum, Kullanıcı Sözleşmesi'ni kabul ediyorum. <span className="text-red-400">*</span>
               </span>
             </label>
 
@@ -132,7 +134,7 @@ export default function LegalOnayPage() {
 
           <button
             type="submit"
-            disabled={loading || !kvkkConsent || !internationalConsent}
+            disabled={loading || !termsConsent || !internationalConsent}
             className="w-full bg-[#00A3AD] text-white py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-black transition-all disabled:opacity-40"
           >
             {loading ? "Onaylanıyor..." : "Onayları Kabul Et"}

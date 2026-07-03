@@ -38,7 +38,9 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [kvkkConsent, setKvkkConsent] = useState(false);
+  // KVKK Tebliğ md.5/1-g: aydınlatma metni ONAYLATILMAZ (rıza konusu değildir);
+  // "okudum" beyanı sözleşme kabul kutusuna gömülür. Açık rıza (yurt dışı) AYRI kutudur.
+  const [termsConsent, setTermsConsent] = useState(false);
   const [internationalConsent, setInternationalConsent] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
   // true = OTP ekranı yeni kayıttan geldi (profil yazılacak)
@@ -50,7 +52,7 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
     setFirstName(''); setLastName(''); setPhone('');
     setShowPassword(false);
     setAuthError(null);
-    setKvkkConsent(false); setInternationalConsent(false); setMarketingConsent(false);
+    setTermsConsent(false); setInternationalConsent(false); setMarketingConsent(false);
     setIsNewUser(false);
   };
 
@@ -171,7 +173,7 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
   // ── Consents → signUp + OTP ────────────────────────────────────────
   const handleConsentsNext = async (e: any) => {
     e.preventDefault();
-    if (!kvkkConsent || !internationalConsent) {
+    if (!termsConsent || !internationalConsent) {
       setAuthError("Devam etmek için zorunlu onayları işaretleyin."); return;
     }
     setLoading(true);
@@ -515,11 +517,11 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
               </p>
               <div className="space-y-4">
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" checked={kvkkConsent} onChange={e => { setKvkkConsent(e.target.checked); setAuthError(null); }}
+                  <input type="checkbox" checked={termsConsent} onChange={e => { setTermsConsent(e.target.checked); setAuthError(null); }}
                     className="mt-0.5 flex-shrink-0 accent-[#00A3AD]" />
                   <span className="text-[10px] font-medium text-gray-500 leading-relaxed">
-                    <Link href="/kullanici-sozlesmesi" target="_blank" className="font-black text-[#00A3AD] hover:underline">Kullanıcı Sözleşmesi</Link>'ni kabul ediyorum ve{" "}
-                    <Link href="/kvkk" target="_blank" className="font-black text-[#00A3AD] hover:underline">KVKK Aydınlatma Metni</Link>'ni okudum. <span className="text-red-400">*</span>
+                    <Link href="/kullanici-sozlesmesi" target="_blank" className="font-black text-[#00A3AD] hover:underline">Kullanıcı Sözleşmesi</Link>'ni ve{" "}
+                    <Link href="/kvkk" target="_blank" className="font-black text-[#00A3AD] hover:underline">KVKK Aydınlatma Metni</Link>'ni okudum, Kullanıcı Sözleşmesi'ni kabul ediyorum. <span className="text-red-400">*</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer">
@@ -537,7 +539,7 @@ export default function AuthModal({ isOpen, onClose, verificationOnly = false, r
                   </span>
                 </label>
               </div>
-              <button disabled={loading || !kvkkConsent || !internationalConsent}
+              <button disabled={loading || !termsConsent || !internationalConsent}
                 className="w-full bg-[#00A3AD] text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl mt-6 hover:bg-black transition-all disabled:opacity-40">
                 {loading ? "Lütfen bekleyin..." : "Sonraki"}
               </button>

@@ -399,6 +399,9 @@ export default function ShopDetail() {
   const [guestError, setGuestError] = useState<string | null>(null);
   const [guestLinks, setGuestLinks] = useState<{ token: string; label: string }[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
+  // KVKK: aydınlatma + yurt dışı aktarım rızası — pre-ticked OLAMAZ
+  const [guestKvkkConsent, setGuestKvkkConsent] = useState(false);
+  const [guestTransferConsent, setGuestTransferConsent] = useState(false);
 
   const heroRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -668,6 +671,7 @@ export default function ShopDetail() {
     if (!phone) { setGuestError('Geçerli bir Türkiye cep telefonu girin. Örnek: 05321234567'); return; }
     const email = guestEmail.trim();
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { setGuestError('Geçerli bir e-posta girin veya boş bırakın.'); return; }
+    if (!guestKvkkConsent || !guestTransferConsent) { setGuestError('Devam etmek için zorunlu onayları işaretleyin.'); return; }
 
     setGuestError(null);
     setLoading(true);
@@ -681,6 +685,7 @@ export default function ShopDetail() {
         body: JSON.stringify({
           shopId,
           guest: { name, phone, email: email || undefined },
+          consents: { kvkk: guestKvkkConsent, transfer: guestTransferConsent },
           items: cart.map(item => ({
             serviceId: item.service.id,
             price: item.discountedPrice,
@@ -1471,7 +1476,7 @@ export default function ShopDetail() {
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
-        onGuestContinue={cart.length > 0 ? () => { setGuestError(null); setShowGuestForm(true); } : undefined}
+        onGuestContinue={cart.length > 0 ? () => { setGuestError(null); setGuestKvkkConsent(false); setGuestTransferConsent(false); setShowGuestForm(true); } : undefined}
       />
 
       {/* Guest details sheet — üyeliksiz hızlı randevu */}
@@ -1543,6 +1548,33 @@ export default function ShopDetail() {
                   className="w-full bg-white border border-gray-200 focus:border-[#14b8a6] rounded-xl px-4 py-3 outline-none font-bold text-sm text-gray-900 transition-all placeholder:text-gray-300"
                 />
               </div>
+              {/* KVKK onayları — hiçbiri önceden işaretli gelmez */}
+              <div className="space-y-2.5 pt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={guestKvkkConsent}
+                    onChange={e => { setGuestKvkkConsent(e.target.checked); setGuestError(null); }}
+                    className="mt-0.5 flex-shrink-0 accent-[#14b8a6]"
+                  />
+                  <span className="text-[10px] font-medium text-gray-500 leading-relaxed">
+                    <a href="/kullanici-sozlesmesi" target="_blank" rel="noreferrer" className="font-black text-[#14b8a6] hover:underline">Kullanıcı Sözleşmesi</a>&apos;ni ve{' '}
+                    <a href="/kvkk" target="_blank" rel="noreferrer" className="font-black text-[#14b8a6] hover:underline">KVKK Aydınlatma Metni</a>&apos;ni okudum, Kullanıcı Sözleşmesi&apos;ni kabul ediyorum. <span className="text-red-400">*</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={guestTransferConsent}
+                    onChange={e => { setGuestTransferConsent(e.target.checked); setGuestError(null); }}
+                    className="mt-0.5 flex-shrink-0 accent-[#14b8a6]"
+                  />
+                  <span className="text-[10px] font-medium text-gray-500 leading-relaxed">
+                    Kişisel verilerimin yurt dışındaki hizmet sağlayıcılarla paylaşılmasına açık rıza gösteriyorum. <span className="text-red-400">*</span>
+                  </span>
+                </label>
+              </div>
+
               {guestError && (
                 <p className="text-[12px] font-bold text-red-500 bg-red-50 rounded-xl px-4 py-3">{guestError}</p>
               )}
@@ -1552,7 +1584,7 @@ export default function ShopDetail() {
             <div className="px-7 pt-5 pb-7">
               <button
                 onClick={handleGuestConfirm}
-                disabled={loading}
+                disabled={loading || !guestKvkkConsent || !guestTransferConsent}
                 className="w-full rounded-xl py-4 font-bold text-sm transition-all hover:opacity-90 disabled:opacity-50"
                 style={{ background: '#14b8a6', color: '#04221d' }}
               >

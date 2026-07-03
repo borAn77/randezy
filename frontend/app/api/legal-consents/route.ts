@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
   }
 
   const userAgent = req.headers.get("user-agent") || null;
+  // İspat yükümlülüğü: onay anındaki IP — server-side, proxy'nin ilettiği ilk adres
+  const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
   const records = documents.map((doc: string) => ({
     user_id:           user.id,
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     document_version:  "2026-06-01",
     marketing_consent: doc === "ticari_ileti_v1" ? marketing_consent : false,
     user_agent:        userAgent,
-    // ip_address: client-side'dan güvenilir alınamaz, NULL bırakılır
+    ip_address:        ipAddress,
   }));
 
   const { error } = await supabaseAdmin.from("legal_consents").insert(records);

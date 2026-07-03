@@ -80,6 +80,12 @@ export async function POST(req: NextRequest) {
   }
   const guestEmail = emailRaw || null;
 
+  // KVKK: aydınlatma + yurt dışı aktarım rızası server'da da zorunlu —
+  // UI atlansa bile rızasız misafir randevusu oluşturulamaz.
+  if (body?.consents?.kvkk !== true || body?.consents?.transfer !== true) {
+    return NextResponse.json({ detail: "Devam etmek için zorunlu onayları işaretleyin." }, { status: 400 });
+  }
+
   const items: GuestItem[] = Array.isArray(body?.items) ? body.items : [];
   if (items.length < 1 || items.length > 5) {
     return NextResponse.json({ detail: "Geçersiz randevu listesi." }, { status: 400 });
@@ -141,6 +147,29 @@ export async function POST(req: NextRequest) {
       { detail: "Bu telefon numarasıyla çok sayıda aktif randevu var. Mevcut randevularınız tamamlandıktan sonra tekrar deneyin." },
       { status: 429 }
     );
+  }
+
+  // ── Rıza kaydı (İSPAT — randevudan ÖNCE yazılır) ────────────────────
+  // Misafirin user_id'si yok; kimlik çıpası guest_phone. Log yazılamazsa
+  // randevu da alınmaz: rızası ispatlanamayan işlem yaratmayız.
+  // Kutu 1 = sözleşme kabulü + aydınlatma tebliği (Tebliğ md.5/1-g gereği
+  // aydınlatma ayrıca onaylatılmaz), kutu 2 = yurt dışı açık rızası.
+  const consentIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const consentUa = req.headers.get("user-agent") || null;
+  const { error: consentError } = await supabaseAdmin.from("legal_consents").insert(
+    ["kullanici_sozlesmesi_v1", "kvkk_v1", "yurtdisi_aktarim_v1"].map((doc) => ({
+      user_id: null,
+      guest_phone: phone,
+      document_key: doc,
+      document_version: "2026-06-01",
+      marketing_consent: false,
+      ip_address: consentIp,
+      user_agent: consentUa,
+    }))
+  );
+  if (consentError) {
+    console.error("[guest-appointments] consent log error:", consentError);
+    return NextResponse.json({ detail: "Onay kaydı oluşturulamadı. Lütfen tekrar deneyin." }, { status: 500 });
   }
 
   // ── Insert ──────────────────────────────────────────────────────────
