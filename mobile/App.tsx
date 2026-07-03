@@ -9,9 +9,12 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './lib/supabase';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import LoginScreen from './screens/LoginScreen';
+import StaffLoginScreen from './screens/StaffLoginScreen';
+import StaffCalendarScreen from './screens/StaffCalendarScreen';
 import HomeScreen from './screens/HomeScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import BusinessScreen from './screens/BusinessScreen';
@@ -191,13 +194,22 @@ function MainTabs() {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
+const STAFF_CODE_KEY = 'randezy_staff_code';
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  // Personel modu: kod AsyncStorage'da; varlığı owner oturumundan öncelikli.
+  // Kod her API isteğinde server'da doğrulanır (owner yenilerse 401 → çıkış).
+  const [staffCode, setStaffCode] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    Promise.all([
+      supabase.auth.getSession(),
+      AsyncStorage.getItem(STAFF_CODE_KEY),
+    ]).then(([{ data: { session } }, savedCode]) => {
       setSession(session);
+      setStaffCode(savedCode);
       setReady(true);
     });
 
@@ -208,13 +220,27 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleStaffLogin = (code: string) => {
+    AsyncStorage.setItem(STAFF_CODE_KEY, code).catch(() => {});
+    setStaffCode(code);
+  };
+
+  const handleStaffLogout = () => {
+    AsyncStorage.removeItem(STAFF_CODE_KEY).catch(() => {});
+    setStaffCode(null);
+  };
+
   if (!ready) return null;
 
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {session ? (
+        {staffCode ? (
+          <Stack.Screen name="PersonelTakvim">
+            {() => <StaffCalendarScreen code={staffCode} onLogout={handleStaffLogout} />}
+          </Stack.Screen>
+        ) : session ? (
           <Stack.Screen name="Main">
             {() => (
               <AppointmentsProvider>
@@ -223,7 +249,17 @@ export default function App() {
             )}
           </Stack.Screen>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="PersonelGiris">
+              {({ navigation }) => (
+                <StaffLoginScreen
+                  onSuccess={handleStaffLogin}
+                  onBack={() => navigation.goBack()}
+                />
+              )}
+            </Stack.Screen>
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

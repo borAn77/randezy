@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: { navigation?: { navigate: (screen: string) => void } }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -114,6 +114,17 @@ export default function LoginScreen() {
             ? <ActivityIndicator color="#6366f1" />
             : <Text style={styles.googleButtonText}>Google ile Giriş Yap</Text>}
         </TouchableOpacity>
+
+        {/* Personel: kodla giriş (ayrı salt-okunur takvim modu) */}
+        <TouchableOpacity
+          style={styles.staffLink}
+          onPress={() => navigation?.navigate('PersonelGiris')}
+          disabled={loading || googleLoading}
+        >
+          <Text style={styles.staffLinkText}>
+            Personel misin? <Text style={styles.staffLinkBold}>Kodla giriş yap</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -199,5 +210,18 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontSize: 16,
     fontWeight: '600',
+  },
+  staffLink: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  staffLinkText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  staffLinkBold: {
+    color: '#6366f1',
+    fontWeight: '700',
   },
 });
