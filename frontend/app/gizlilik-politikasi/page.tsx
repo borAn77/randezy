@@ -53,7 +53,7 @@ Verileriniz hiçbir koşulda reklam, pazarlama veya veri ticareti amacıyla üç
         },
         {
           title: "5. Veri Saklama",
-          content: `Verileriniz hesabınız aktif olduğu sürece saklanır. Hesabınızı kapatmanız veya silme talebinde bulunmanız durumunda kişisel verileriniz, yasal yükümlülükler çerçevesinde belirlenen süreler dışında en geç 30 gün içinde kaldırılır.`,
+          content: `Verileriniz hesabınız aktif olduğu sürece saklanır. Hesabınızı silme talebinde bulunmanız durumunda profil verileriniz en geç 30 gün içinde kaldırılır veya anonimleştirilir. Ancak, olası hukuki uyuşmazlıklarda delil teşkil edebilecek temel işlem ve onay kayıtları (IP adresi, log kayıtları, onay zaman damgaları), yasal zamanaşımı süreleri boyunca (1 ila 10 yıl) güvenli bir şekilde saklanmaya devam edecektir.`,
         },
         {
           title: "6. İletişim",

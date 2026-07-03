@@ -17,7 +17,9 @@ export default function KullaniciSozlesmesiPage() {
           content: `• Platformu kullanmak için geçerli bir e-posta adresiyle hesap oluşturmanız gerekmektedir.
 • Hesap bilgilerinizin gizliliğini korumak ve yetkisiz erişimi önlemek sizin sorumluluğunuzdadır.
 • Hesabınız üzerinden gerçekleştirilen tüm işlemlerden siz sorumlusunuz.
-• Başkası adına veya gerçek olmayan bilgilerle hesap oluşturmak yasaktır.`,
+• Başkası adına veya gerçek olmayan bilgilerle hesap oluşturmak yasaktır.
+
+Platforma kayıt olan veya misafir olarak randevu alan kullanıcılar, 18 yaşını doldurduklarını ve yasal olarak sözleşme akdetme ehliyetine sahip olduklarını kabul, beyan ve taahhüt ederler.`,
         },
         {
           title: "3. Kullanım Koşulları",
@@ -34,7 +36,9 @@ export default function KullaniciSozlesmesiPage() {
           content: `• Randevu oluşturduğunuzda ad, iletişim ve randevu bilgileriniz ilgili işletme ile paylaşılır.
 • İptal koşulları ve politikaları her işletme tarafından ayrıca belirlenir.
 • Randezy, işletmelerin iptal politikasından veya randevu iptali nedeniyle oluşan zararlardan sorumlu tutulamaz.
-• Gelemeyeceğiniz randevuları önceden iptal etmenizi tavsiye ederiz; bu hem işletmeyi hem de diğer müşterileri destekler.`,
+• Gelemeyeceğiniz randevuları önceden iptal etmenizi tavsiye ederiz; bu hem işletmeyi hem de diğer müşterileri destekler.
+
+Randezy, randevu hizmeti için kullanıcılardan doğrudan bir ücret tahsil etmez. Hizmet bedeli, müşteri ile işletme arasında işletmenin kendi kurallarına göre tahsil edilir.`,
         },
         {
           title: "5. Sorumluluk Sınırı",
@@ -56,7 +60,11 @@ export default function KullaniciSozlesmesiPage() {
           content: `Bu sözleşmede yapılacak önemli değişiklikler, yürürlük tarihinden en az 15 gün önce kayıtlı e-posta adresinize bildirilecektir. Platformu kullanmaya devam etmeniz güncel koşulları kabul ettiğiniz anlamına gelir.`,
         },
         {
-          title: "8. İletişim",
+          title: "8. Uyuşmazlık Çözümü",
+          content: `Bu sözleşmeden doğabilecek uyuşmazlıklarda Türk Hukuku uygulanacaktır. Bireysel kullanıcılar (tüketiciler), uyuşmazlık konusundaki başvurularını yerleşim yerlerindeki Tüketici Hakem Heyetlerine veya Tüketici Mahkemelerine yapabilirler.`,
+        },
+        {
+          title: "9. İletişim",
           content: `destek@randezy.com`,
         },
       ]}
