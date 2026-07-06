@@ -1687,6 +1687,32 @@ export default function Dashboard() {
 
         <div className="flex-1 overflow-y-auto p-8">
 
+        {/* ── Ön onay durumu bandı ── */}
+        {shop && shop.approval_status === 'pending' && (
+          <div className="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+            <AlertCircle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[13px] font-bold text-amber-800">İşletmeniz ön inceleme aşamasında</p>
+              <p className="text-[12px] text-amber-700 mt-0.5">
+                Ekibimiz başvurunuzu doğruluyor; onaylanana kadar işletmeniz müşterilere görünmez.
+                Bu sırada panelinizi hazırlamaya devam edebilirsiniz. Onay genellikle aynı gün tamamlanır.
+              </p>
+            </div>
+          </div>
+        )}
+        {shop && shop.approval_status === 'rejected' && (
+          <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+            <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[13px] font-bold text-red-800">Başvurunuz onaylanmadı</p>
+              <p className="text-[12px] text-red-700 mt-0.5">
+                İşletme doğrulaması tamamlanamadı. Bir yanlışlık olduğunu düşünüyorsanız bize ulaşın:
+                {' '}<a href="mailto:yildirimmehmetali65@gmail.com" className="font-semibold underline">yildirimmehmetali65@gmail.com</a>
+              </p>
+            </div>
+          </div>
+        )}
+
         {!shop && activeTab !== "settings" ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-24 h-24 bg-[#E6F6F7] rounded-full flex items-center justify-center mb-8"><AlertCircle size={40} className="text-[#00A3AD]" /></div>

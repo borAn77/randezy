@@ -429,6 +429,8 @@ export default function ShopDetail() {
       .select('id, name, category, city, district, image_url, gallery_urls, created_at, is_promoted, services(price, duration), shop_hours(day_of_week, is_closed, open_time, close_time), reviews(rating), campaigns(id, type, discount_value, start_date, end_date, is_active)')
       .neq('id', shop.id)
       .eq('city', shop.city)
+      .eq('is_active', true)
+      .eq('approval_status', 'approved')
       .limit(12)
       .then(async ({ data }) => {
         if (!data) return;

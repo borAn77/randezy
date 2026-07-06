@@ -128,6 +128,7 @@ export default function Home() {
       .from("shops")
       .select("*, campaigns(id, type, discount_value, start_date, end_date, is_active), services(name, price, sort_order), reviews(rating)")
       .eq("is_active", true)
+      .eq("approval_status", "approved")
       .then(({ data, error }) => {
         if (error) { setError(true); } else { setShops(data || []); }
         setLoading(false);
