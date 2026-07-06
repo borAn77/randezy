@@ -7,11 +7,13 @@ import { supabase } from '../lib/supabase';
 import { BRAND, BRAND_LIGHT } from '../constants/colors';
 
 interface MonthStats {
-  revenue: number; completed: number; cancelled: number; total: number;
+  revenue: number; completed: number; cancelled: number; noShow: number; total: number;
+  cancellationLoss: number;
 }
 
 interface ServiceStat { name: string; count: number; revenue: number }
 interface DayStat { date: string; revenue: number; count: number }
+interface StaffStat { id: string; name: string; count: number; revenue: number }
 
 type Period = 'week' | 'month' | 'year';
 
@@ -38,9 +40,12 @@ function getPeriodRange(period: Period): { start: string; end: string } {
 
 export default function FinanceScreen() {
   const [period, setPeriod] = useState<Period>('month');
-  const [stats, setStats] = useState<MonthStats>({ revenue: 0, completed: 0, cancelled: 0, total: 0 });
+  const [stats, setStats] = useState<MonthStats>({
+    revenue: 0, completed: 0, cancelled: 0, noShow: 0, total: 0, cancellationLoss: 0,
+  });
   const [services, setServices] = useState<ServiceStat[]>([]);
   const [days, setDays] = useState<DayStat[]>([]);
+  const [staffStats, setStaffStats] = useState<StaffStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -53,22 +58,30 @@ export default function FinanceScreen() {
       const shopId = shops[0].id;
 
       const { start, end } = getPeriodRange(p);
-      const { data: apts } = await supabase
-        .from('appointments')
-        .select('status, price, service_name, appointment_date')
-        .eq('shop_id', shopId)
-        .gte('appointment_date', start)
-        .lte('appointment_date', end);
+      const [{ data: apts }, { data: staff }] = await Promise.all([
+        supabase
+          .from('appointments')
+          .select('status, price, service_name, appointment_date, staff_id')
+          .eq('shop_id', shopId)
+          .gte('appointment_date', start)
+          .lte('appointment_date', end),
+        supabase.from('staff').select('id, first_name, last_name').eq('shop_id', shopId),
+      ]);
 
       const list = apts || [];
       const completed = list.filter((a: any) => a.status === 'Tamamlandı');
+      const cancelled = list.filter((a: any) => a.status === 'İptal Edildi');
+      const noShow = list.filter((a: any) => a.status === 'Gelmedi');
       const revenue = completed.reduce((s: number, a: any) => s + (a.price ?? 0), 0);
+      const cancellationLoss = cancelled.reduce((s: number, a: any) => s + (a.price ?? 0), 0);
 
       setStats({
         revenue,
         completed: completed.length,
-        cancelled: list.filter((a: any) => a.status === 'İptal Edildi').length,
+        cancelled: cancelled.length,
+        noShow: noShow.length,
         total: list.length,
+        cancellationLoss,
       });
 
       // Service breakdown
@@ -79,6 +92,18 @@ export default function FinanceScreen() {
         svcMap[a.service_name].revenue += a.price ?? 0;
       }
       setServices(Object.values(svcMap).sort((a, b) => b.revenue - a.revenue).slice(0, 8));
+
+      // Staff performance
+      const staffMap: Record<string, StaffStat> = {};
+      for (const s of staff || []) {
+        staffMap[s.id] = { id: s.id, name: `${s.first_name} ${s.last_name}`, count: 0, revenue: 0 };
+      }
+      for (const a of completed) {
+        if (!a.staff_id || !staffMap[a.staff_id]) continue;
+        staffMap[a.staff_id].count++;
+        staffMap[a.staff_id].revenue += a.price ?? 0;
+      }
+      setStaffStats(Object.values(staffMap).sort((a, b) => b.revenue - a.revenue));
 
       // Daily revenue for bar chart (last 7 days for week, last 30 for month)
       const dayMap: Record<string, DayStat> = {};
@@ -100,6 +125,7 @@ export default function FinanceScreen() {
   const onRefresh = () => { setRefreshing(true); load(period); };
 
   const maxRevenue = Math.max(...days.map(d => d.revenue), 1);
+  const avgBasket = stats.completed > 0 ? stats.revenue / stats.completed : 0;
 
   if (loading) {
     return (
@@ -155,6 +181,23 @@ export default function FinanceScreen() {
               <Text style={[styles.heroStatValue, { color: '#ef4444' }]}>{stats.cancelled}</Text>
               <Text style={styles.heroStatLabel}>İptal</Text>
             </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+              <Text style={[styles.heroStatValue, { color: '#9ca3af' }]}>{stats.noShow}</Text>
+              <Text style={styles.heroStatLabel}>Gelmedi</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Ort. Sepet + İptal Kaybı */}
+        <View style={styles.miniCardRow}>
+          <View style={styles.miniCard}>
+            <Text style={styles.miniCardLabel}>Ort. Sepet</Text>
+            <Text style={styles.miniCardValue}>₺{avgBasket.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</Text>
+          </View>
+          <View style={styles.miniCard}>
+            <Text style={[styles.miniCardLabel, { color: '#c2410c' }]}>İptal Kaybı</Text>
+            <Text style={[styles.miniCardValue, { color: '#c2410c' }]}>₺{stats.cancellationLoss.toLocaleString('tr-TR')}</Text>
           </View>
         </View>
 
@@ -176,6 +219,31 @@ export default function FinanceScreen() {
                 );
               })}
             </View>
+          </View>
+        )}
+
+        {/* Staff performance */}
+        {staffStats.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Personel Performansı</Text>
+            {staffStats.map((s, i) => {
+              const maxRev = staffStats[0].revenue || 1;
+              return (
+                <View key={s.id} style={styles.serviceRow}>
+                  <View style={[styles.serviceRankBadge, i === 0 && s.revenue > 0 && { backgroundColor: '#dcfce7' }]}>
+                    <Text style={[styles.serviceRank, i === 0 && s.revenue > 0 && { color: '#16a34a' }]}>{i + 1}</Text>
+                  </View>
+                  <View style={styles.serviceMid}>
+                    <Text style={styles.serviceName} numberOfLines={1}>{s.name}</Text>
+                    <View style={styles.staffBarTrack}>
+                      <View style={[styles.staffBarFill, { width: `${Math.max(2, (s.revenue / maxRev) * 100)}%` }]} />
+                    </View>
+                    <Text style={styles.serviceCount}>{s.count} randevu</Text>
+                  </View>
+                  <Text style={styles.serviceRevenue}>₺{s.revenue.toLocaleString('tr-TR')}</Text>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -223,16 +291,23 @@ const styles = StyleSheet.create({
   periodTabText: { fontSize: 12, fontWeight: '600', color: '#94a3b8' },
   periodTabTextActive: { color: '#0f172a', fontWeight: '700' },
   heroCard: {
-    backgroundColor: BRAND, borderRadius: 20, padding: 20, marginBottom: 16,
+    backgroundColor: BRAND, borderRadius: 20, padding: 20, marginBottom: 12,
     shadowColor: BRAND, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
   },
   heroLabel: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
   heroValue: { fontSize: 36, fontWeight: '900', color: '#fff', marginVertical: 8 },
   heroStats: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   heroStat: { flex: 1, alignItems: 'center' },
-  heroStatValue: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  heroStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2, fontWeight: '500' },
+  heroStatValue: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  heroStatLabel: { fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 2, fontWeight: '500' },
   heroStatDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
+  miniCardRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  miniCard: {
+    flex: 1, backgroundColor: '#fff', borderRadius: 16, padding: 14,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+  },
+  miniCardLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  miniCardValue: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginTop: 4 },
   section: { marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginBottom: 12 },
   barChart: {
@@ -257,6 +332,8 @@ const styles = StyleSheet.create({
   serviceName: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
   serviceCount: { fontSize: 11, color: '#94a3b8', marginTop: 1 },
   serviceRevenue: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
+  staffBarTrack: { height: 4, backgroundColor: '#f1f5f9', borderRadius: 2, marginTop: 6, marginBottom: 2 },
+  staffBarFill: { height: 4, borderRadius: 2, backgroundColor: BRAND },
   emptyState: { alignItems: 'center', paddingTop: 60, gap: 10 },
   emptyIcon: { fontSize: 52 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#64748b' },

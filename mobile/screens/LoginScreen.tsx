@@ -125,6 +125,17 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
             Personel misin? <Text style={styles.staffLinkBold}>Kodla giriş yap</Text>
           </Text>
         </TouchableOpacity>
+
+        {/* İşletme kaydı web'de yapılıyor; uygulamayı ilk indirenler için yönlendirme */}
+        <TouchableOpacity
+          style={styles.signupLink}
+          onPress={() => Linking.openURL('https://www.randezy.com/isletme-ekle')}
+          disabled={loading || googleLoading}
+        >
+          <Text style={styles.staffLinkText}>
+            İşletmeniz yok mu? <Text style={styles.staffLinkBold}>Hemen kaydolun</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -213,6 +224,10 @@ const styles = StyleSheet.create({
   },
   staffLink: {
     marginTop: 18,
+    alignItems: 'center',
+  },
+  signupLink: {
+    marginTop: 14,
     alignItems: 'center',
   },
   staffLinkText: {

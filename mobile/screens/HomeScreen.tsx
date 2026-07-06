@@ -46,24 +46,33 @@ type DbApt = {
   guest_phone?: string | null;
   profiles?: { full_name?: string | null; phone?: string | null; email?: string | null } | null;
 };
-type DispStatus = 'done' | 'now' | 'confirmed' | 'pending';
+type DispStatus = 'done' | 'cancelled' | 'noShow' | 'now' | 'overdue' | 'confirmed' | 'pending';
 type AptDisplay = DbApt & { dispStatus: DispStatus };
 
 const STATUS_META: Record<DispStatus, { c: string; bg: string; label: string }> = {
   done:      { c: OK,      bg: 'rgba(27,183,110,0.10)',  label: 'Tamamlandı'    },
+  cancelled: { c: ROSE,    bg: 'rgba(240,106,139,0.12)', label: 'İptal Edildi'  },
+  noShow:    { c: MUTED,   bg: 'rgba(138,141,168,0.14)', label: 'Gelmedi'       },
   now:       { c: PRIMARY, bg: 'rgba(91,91,247,0.12)',   label: 'Devam ediyor'  },
+  overdue:   { c: WARN,    bg: 'rgba(245,165,36,0.14)',  label: 'Onay Bekliyor' },
   confirmed: { c: SKY,     bg: 'rgba(62,160,245,0.12)',  label: 'Onaylı'        },
   pending:   { c: WARN,    bg: 'rgba(245,165,36,0.14)',  label: 'Bekleyen'      },
 };
 
+// Randevu saati geçtiği halde işletme sahibi henüz "Geldi/Tamamla" ya da
+// "Gelmedi" olarak işaretlememişse, bunu sessizce "Tamamlandı" saymak yerine
+// ayrı bir "Onay Bekliyor" durumuna düşürüyoruz — aksi halde gelire hiç
+// girmeden dimmed/done görünüp NextUpCard'da bir daha hiç sorulmuyordu.
 function computeDispStatus(apt: DbApt): DispStatus {
-  if (apt.status === 'Tamamlandı' || apt.status === 'İptal Edildi') return 'done';
+  if (apt.status === 'Tamamlandı') return 'done';
+  if (apt.status === 'İptal Edildi') return 'cancelled';
+  if (apt.status === 'Gelmedi') return 'noShow';
   const now = new Date();
   const [h, m] = apt.appointment_time.split(':').map(Number);
   const start = new Date(); start.setHours(h, m, 0, 0);
   const end   = new Date(start.getTime() + (apt.duration_snapshot || 30) * 60000);
   if (now >= start && now <= end) return 'now';
-  if (now > end) return 'done';
+  if (now > end) return 'overdue';
   if (apt.status === 'Beklemede') return 'pending';
   return 'confirmed';
 }
@@ -96,16 +105,15 @@ function HomeHeader({ ownerName, shopName, onGoCalendar, onGoSettings }: { owner
         <TouchableOpacity style={styles.iconBtn} onPress={onGoCalendar}>
           <Feather name="search" size={20} color={INK} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.iconBtn, { position: 'relative' }]} onPress={onGoSettings}>
+        <TouchableOpacity style={styles.iconBtn} onPress={onGoSettings}>
           <Feather name="bell" size={20} color={INK} />
-          <View style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: ROSE, borderWidth: 1.5, borderColor: CARD }} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCount: number; totalCount: number }) {
+function TodayHero({ revenue, doneCount, totalCount, siradaCount }: { revenue: number; doneCount: number; totalCount: number; siradaCount: number }) {
   const d = new Date();
   const months = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
   const dateLabel = `${d.getDate()} ${months[d.getMonth()]} ${DAY_LABELS[d.getDay()]}`;
@@ -116,9 +124,8 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.9)', letterSpacing: 0.2 }}>BUGÜN · {dateLabel}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99 }}>
-          <Feather name="trending-up" size={11} color="#C8FFD8" />
-          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff' }}> Randezy</Text>
+        <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99 }}>
+          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#fff' }}>Randezy</Text>
         </View>
       </View>
 
@@ -128,7 +135,7 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
       </View>
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
-        {[{ n: totalCount, l: 'Randevu' }, { n: doneCount, l: 'Tamamlandı' }, { n: Math.max(0, totalCount - doneCount), l: 'Sırada' }].map((s, i) => (
+        {[{ n: totalCount, l: 'Randevu' }, { n: doneCount, l: 'Tamamlandı' }, { n: siradaCount, l: 'Sırada' }].map((s, i) => (
           <View key={i} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' }}>
             <Text style={{ fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>{s.n}</Text>
             <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: '500', marginTop: 3 }}>{s.l}</Text>
@@ -142,6 +149,7 @@ function TodayHero({ revenue, doneCount, totalCount }: { revenue: number; doneCo
 function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: (id: string, status: string) => void }) {
   const isNow     = apt.dispStatus === 'now';
   const isPending = apt.dispStatus === 'pending';
+  const isOverdue = apt.dispStatus === 'overdue';
   const name      = apt.guest_name || apt.profiles?.full_name || apt.profiles?.email || 'Misafir';
   const phone     = apt.guest_phone || apt.profiles?.phone;
 
@@ -157,19 +165,25 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
       { text: '✓ Geldi', onPress: () => onStatusChange(apt.id, 'Tamamlandı') },
     ]);
 
-  const noShow = () =>
-    Alert.alert('Müşteri gelmedi', `${name} randevusu iptal edilsin mi?`, [
+  const cancelPending = () =>
+    Alert.alert('Randevuyu iptal et', `${name} için randevu iptal edilsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Gelmedi', style: 'destructive', onPress: () => onStatusChange(apt.id, 'İptal Edildi') },
+      { text: 'İptal Et', style: 'destructive', onPress: () => onStatusChange(apt.id, 'İptal Edildi') },
+    ]);
+
+  const markNoShow = () =>
+    Alert.alert('Müşteri gelmedi', `${name} randevusuna gelmedi olarak işaretlensin mi?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Gelmedi', style: 'destructive', onPress: () => onStatusChange(apt.id, 'Gelmedi') },
     ]);
 
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 14, backgroundColor: CARD, borderRadius: 22, padding: 14, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.07, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: isNow ? 'rgba(27,183,110,0.12)' : isPending ? 'rgba(245,165,36,0.14)' : 'rgba(91,91,247,0.10)' }}>
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNow ? OK : isPending ? WARN : PRIMARY }} />
-            <Text style={{ fontSize: 11, fontWeight: '700', color: isNow ? OK : isPending ? WARN : PRIMARY, letterSpacing: 0.2 }}>{isNow ? 'ŞİMDİ' : isPending ? 'BEKLİYOR' : 'SIRADAKİ'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: isNow ? 'rgba(27,183,110,0.12)' : (isPending || isOverdue) ? 'rgba(245,165,36,0.14)' : 'rgba(91,91,247,0.10)' }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNow ? OK : (isPending || isOverdue) ? WARN : PRIMARY }} />
+            <Text style={{ fontSize: 11, fontWeight: '700', color: isNow ? OK : (isPending || isOverdue) ? WARN : PRIMARY, letterSpacing: 0.2 }}>{isNow ? 'ŞİMDİ' : isPending ? 'BEKLİYOR' : isOverdue ? 'ONAY BEKLİYOR' : 'SIRADAKİ'}</Text>
           </View>
           <Text style={{ fontSize: 12, color: MUTED, fontWeight: '600' }}>{apt.appointment_time.slice(0, 5)} · {apt.duration_snapshot || 30} dk</Text>
         </View>
@@ -203,7 +217,7 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity
             style={[styles.softBtn, { flex: 1, backgroundColor: 'rgba(245,165,36,0.10)', borderColor: 'rgba(245,165,36,0.3)' }]}
-            onPress={noShow}
+            onPress={cancelPending}
           >
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: WARN }}>İptal</Text>
           </TouchableOpacity>
@@ -219,7 +233,7 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <TouchableOpacity
             style={[styles.softBtn, { flex: 1, backgroundColor: 'rgba(240,106,139,0.10)', borderColor: 'rgba(240,106,139,0.3)' }]}
-            onPress={noShow}
+            onPress={markNoShow}
           >
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: ROSE }}>Gelmedi</Text>
           </TouchableOpacity>
@@ -284,7 +298,8 @@ function ScheduleTimeline({ items, onPress }: { items: AptDisplay[]; onPress?: (
     <View style={{ marginHorizontal: 16, marginBottom: 18, backgroundColor: CARD, borderRadius: 22, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 6, borderWidth: 1, borderColor: HAIR, shadowColor: INK, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 }}>
       {items.map((a, i) => {
         const meta = STATUS_META[a.dispStatus];
-        const dim  = a.dispStatus === 'done';
+        // "overdue" bilerek dim'lenmiyor — henüz kapatılmamış, dikkat ister.
+        const dim  = a.dispStatus === 'done' || a.dispStatus === 'cancelled' || a.dispStatus === 'noShow';
         const name = a.guest_name || a.profiles?.full_name || a.profiles?.email || 'Misafir';
         return (
           <TouchableOpacity key={a.id} onPress={onPress} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, borderBottomWidth: i === items.length - 1 ? 0 : 1, borderBottomColor: 'rgba(15,16,36,0.05)', opacity: dim ? 0.5 : 1 }}>
@@ -363,7 +378,7 @@ function InsightsRow({ score }: { score: number | null }) {
   );
 }
 
-function PromoCard() {
+function PromoCard({ onSend }: { onSend: () => void }) {
   return (
     <View style={{ marginHorizontal: 16, marginBottom: 24, borderRadius: 22, padding: 16, overflow: 'hidden', backgroundColor: '#0F1024', shadowColor: INK, shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
       <View style={{ position: 'absolute', right: -30, top: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,179,99,0.28)' }} />
@@ -376,7 +391,7 @@ function PromoCard() {
           <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: -0.2 }}>Boş slot var</Text>
           <Text style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 18 }}>Müşterilere özel kampanya göndererek doluluk oranını artır.</Text>
         </View>
-        <TouchableOpacity style={{ backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
+        <TouchableOpacity style={{ backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }} onPress={onSend}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: INK }}>Gönder</Text>
         </TouchableOpacity>
       </View>
@@ -398,7 +413,7 @@ export default function HomeScreen() {
 
   const goCalendar   = () => navigation.navigate('Takvim');
   const goSettings   = () => navigation.navigate('Profil');
-  const goFinans     = () => navigation.navigate('Isletme');
+  const goFinans     = () => navigation.navigate('Finans');
   const goKampanya   = () => navigation.navigate('Isletme', { initialTab: 'campaigns' });
 
   const handleStatusChange = useCallback(async (aptId: string, newStatus: string) => {
@@ -483,8 +498,9 @@ export default function HomeScreen() {
   }
 
   const doneCount   = todayApts.filter(a => a.dispStatus === 'done').length;
-  const nextUp      = todayApts.find(a => a.dispStatus === 'now') ?? todayApts.find(a => a.dispStatus === 'confirmed' || a.dispStatus === 'pending');
-  const hasEmpty    = todayApts.filter(a => a.dispStatus !== 'done').length === 0 && todayApts.length > 0;
+  const siradaCount = todayApts.filter(a => a.dispStatus === 'now' || a.dispStatus === 'overdue' || a.dispStatus === 'confirmed' || a.dispStatus === 'pending').length;
+  const nextUp      = todayApts.find(a => a.dispStatus === 'now') ?? todayApts.find(a => a.dispStatus === 'overdue') ?? todayApts.find(a => a.dispStatus === 'confirmed' || a.dispStatus === 'pending');
+  const hasEmpty    = todayApts.length > 0 && siradaCount === 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }}>
@@ -494,21 +510,21 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
       >
         <HomeHeader ownerName={ownerName} shopName={shopName} onGoCalendar={goCalendar} onGoSettings={goSettings} />
-        <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} />
+        <TodayHero revenue={revenue} doneCount={doneCount} totalCount={todayApts.length} siradaCount={siradaCount} />
         {nextUp && <NextUpCard apt={nextUp} onStatusChange={handleStatusChange} />}
         <QuickActions onGoFinans={goFinans} onGoKampanya={goKampanya} />
 
         <SectionHeader
           title="Bugünün programı"
-          subtle={`${todayApts.length} randevu · ${Math.max(0, todayApts.length - doneCount)} sırada`}
+          subtle={`${todayApts.length} randevu · ${siradaCount} sırada`}
           action="Tümü"
           onAction={goCalendar}
         />
         <ScheduleTimeline items={todayApts} onPress={goCalendar} />
 
-        {hasEmpty && <PromoCard />}
+        {hasEmpty && <PromoCard onSend={goKampanya} />}
 
-        <SectionHeader title="Performans" subtle="Bu haftaki dağılım" action="Detay" onAction={goCalendar} />
+        <SectionHeader title="Performans" subtle="Bu haftaki dağılım" action="Detay" onAction={goFinans} />
         {weekData.length > 0 && <WeekChart data={weekData} />}
         <InsightsRow score={shopScore} />
       </ScrollView>

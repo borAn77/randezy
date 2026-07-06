@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.randezy.business",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "3"
     },
     "android": {
       "adaptiveIcon": {
@@ -38,7 +39,8 @@
           "defaultChannel": "default"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "./plugins/withFmtConstevalFix.js"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

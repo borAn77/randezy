@@ -18,6 +18,7 @@ import StaffCalendarScreen from './screens/StaffCalendarScreen';
 import HomeScreen from './screens/HomeScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import BusinessScreen from './screens/BusinessScreen';
+import FinanceScreen from './screens/FinanceScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { BRAND } from './constants/colors';
 import { AppointmentsProvider, useAppointments } from './contexts/AppointmentsContext';
@@ -35,14 +36,15 @@ const TABS: {
 }[] = [
   { name: 'Ana',     label: 'Ana Sayfa', icon: 'home-outline',       iconActive: 'home' },
   { name: 'Takvim',  label: 'Takvim',    icon: 'calendar-outline',   iconActive: 'calendar' },
+  { name: 'Finans',  label: 'Finans',    icon: 'cash-outline',       iconActive: 'cash' },
   { name: 'Isletme', label: 'İşletme',   icon: 'storefront-outline', iconActive: 'storefront' },
   { name: 'Profil',  label: 'Profil',    icon: 'person-outline',     iconActive: 'person' },
 ];
 
 // ─── Custom Tab Bar ────────────────────────────────────────────────────────────
 function CustomTabBar({ state, navigation, onFab }: BottomTabBarProps & { onFab: () => void }) {
-  const leftTabs = [0, 1];
-  const rightTabs = [2, 3];
+  const leftTabs = [0, 1, 2];
+  const rightTabs = [3, 4];
 
   const renderTab = (tabIndex: number) => {
     const tab = TABS[tabIndex];
@@ -177,6 +179,7 @@ function MainTabs() {
       >
         <Tab.Screen name="Ana"     component={HomeScreen} />
         <Tab.Screen name="Takvim"  component={CalendarScreen} />
+        <Tab.Screen name="Finans"  component={FinanceScreen} />
         <Tab.Screen name="Isletme" component={BusinessScreen} />
         <Tab.Screen name="Profil"  component={SettingsScreen} />
       </Tab.Navigator>
