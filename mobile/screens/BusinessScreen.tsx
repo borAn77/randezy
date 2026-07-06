@@ -10,16 +10,14 @@ import { supabase } from '../lib/supabase';
 import { BRAND, BRAND_LIGHT, BORDER } from '../constants/colors';
 import { toDateStr, parseDateStr, formatDateShortTR } from '../utils/date';
 import DatePickerModal from '../components/modals/DatePickerModal';
-import FinanceScreen from './FinanceScreen';
 
-type InnerTab = 'services' | 'staff' | 'hours' | 'campaigns' | 'finance';
+type InnerTab = 'services' | 'staff' | 'hours' | 'campaigns';
 
 const TAB_LABELS: Record<InnerTab, string> = {
   services: 'Hizmetler',
   staff: 'Personel',
   hours: 'Saatler',
   campaigns: 'Kampanyalar',
-  finance: 'Finans',
 };
 
 const DAYS = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
@@ -311,12 +309,12 @@ export default function BusinessScreen() {
         <Text style={styles.title}>İşletme</Text>
       </View>
 
-      {/* Tab row — horizontal scroll for 5 tabs */}
+      {/* Tab row — horizontal scroll for 4 tabs */}
       <ScrollView
         horizontal showsHorizontalScrollIndicator={false}
         style={styles.tabRowWrap} contentContainerStyle={styles.tabRow}
       >
-        {(['services', 'staff', 'hours', 'campaigns', 'finance'] as InnerTab[]).map(t => (
+        {(['services', 'staff', 'hours', 'campaigns'] as InnerTab[]).map(t => (
           <TouchableOpacity
             key={t} onPress={() => setTab(t)}
             style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
@@ -328,10 +326,8 @@ export default function BusinessScreen() {
         ))}
       </ScrollView>
 
-      {tab === 'finance' && <FinanceScreen />}
-
-      {tab !== 'finance' && (
-        <ScrollView
+      <ScrollView
+          style={styles.mainScroll}
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND} />}
@@ -492,8 +488,7 @@ export default function BusinessScreen() {
               })}
             </>
           )}
-        </ScrollView>
-      )}
+      </ScrollView>
 
       {/* ════ Service Modal ════ */}
       <Modal visible={showServiceModal} transparent animationType="slide" onRequestClose={() => setShowServiceModal(false)}>
@@ -728,7 +723,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 },
   title: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
 
-  tabRowWrap: { marginHorizontal: 16, marginVertical: 10 },
+  tabRowWrap: { marginHorizontal: 16, marginVertical: 10, flexGrow: 0, flexShrink: 0 },
+  mainScroll: { flex: 1 },
   tabRow: {
     flexDirection: 'row', backgroundColor: '#f1f5f9',
     borderRadius: 14, padding: 4, gap: 4,
