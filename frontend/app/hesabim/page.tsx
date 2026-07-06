@@ -89,7 +89,7 @@ export default function HesabimPage() {
       if (shopIds.length > 0) {
         const { data: shopData } = await supabase
           .from('shops')
-          .select('id, name, city, district, image_url, score, category')
+          .select('id, name, city, district, image_url, score, category, reviews(rating)')
           .in('id', shopIds);
         const shopMap = Object.fromEntries((shopData || []).map((s: any) => [s.id, s]));
         setFavorites(shopIds.map((id: any) => shopMap[id]).filter(Boolean));
@@ -478,7 +478,11 @@ export default function HesabimPage() {
                       <div className="min-w-0">
                         <h3 className="font-black text-sm uppercase tracking-tight text-black group-hover:text-[#00A3AD] transition-colors truncate">{shop.name}</h3>
                         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mt-1">{shop.district}, {shop.city}</p>
-                        {shop.score && <p className="text-[11px] font-black text-[#00A3AD] mt-1">⭐ {shop.score}</p>}
+                        {(shop.reviews?.length ?? 0) >= 3 && (
+                          <p className="text-[11px] font-black text-[#00A3AD] mt-1">
+                            ⭐ {(shop.reviews.reduce((s: number, r: any) => s + (r.rating || 0), 0) / shop.reviews.length).toFixed(1)}
+                          </p>
+                        )}
                       </div>
                     </a>
                   ))}

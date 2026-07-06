@@ -184,7 +184,12 @@ export default function Home() {
       return matchesSearch && matchesCategory && matchesCity && matchesDistrict;
     });
     if (sortBy === "rating") {
-      result = [...result].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      // 3+ yorumu olmayan işletmeler puansız sayılır (score kolonunun varsayılan 5'i sıralamayı bozmasın)
+      const ratingOf = (s: any) => {
+        const revs = s.reviews || [];
+        return revs.length >= 3 ? revs.reduce((t: number, r: any) => t + (r.rating || 0), 0) / revs.length : 0;
+      };
+      result = [...result].sort((a, b) => ratingOf(b) - ratingOf(a));
     }
     return result;
   }, [shops, searchQuery, selectedCategory, selectedCity, selectedDistrict, sortBy]);
@@ -509,6 +514,10 @@ export default function Home() {
                 : null;
               const isDiscount = activeCampaign && (activeCampaign.type === 'percentage' || activeCampaign.type === 'fixed');
               const reviewCount = (shop.reviews || []).length;
+              // Puan yalnızca 3+ yorumdan sonra, gerçek yorum ortalaması olarak gösterilir
+              const avgRating = reviewCount >= 3
+                ? ((shop.reviews as any[]).reduce((s: number, r: any) => s + (r.rating || 0), 0) / reviewCount).toFixed(1)
+                : null;
               const topServices = [...(shop.services || [])]
                 .filter((s: any) => s && s.name)
                 .sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
@@ -541,14 +550,14 @@ export default function Home() {
                         </span>
                       </div>
                     )}
-                    {shop.score != null && (
+                    {avgRating && (
                       <div
                         className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-semibold shadow-sm flex items-center gap-1"
                         style={{ color: "#0c0c0d" }}
                       >
                         <span className="text-amber-400">★</span>
-                        {shop.score}
-                        {reviewCount > 0 && <span style={{ color: "#8a8a8e" }}>({reviewCount})</span>}
+                        {avgRating}
+                        <span style={{ color: "#8a8a8e" }}>({reviewCount})</span>
                       </div>
                     )}
                     <button

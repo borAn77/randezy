@@ -739,12 +739,13 @@ export default function ShopDetail() {
   }, [filteredServices]);
 
   const getNearbyMinPrice = (svcs: any[]) => { if (!svcs?.length) return null; const min = Math.min(...svcs.map((s: any) => Number(s.price) || Infinity)); return min === Infinity ? null : min; };
-  const getNearbyRating = (revs: any[]) => { if (!revs?.length) return null; return (revs.reduce((s: number, r: any) => s + r.rating, 0) / revs.length).toFixed(1); };
+  const getNearbyRating = (revs: any[]) => { if (!revs || revs.length < 3) return null; return (revs.reduce((s: number, r: any) => s + r.rating, 0) / revs.length).toFixed(1); };
 
   if (notFound) return <div className="p-10 text-center font-black text-gray-400 uppercase tracking-widest">Dükkan bulunamadı.</div>;
   if (!shop) return <div className="p-10 text-center font-black text-gray-200 uppercase tracking-widest italic">Yükleniyor...</div>;
 
-  const avgRating = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
+  // Puan yalnızca 3+ yorumdan sonra gösterilir
+  const avgRating = reviews.length >= 3 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
   const todayIdx = new Date().getDay();
   const todayHours = shopHours.find((h: any) => h.day_of_week === todayIdx);
   const isOpenNow = !!(todayHours && !todayHours.is_closed && (() => {
@@ -1141,7 +1142,7 @@ export default function ShopDetail() {
                 {reviews.length > 0 && <div className="font-mono text-[11px] text-gray-400 uppercase tracking-widest">{reviews.length} yorum</div>}
               </div>
 
-              {reviews.length > 0 && (
+              {avgRating && (
                 <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-8 mb-8 p-6 rounded-2xl" style={{ background: '#fafaf8' }}>
                   <div>
                     <div className="text-7xl font-bold leading-none tracking-tight">{avgRating}</div>
