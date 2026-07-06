@@ -37,7 +37,8 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [gate, setGate] = useState<"checking" | "denied" | "ok">("checking");
+  const [gate, setGate] = useState<"checking" | "login" | "denied" | "ok">("checking");
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [tab, setTab] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [query, setQuery] = useState("");
@@ -55,7 +56,8 @@ export default function AdminPage() {
 
   const fetchShops = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) { setGate("denied"); return; }
+    if (!session?.access_token) { setGate("login"); return; }
+    setSessionEmail(session.user?.email ?? null);
     const res = await fetch("/api/admin/shops", {
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
@@ -130,11 +132,30 @@ export default function AdminPage() {
     );
   }
 
+  if (gate === "login") {
+    return (
+      <div className="h-screen bg-[#f7f5f0] flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <AlertCircle size={40} className="text-gray-300" />
+        <p className="text-sm font-semibold text-gray-600">Bu sayfayı görüntülemek için önce giriş yapmalısın.</p>
+        <p className="text-[12px] text-gray-400">Ana sayfaya git, admin yetkili hesabınla giriş yap, sonra bu sayfaya geri dön.</p>
+        <button onClick={() => router.replace("/")} className="text-[12px] font-bold text-[#14b8a6] border-b border-[#14b8a6] pb-0.5">
+          Ana sayfaya git
+        </button>
+      </div>
+    );
+  }
+
   if (gate === "denied") {
     return (
       <div className="h-screen bg-[#f7f5f0] flex flex-col items-center justify-center gap-4 px-6 text-center">
         <AlertCircle size={40} className="text-gray-300" />
-        <p className="text-sm font-semibold text-gray-500">Bu sayfaya erişim yetkiniz yok.</p>
+        <p className="text-sm font-semibold text-gray-600">Bu hesabın admin yetkisi yok.</p>
+        {sessionEmail && (
+          <p className="text-[12px] text-gray-400">
+            Şu an <span className="font-bold text-gray-600">{sessionEmail}</span> ile girişlisin.
+            Admin yetkili hesabınla giriş yapıp tekrar dene.
+          </p>
+        )}
         <button onClick={() => router.replace("/")} className="text-[12px] font-bold text-[#14b8a6] border-b border-[#14b8a6] pb-0.5">
           Ana sayfaya dön
         </button>
