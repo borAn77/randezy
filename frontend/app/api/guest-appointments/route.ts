@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
   // ── İşletme + hizmet + personel doğrulaması (DB kaynaklı) ───────────
   const { data: shop } = await supabaseAdmin
     .from("shops")
-    .select("id, name, owner_id, is_active")
+    .select("id, name, owner_id, is_active, auto_confirm_appointments")
     .eq("id", shopId)
     .maybeSingle();
   if (!shop || shop.is_active === false) {
@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
   // ── Insert ──────────────────────────────────────────────────────────
   // Fiyat: kampanyalı fiyat client'tan gelir (giriş yapmış akışla parite);
   // sadece 0..baz fiyat aralığına sabitlenir, aralık dışıysa baz fiyat kullanılır.
+  const autoConfirm = shop.auto_confirm_appointments === true;
   const rows = items.map((it) => {
     const svc: any = serviceMap.get(String(it.serviceId));
     const base = Number(svc.price) || 0;
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
       price: safePrice,
       appointment_date: it.date,
       appointment_time: it.time,
-      status: "Beklemede",
+      status: autoConfirm ? "Onaylandı" : "Beklemede",
       staff_id: it.staffId || null,
       duration_snapshot: Number(svc.duration) > 0 ? Number(svc.duration) : 30,
     };
@@ -218,19 +219,19 @@ export async function POST(req: NextRequest) {
   // ── Bildirimler (booking'i asla düşürmez) ───────────────────────────
   try {
     for (const apt of inserted || []) {
-      await notifyOwnerNewAppointment(shop.owner_id, name, apt);
+      await notifyOwnerNewAppointment(shop.owner_id, name, apt, autoConfirm);
     }
   } catch (e) { console.error("[guest-appointments] owner notify failed:", e); }
 
   try {
     if (guestEmail && resend && (inserted?.length ?? 0) > 0) {
-      await sendGuestConfirmationEmail(guestEmail, name, shop.name, inserted!);
+      await sendGuestConfirmationEmail(guestEmail, name, shop.name, inserted!, autoConfirm);
     }
   } catch (e) { console.error("[guest-appointments] guest email failed:", e); }
 
   try {
     if ((inserted?.length ?? 0) > 0) {
-      await sendGuestConfirmationSms(phone, name, shop.name, inserted!);
+      await sendGuestConfirmationSms(phone, name, shop.name, inserted!, autoConfirm);
     }
   } catch (e) { console.error("[guest-appointments] guest sms failed:", e); }
 
@@ -262,7 +263,8 @@ async function sendExpoPush(token: string, title: string, body: string, data?: o
 async function notifyOwnerNewAppointment(
   ownerId: string,
   customerName: string,
-  apt: { service_name: string; appointment_date: string; appointment_time: string; price: number }
+  apt: { service_name: string; appointment_date: string; appointment_time: string; price: number },
+  autoConfirm: boolean
 ) {
   if (!ownerId) return;
 
@@ -306,7 +308,9 @@ async function notifyOwnerNewAppointment(
         `<b>Saat:</b> ${apt.appointment_time?.slice(0, 5)}`,
         `<b>Ücret:</b> ₺${apt.price}`,
       ],
-      note: "Randevuyu onaylamak veya reddetmek için dashboard'ınıza giriş yapın.",
+      note: autoConfirm
+        ? "Bu randevu otomatik onay ayarınız açık olduğu için doğrudan onaylandı."
+        : "Randevuyu onaylamak veya reddetmek için dashboard'ınıza giriş yapın.",
       ctaText: "Dashboard'a Git",
       ctaUrl: "https://randezy.com/dashboard",
     }),
@@ -317,15 +321,16 @@ async function sendGuestConfirmationEmail(
   to: string,
   guestName: string,
   shopName: string,
-  appointments: { guest_token: string; service_name: string; appointment_date: string; appointment_time: string; price: number }[]
+  appointments: { guest_token: string; service_name: string; appointment_date: string; appointment_time: string; price: number }[],
+  autoConfirm: boolean
 ) {
   const first = appointments[0];
   await resend!.emails.send({
     from: "Randezy <bildirim@randezy.com>",
     to,
-    subject: `Randevu Talebiniz Alındı — ${shopName}`,
+    subject: autoConfirm ? `Randevunuz Onaylandı — ${shopName}` : `Randevu Talebiniz Alındı — ${shopName}`,
     html: emailTemplate({
-      title: "Randevu Talebiniz Alındı!",
+      title: autoConfirm ? "Randevunuz Onaylandı!" : "Randevu Talebiniz Alındı!",
       color: "#00A3AD",
       lines: appointments.flatMap((a) => [
         `<b>Hizmet:</b> ${a.service_name}`,
@@ -333,7 +338,9 @@ async function sendGuestConfirmationEmail(
         `<b>Ücret:</b> ₺${a.price}`,
         `<b>Takip linki:</b> <a href="https://randezy.com/randevu/${a.guest_token}">randezy.com/randevu/${a.guest_token.slice(0, 8)}…</a>`,
       ]),
-      note: `Merhaba ${guestName}, işletme onayladığında bilgilendirileceksiniz. Randevunuzu takip linkinden görüntüleyebilir ve gerekirse iptal edebilirsiniz.`,
+      note: autoConfirm
+        ? `Merhaba ${guestName}, randevunuz onaylandı. Randevunuzu takip linkinden görüntüleyebilir ve gerekirse iptal edebilirsiniz.`
+        : `Merhaba ${guestName}, işletme onayladığında bilgilendirileceksiniz. Randevunuzu takip linkinden görüntüleyebilir ve gerekirse iptal edebilirsiniz.`,
       ctaText: "Randevumu Görüntüle",
       ctaUrl: `https://randezy.com/randevu/${first.guest_token}`,
     }),
@@ -344,15 +351,19 @@ async function sendGuestConfirmationSms(
   phone: string,
   guestName: string,
   shopName: string,
-  appointments: { guest_token: string; service_name: string; appointment_date: string; appointment_time: string }[]
+  appointments: { guest_token: string; service_name: string; appointment_date: string; appointment_time: string }[],
+  autoConfirm: boolean
 ) {
   const first = appointments[0];
   const dateStr = formatDate(first.appointment_date);
   const trackUrl = `https://randezy.com/randevu/${first.guest_token}`;
-  const msg =
-    appointments.length > 1
-      ? `Sayın ${guestName}, ${shopName} için ${appointments.length} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`
-      : `Sayın ${guestName}, ${shopName} - ${first.service_name} - ${dateStr} ${first.appointment_time?.slice(0, 5)} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`;
+  const msg = autoConfirm
+    ? (appointments.length > 1
+        ? `Sayın ${guestName}, ${shopName} için ${appointments.length} randevunuz onaylandı. Takip: ${trackUrl}`
+        : `Sayın ${guestName}, ${shopName} - ${first.service_name} - ${dateStr} ${first.appointment_time?.slice(0, 5)} randevunuz onaylandı. Takip: ${trackUrl}`)
+    : (appointments.length > 1
+        ? `Sayın ${guestName}, ${shopName} için ${appointments.length} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`
+        : `Sayın ${guestName}, ${shopName} - ${first.service_name} - ${dateStr} ${first.appointment_time?.slice(0, 5)} randevu talebiniz alındı. Onaylandığında bilgilendirileceksiniz. Takip: ${trackUrl}`);
   await sendSms(phone, msg);
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, TextInput, Alert, ActivityIndicator,
+  TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -12,7 +12,8 @@ import ReviewsScreen from './ReviewsScreen';
 
 interface ShopInfo {
   id: number; name: string; category?: string; city?: string;
-  district?: string; address?: string; phone?: string; description?: string;
+  district?: string; street?: string; shop_phone?: string; description?: string;
+  auto_confirm_appointments?: boolean;
 }
 
 export default function SettingsScreen() {
@@ -33,7 +34,7 @@ export default function SettingsScreen() {
       setEmail(session.user.email ?? '');
 
       const [{ data: shops }, { data: profile }] = await Promise.all([
-        supabase.from('shops').select('id, name, category, city, district, address, phone, description').eq('owner_id', session.user.id).limit(1),
+        supabase.from('shops').select('id, name, category, city, district, street, shop_phone, description, auto_confirm_appointments').eq('owner_id', session.user.id).limit(1),
         supabase.from('profiles').select('full_name').eq('id', session.user.id).single(),
       ]);
 
@@ -55,7 +56,7 @@ export default function SettingsScreen() {
     try {
       const { error } = await supabase.from('shops').update({
         name: form.name, category: form.category, city: form.city,
-        district: form.district, address: form.address, phone: form.phone, description: form.description,
+        district: form.district, street: form.street, shop_phone: form.shop_phone, description: form.description,
       }).eq('id', shop.id);
       if (error) throw error;
       clearShopCache();
@@ -66,6 +67,22 @@ export default function SettingsScreen() {
       Alert.alert('Hata', e?.message ?? 'Kayıt başarısız');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleAutoConfirm = async (value: boolean) => {
+    if (!shop) return;
+    const prev = shop;
+    setShop({ ...shop, auto_confirm_appointments: value });
+    const { error } = await supabase.from('shops').update({ auto_confirm_appointments: value }).eq('id', shop.id);
+    if (error) {
+      setShop(prev);
+      Alert.alert('Hata', 'Ayar güncellenemedi.');
+      return;
+    }
+    clearShopCache();
+    if (value) {
+      Alert.alert('Otomatik Onay Açıldı', 'Bundan sonra gelen yeni randevular sizin onayınız olmadan otomatik olarak onaylanacak.');
     }
   };
 
@@ -146,8 +163,8 @@ export default function SettingsScreen() {
                 <FormField label="Kategori" value={form.category ?? ''} onChangeText={v => setForm(f => ({ ...f, category: v }))} />
                 <FormField label="Şehir" value={form.city ?? ''} onChangeText={v => setForm(f => ({ ...f, city: v }))} />
                 <FormField label="İlçe" value={form.district ?? ''} onChangeText={v => setForm(f => ({ ...f, district: v }))} />
-                <FormField label="Adres" value={form.address ?? ''} onChangeText={v => setForm(f => ({ ...f, address: v }))} multiline />
-                <FormField label="Telefon" value={form.phone ?? ''} onChangeText={v => setForm(f => ({ ...f, phone: v }))} keyboardType="phone-pad" />
+                <FormField label="Adres" value={form.street ?? ''} onChangeText={v => setForm(f => ({ ...f, street: v }))} multiline />
+                <FormField label="Telefon" value={form.shop_phone ?? ''} onChangeText={v => setForm(f => ({ ...f, shop_phone: v }))} keyboardType="phone-pad" />
                 <FormField label="Açıklama" value={form.description ?? ''} onChangeText={v => setForm(f => ({ ...f, description: v }))} multiline />
 
                 <TouchableOpacity style={styles.saveBtn} onPress={saveShop} disabled={saving}>
@@ -159,11 +176,34 @@ export default function SettingsScreen() {
                 <InfoRow label="İşletme Adı" value={shop.name} />
                 {shop.category && <InfoRow label="Kategori" value={shop.category} />}
                 {shop.city && <InfoRow label="Şehir" value={[shop.city, shop.district].filter(Boolean).join(' / ')} />}
-                {shop.address && <InfoRow label="Adres" value={shop.address} />}
-                {shop.phone && <InfoRow label="Telefon" value={shop.phone} />}
+                {shop.street && <InfoRow label="Adres" value={shop.street} />}
+                {shop.shop_phone && <InfoRow label="Telefon" value={shop.shop_phone} />}
                 {shop.description && <InfoRow label="Açıklama" value={shop.description} />}
               </View>
             )}
+          </View>
+        )}
+
+        {/* Otomatik onay */}
+        {shop && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Randevu Onayı</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.autoConfirmRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.autoConfirmLabel}>Otomatik Onay</Text>
+                  <Text style={styles.autoConfirmDesc}>
+                    Açıksa yeni gelen randevular otomatik onaylanır, elle onaylamanıza gerek kalmaz.
+                  </Text>
+                </View>
+                <Switch
+                  value={!!shop.auto_confirm_appointments}
+                  onValueChange={toggleAutoConfirm}
+                  trackColor={{ true: BRAND, false: '#e2e8f0' }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
           </View>
         )}
 
@@ -288,6 +328,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 16, paddingHorizontal: 14,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
+  autoConfirmRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12,
+  },
+  autoConfirmLabel: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
+  autoConfirmDesc: { fontSize: 12, color: '#64748b', lineHeight: 16 },
   formCard: {
     backgroundColor: '#fff', borderRadius: 16, padding: 14, gap: 12,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
