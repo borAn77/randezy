@@ -85,8 +85,16 @@ export default function IsletmeEkle() {
       setPaymentNotice({ ok: false, msg: 'Ödeme iptal edildi. Formu doldurup daha sonra dashboard\'dan da abone olabilirsin.' });
       return;
     }
+    if (billing !== 'success') return;
+
+    // Promo koddan geldi (Stripe'a hiç uğramadı) — zaten uygulandı, sadece bildir
+    if (params.get('promo') === '1') {
+      setPaymentNotice({ ok: true, msg: 'Promo kodun uygulandı 🎉 Şimdi işletmeni oluştur, aboneliğin otomatik aktifleşecek.' });
+      return;
+    }
+
     const sessionId = params.get('session_id');
-    if (billing !== 'success' || !sessionId) return;
+    if (!sessionId) return;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/billing/confirm', {

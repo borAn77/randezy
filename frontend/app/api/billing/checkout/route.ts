@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
 
   const origin = req.headers.get("origin") || "https://www.randezy.com";
   const metadata: Record<string, string> = shop ? { shop_id: String(shop.id) } : { owner_id: user.id };
-  const returnPath = shop ? "/dashboard" : "/isletme-ekle";
+  // Başarı: işletmesi olan → dashboard, olmayan → işletme formu (ödeme sonrası kurulum).
+  // İptal: işletmesi olan → dashboard, olmayan → /pro (forma hiç girmesin, baştan denesin).
+  const successPath = shop ? "/dashboard" : "/isletme-ekle";
+  const cancelPath = shop ? "/dashboard" : "/pro";
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -39,8 +42,8 @@ export async function POST(req: NextRequest) {
       metadata,
       subscription_data: { metadata },
       locale: "tr",
-      success_url: `${origin}${returnPath}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}${returnPath}?billing=cancel`,
+      success_url: `${origin}${successPath}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}${cancelPath}?billing=cancel`,
     });
     return NextResponse.json({ ok: true, url: session.url });
   } catch (err) {
