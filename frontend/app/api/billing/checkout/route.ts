@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
       metadata,
       subscription_data: { metadata },
       locale: "tr",
+      // Stripe'ın kendi "Promosyon kodu ekle" alanı — RANDEZY2026 gibi
+      // kampanya kodları burada girilir, indirim varsa kart bile istenmez.
+      allow_promotion_codes: true,
+      payment_method_collection: "if_required",
       success_url: `${origin}${successPath}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}${cancelPath}?billing=cancel`,
     });

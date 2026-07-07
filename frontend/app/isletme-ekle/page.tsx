@@ -87,12 +87,6 @@ export default function IsletmeEkle() {
     }
     if (billing !== 'success') return;
 
-    // Promo koddan geldi (Stripe'a hiç uğramadı) — zaten uygulandı, sadece bildir
-    if (params.get('promo') === '1') {
-      setPaymentNotice({ ok: true, msg: 'Promo kodun uygulandı 🎉 Şimdi işletmeni oluştur, aboneliğin otomatik aktifleşecek.' });
-      return;
-    }
-
     const sessionId = params.get('session_id');
     if (!sessionId) return;
     (async () => {

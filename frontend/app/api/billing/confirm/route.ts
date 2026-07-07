@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../../lib/admin-auth";
-import { stripe, periodEndFromSubscription, subscriptionUntilFromPeriodEnd } from "../../../../lib/stripe";
+import { stripe, periodEndFromSubscription, subscriptionUntilFromPeriodEnd, discountEndFromSubscription } from "../../../../lib/stripe";
 
 // Checkout dönüşünde ödemeyi Stripe'tan doğrulayıp aboneliği işler.
 // Webhook'un yedeği: kullanıcı success_url'e döner dönmez süre uzasın diye.
@@ -23,16 +23,23 @@ export async function POST(req: NextRequest) {
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["subscription"] });
-    if (session.payment_status !== "paid") {
+    // %100 promosyon kodu uygulanmış (kart istenmeyen) oturumlarda Stripe
+    // "paid" değil "no_payment_required" döner — bu da geçerli bir ödemedir.
+    if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
       return NextResponse.json({ ok: false, reason: "not_paid" }, { status: 402 });
     }
 
     const subId = typeof session.subscription === "object" && session.subscription
       ? session.subscription.id
       : (session.subscription as string | null);
+    // Promosyon kodu uygulanmışsa Stripe indirimin TAM bitiş tarihini verir
+    // (örn. RANDEZY2026 → 6 ay sonrası) — webhook'a bağımlı kalmadan bunu
+    // ilk anda kullan. Yoksa normal aylık dönem sonuna düş.
+    const discountEnd = discountEndFromSubscription(session.subscription);
     const periodEnd = periodEndFromSubscription(session.subscription);
-    const newUntil = periodEnd
-      ? subscriptionUntilFromPeriodEnd(periodEnd)
+    const effectiveEnd = discountEnd ?? periodEnd;
+    const newUntil = effectiveEnd
+      ? subscriptionUntilFromPeriodEnd(effectiveEnd)
       : new Date(Date.now() + 31 * 86400000).toISOString(); // emniyet: dönem okunamadıysa 31 gün
 
     // Yol A: işletme zaten vardı (yenileme/ilk ödeme sonrası dashboard akışı)

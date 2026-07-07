@@ -71,14 +71,6 @@ export async function POST(req: NextRequest) {
     })
     .eq("id", user.id);
 
-  // Promo koddan geldiyse (redeem-pending), owner_id ile tutulan kaydı
-  // gerçek shop_id'ye bağla — admin panelinde işletme adı görünsün.
-  await supabaseAdmin
-    .from("promo_redemptions")
-    .update({ shop_id: shopId })
-    .eq("owner_id", user.id)
-    .is("shop_id", null);
-
   console.log(`[billing/attach-pending] shop ${shopId} ← owner ${user.id} bekleyen ödeme aktarıldı, until ${finalUntil}`);
   return NextResponse.json({ ok: true, applied: true, subscription_until: finalUntil });
 }

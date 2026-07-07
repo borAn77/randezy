@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "../../../../lib/admin-auth";
-import { stripe, periodEndFromSubscription, subscriptionUntilFromPeriodEnd } from "../../../../lib/stripe";
+import { stripe, periodEndFromSubscription, subscriptionUntilFromPeriodEnd, discountEndFromSubscription } from "../../../../lib/stripe";
 
 // Stripe webhook — özellikle AYLIK YENİLEMELER için (invoice.paid).
 // Kurulum: Stripe Dashboard → Developers → Webhooks → endpoint:
@@ -37,18 +37,31 @@ export async function POST(req: NextRequest) {
       if (subId) {
         const sub = await stripe.subscriptions.retrieve(subId);
         const shopId = parseInt(sub.metadata?.shop_id || "", 10);
-        const periodEnd = periodEndFromSubscription(sub);
-        if (Number.isFinite(shopId) && periodEnd) {
-          const until = subscriptionUntilFromPeriodEnd(periodEnd);
-          await supabaseAdmin
+        // Promosyon kod indirimi varsa (örn. RANDEZY2026, 6 ay) tam bitiş
+        // tarihini kullan; yoksa normal aylık dönem sonu.
+        const effectiveEnd = discountEndFromSubscription(sub) ?? periodEndFromSubscription(sub);
+        if (Number.isFinite(shopId) && effectiveEnd) {
+          const until = subscriptionUntilFromPeriodEnd(effectiveEnd);
+          const { data: shop } = await supabaseAdmin
             .from("shops")
-            .update({
-              subscription_until: until,
-              stripe_customer_id: (invoice.customer as string) ?? null,
-              stripe_subscription_id: subId,
-            })
-            .eq("id", shopId);
-          console.log(`[billing/webhook] invoice.paid → shop ${shopId} until ${until}`);
+            .select("subscription_until")
+            .eq("id", shopId)
+            .maybeSingle();
+          // Geriye gitme koruması: confirm.ts zaten 6 ayı baştan vermiş
+          // olabilir — aylık invoice.paid bunu asla kısaltmasın.
+          if (shop && new Date(until) <= new Date(shop.subscription_until ?? 0)) {
+            console.log(`[billing/webhook] shop ${shopId} zaten daha ileri tarihte (${shop.subscription_until}), atlandı`);
+          } else {
+            await supabaseAdmin
+              .from("shops")
+              .update({
+                subscription_until: until,
+                stripe_customer_id: (invoice.customer as string) ?? null,
+                stripe_subscription_id: subId,
+              })
+              .eq("id", shopId);
+            console.log(`[billing/webhook] invoice.paid → shop ${shopId} until ${until}`);
+          }
         }
       }
     }
