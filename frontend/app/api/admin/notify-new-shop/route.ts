@@ -48,18 +48,9 @@ export async function POST(req: NextRequest) {
     </div>`;
   const subject = `Yeni işletme başvurusu: ${shop.name}`;
 
-  // ⚠️ randezy.com domaini Resend'de HENÜZ DOĞRULANMAMIŞ (resend.com/domains'te
-  // kayıt yok). Doğrulanana kadar @randezy.com'dan gönderim 403 ile SESSİZCE
-  // reddediliyordu (SDK hata fırlatmıyor, {error} alanında dönüyor — bu yüzden
-  // önceki kod "başarılı" sanıyordu). Geçici çözüm: Resend'in kendi doğrulanmış
-  // adresi (onboarding@resend.dev). Bu adres SADECE Resend hesabını açan
-  // e-postaya (adminEmails()[0]) gönderim yapabiliyor — çoklu alıcıda TÜMÜ
-  // reddediliyor. Domain doğrulanınca: from → bildirim@randezy.com,
-  // to → recipients (tam liste) olarak geri alınmalı.
-  const primary = recipients[0];
   const { error } = await resend.emails.send({
-    from: "Randezy <onboarding@resend.dev>",
-    to: [primary],
+    from: "Randezy <bildirim@randezy.com>",
+    to: recipients,
     subject,
     html,
   });
@@ -69,6 +60,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "send_failed", detail: error.message }, { status: 500 });
   }
 
-  console.log(`[admin/notify-new-shop] shop ${shopId} için ${primary} adresine bildirim gönderildi (domain doğrulanmadığı için diğer adminlere gitmedi: ${recipients.slice(1).join(", ") || "-"})`);
-  return NextResponse.json({ ok: true, sentTo: primary, skipped: recipients.slice(1) });
+  console.log(`[admin/notify-new-shop] shop ${shopId} için ${recipients.length} admine bildirim gönderildi`);
+  return NextResponse.json({ ok: true, sentTo: recipients });
 }
