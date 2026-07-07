@@ -33,6 +33,7 @@ export default function IsletmeEkle() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<{ ok: boolean; msg: string } | null>(null);
   const [businessTermsConsent, setBusinessTermsConsent] = useState(false);
   // Kapı: form yalnız session + profiles.email_verified===true ise açılır
   const [gate, setGate] = useState<'checking' | 'auth' | 'verify' | 'ok'>('checking');
@@ -74,6 +75,32 @@ export default function IsletmeEkle() {
     return () => { cancelled = true; window.removeEventListener('profile-updated', onProfileUpdated); };
   }, []);
 
+  // "Hemen Başla" ödeme sayfasından dönüş: ?billing=success&session_id=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get('billing');
+    if (!billing) return;
+    window.history.replaceState({}, '', '/isletme-ekle');
+    if (billing === 'cancel') {
+      setPaymentNotice({ ok: false, msg: 'Ödeme iptal edildi. Formu doldurup daha sonra dashboard\'dan da abone olabilirsin.' });
+      return;
+    }
+    const sessionId = params.get('session_id');
+    if (billing !== 'success' || !sessionId) return;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/billing/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setPaymentNotice(json.ok
+        ? { ok: true, msg: 'Ödemeniz alındı 🎉 Şimdi işletmeni oluştur, aboneliğin otomatik aktifleşecek.' }
+        : { ok: false, msg: 'Ödeme doğrulanamadı. Formu doldurabilirsin; sorun sürerse dashboard\'dan tekrar dene.' });
+    })();
+  }, []);
+
   const set = (key: string, val: string) => setForm(f => ({ ...f, [key]: val }));
 
   const isValid = form.category && form.shopName.trim() && form.city && form.district.trim() && form.street.trim() && businessTermsConsent;
@@ -110,7 +137,7 @@ export default function IsletmeEkle() {
         throw new Error("Sözleşme onayı kaydedilemedi. Lütfen tekrar deneyin.");
       }
 
-      const { error: shopError } = await supabase.from('shops').insert([{
+      const { data: newShop, error: shopError } = await supabase.from('shops').insert([{
         owner_id: user.id,
         name: form.shopName.trim(),
         category: form.category,
@@ -119,10 +146,23 @@ export default function IsletmeEkle() {
         district: form.district.trim(),
         street: form.street.trim(),
         is_active: false,
-      }]);
+      }]).select('id').single();
       if (shopError) throw shopError;
 
       await supabase.from('profiles').update({ role: 'business_owner' }).eq('id', user.id);
+
+      // "Hemen Başla" akışıyla işletmeden ÖNCE ödeme yapılmışsa, o ödemenin
+      // süresini bu yeni işletmeye aktar. Ödeme yoksa sessizce no-op döner.
+      try {
+        await fetch('/api/billing/attach-pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ shopId: newShop.id }),
+        });
+      } catch {
+        // aktarım başarısız olsa da işletme oluştu — dashboard'daki abonelik
+        // bandı sahibi yine de ödeme/promo ile devam edebilir
+      }
 
       router.push('/dashboard');
     } catch (err: any) {
@@ -175,6 +215,14 @@ export default function IsletmeEkle() {
             Sadece temel bilgiler yeterli.
           </p>
         </div>
+
+        {paymentNotice && (
+          <div className={`mb-8 rounded-2xl p-4 text-center text-sm font-bold ${
+            paymentNotice.ok ? 'bg-emerald-50 border border-emerald-100 text-emerald-700' : 'bg-amber-50 border border-amber-100 text-amber-700'
+          }`}>
+            {paymentNotice.msg}
+          </div>
+        )}
 
         {/* Sonrasında ne olacak? */}
         <div className="grid grid-cols-3 gap-3 mb-10">
