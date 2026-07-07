@@ -166,6 +166,13 @@ export default function IsletmeEkle() {
         // bandı sahibi yine de ödeme/promo ile devam edebilir
       }
 
+      // Adminlere "yeni başvuru var" e-postası — başarısız olsa da akış kesilmez
+      fetch('/api/admin/notify-new-shop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ shopId: newShop.id }),
+      }).catch(() => {});
+
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || "Bir hata oluştu, lütfen tekrar deneyin.");
