@@ -629,6 +629,7 @@ export default function ShopDetail() {
       .select('full_name')
       .single();
     const customerName = profileData?.full_name || session.user.user_metadata?.full_name || 'Müşteri';
+    const autoConfirm = !!shop?.auto_confirm_appointments;
     const inserts = cart.map(item => ({
       user_id: session.user.id,
       shop_id: shopId,
@@ -638,14 +639,14 @@ export default function ShopDetail() {
       price: item.discountedPrice,
       appointment_date: localDateStr(item.date),
       appointment_time: item.time,
-      status: 'Beklemede',
+      status: autoConfirm ? 'Onaylandı' : 'Beklemede',
       staff_id: item.staff?.id || null,
       duration_snapshot: item.service.duration,
     }));
     const { data: insertedApts, error } = await supabase.from('appointments').insert(inserts).select('id');
     if (!error) {
       setLastConfirmed(cart[0]);
-      cart.forEach((_item, idx) => {
+      cart.forEach((item, idx) => {
         const appointmentId = insertedApts?.[idx]?.id;
         if (!appointmentId) return;
         fetch('/api/notify', {
@@ -653,6 +654,25 @@ export default function ShopDetail() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify({ type: 'new_appointment', appointmentId }),
         }).catch(() => {});
+        if (autoConfirm && session.user.email) {
+          const [y, mo, d] = localDateStr(item.date).split('-').map(Number);
+          const [hh, mm] = item.time.split(':').map(Number);
+          const staffName = item.staff
+            ? `${item.staff.first_name ?? ''} ${item.staff.last_name ?? ''}`.trim() || null
+            : null;
+          fetch('https://randezy-api.vercel.app/appointments/send-confirmed-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              customer_email: session.user.email,
+              customer_name: customerName,
+              business_name: shop?.name ?? '',
+              service_name: item.service.name,
+              start_time: new Date(y, mo - 1, d, hh, mm).toISOString(),
+              staff_name: staffName,
+            }),
+          }).catch(() => {});
+        }
       });
       setCart([]);
       setExpandedServiceId(null);
