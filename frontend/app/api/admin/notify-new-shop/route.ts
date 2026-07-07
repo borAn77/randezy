@@ -37,25 +37,38 @@ export async function POST(req: NextRequest) {
   }
 
   const owner = (shop as any).profiles;
-  try {
-    await resend.emails.send({
-      from: "Randezy <bildirim@randezy.com>",
-      to: recipients,
-      subject: `Yeni işletme başvurusu: ${shop.name}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-          <h2 style="color:#0c0c0d">Yeni işletme onay bekliyor</h2>
-          <p style="color:#333;line-height:1.6">
-            <strong>${shop.name}</strong> (${shop.category || "-"}) — ${[shop.district, shop.city].filter(Boolean).join(", ") || "-"}<br/>
-            Başvuran: ${owner?.full_name || "-"} · ${owner?.email || "-"}${owner?.phone ? " · " + owner.phone : ""}
-          </p>
-          <a href="https://www.randezy.com/admin" style="display:inline-block;background:#14b8a6;color:#fff;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:bold;margin-top:8px">Onay Merkezine Git</a>
-        </div>`,
-    });
-    console.log(`[admin/notify-new-shop] shop ${shopId} için ${recipients.length} admine bildirim gönderildi`);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[admin/notify-new-shop] email error:", err);
-    return NextResponse.json({ ok: false, reason: "send_failed" }, { status: 500 });
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
+      <h2 style="color:#0c0c0d">Yeni işletme onay bekliyor</h2>
+      <p style="color:#333;line-height:1.6">
+        <strong>${shop.name}</strong> (${shop.category || "-"}) — ${[shop.district, shop.city].filter(Boolean).join(", ") || "-"}<br/>
+        Başvuran: ${owner?.full_name || "-"} · ${owner?.email || "-"}${owner?.phone ? " · " + owner.phone : ""}
+      </p>
+      <a href="https://www.randezy.com/admin" style="display:inline-block;background:#14b8a6;color:#fff;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:bold;margin-top:8px">Onay Merkezine Git</a>
+    </div>`;
+  const subject = `Yeni işletme başvurusu: ${shop.name}`;
+
+  // ⚠️ randezy.com domaini Resend'de HENÜZ DOĞRULANMAMIŞ (resend.com/domains'te
+  // kayıt yok). Doğrulanana kadar @randezy.com'dan gönderim 403 ile SESSİZCE
+  // reddediliyordu (SDK hata fırlatmıyor, {error} alanında dönüyor — bu yüzden
+  // önceki kod "başarılı" sanıyordu). Geçici çözüm: Resend'in kendi doğrulanmış
+  // adresi (onboarding@resend.dev). Bu adres SADECE Resend hesabını açan
+  // e-postaya (adminEmails()[0]) gönderim yapabiliyor — çoklu alıcıda TÜMÜ
+  // reddediliyor. Domain doğrulanınca: from → bildirim@randezy.com,
+  // to → recipients (tam liste) olarak geri alınmalı.
+  const primary = recipients[0];
+  const { error } = await resend.emails.send({
+    from: "Randezy <onboarding@resend.dev>",
+    to: [primary],
+    subject,
+    html,
+  });
+
+  if (error) {
+    console.error(`[admin/notify-new-shop] shop ${shopId} için e-posta gönderilemedi:`, error);
+    return NextResponse.json({ ok: false, reason: "send_failed", detail: error.message }, { status: 500 });
   }
+
+  console.log(`[admin/notify-new-shop] shop ${shopId} için ${primary} adresine bildirim gönderildi (domain doğrulanmadığı için diğer adminlere gitmedi: ${recipients.slice(1).join(", ") || "-"})`);
+  return NextResponse.json({ ok: true, sentTo: primary, skipped: recipients.slice(1) });
 }
