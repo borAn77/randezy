@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabase";
 import {
   ShieldCheck, MapPin, Phone, Mail, Clock, CheckCircle2, XCircle,
   ExternalLink, Package, Users, RefreshCw, Search, AlertCircle, Undo2,
+  Tag, Copy, Plus,
 } from "lucide-react";
 
 type AdminShop = {
@@ -23,10 +24,24 @@ type AdminShop = {
   instagram: string | null;
   is_active: boolean;
   approval_status: "pending" | "approved" | "rejected";
+  subscription_until?: string | null;
   created_at: string;
   profiles: { full_name: string | null; email: string | null; phone: string | null } | null;
   services: { id: number; name: string; price: number }[];
   staff: { id: string; first_name: string; last_name: string }[];
+};
+
+type AdminPromo = {
+  id: number;
+  code: string;
+  description: string | null;
+  duration_days: number;
+  max_uses: number | null;
+  used_count: number;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string;
+  promo_redemptions: { shop_id: number; redeemed_at: string; shops: { name: string } | null }[];
 };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
@@ -39,6 +54,10 @@ export default function AdminPage() {
   const router = useRouter();
   const [gate, setGate] = useState<"checking" | "login" | "denied" | "ok">("checking");
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [view, setView] = useState<"shops" | "promos">("shops");
+  const [promos, setPromos] = useState<AdminPromo[]>([]);
+  const [promoForm, setPromoForm] = useState({ code: "", duration_days: "60", max_uses: "", expires_at: "", description: "" });
+  const [promoBusy, setPromoBusy] = useState(false);
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [tab, setTab] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [query, setQuery] = useState("");
@@ -68,7 +87,71 @@ export default function AdminPage() {
     setGate("ok");
   };
 
-  useEffect(() => { fetchShops(); }, []);
+  const fetchPromos = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    const res = await fetch("/api/admin/promos", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (res.ok) {
+      const json = await res.json();
+      setPromos(json.promos || []);
+    }
+  };
+
+  useEffect(() => { fetchShops(); fetchPromos(); }, []);
+
+  const createPromo = async () => {
+    if (promoBusy) return;
+    setPromoBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/admin/promos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({
+        code: promoForm.code,
+        duration_days: promoForm.duration_days,
+        max_uses: promoForm.max_uses,
+        expires_at: promoForm.expires_at || null,
+        description: promoForm.description,
+      }),
+    });
+    setPromoBusy(false);
+    const json = await res.json().catch(() => ({}));
+    if (json.ok) {
+      showToast(`Kod oluşturuldu: ${json.promo.code}`);
+      setPromoForm({ code: "", duration_days: "60", max_uses: "", expires_at: "", description: "" });
+      fetchPromos();
+    } else {
+      const msgs: Record<string, string> = {
+        duplicate_code: "Bu kod zaten var.",
+        invalid_code: "Kod formatı geçersiz (4-24 karakter, A-Z, 0-9 ve tire).",
+        invalid_duration: "Süre 1-730 gün arasında olmalı.",
+        invalid_max_uses: "Kullanım limiti geçersiz.",
+      };
+      showToast(msgs[json.reason as string] || "Kod oluşturulamadı.");
+    }
+  };
+
+  const togglePromo = async (promo: AdminPromo) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/admin/promos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ id: promo.id, is_active: !promo.is_active }),
+    });
+    if (res.ok) {
+      setPromos(prev => prev.map(p => p.id === promo.id ? { ...p, is_active: !p.is_active } : p));
+      showToast(promo.is_active ? `"${promo.code}" kapatıldı.` : `"${promo.code}" tekrar aktif.`);
+    } else {
+      showToast("İşlem başarısız oldu.");
+    }
+  };
+
+  const copyCode = async (code: string) => {
+    try { await navigator.clipboard.writeText(code); showToast(`"${code}" kopyalandı.`); }
+    catch { showToast("Kopyalanamadı — kodu elle seç."); }
+  };
 
   const setStatus = async (shop: AdminShop, status: "approved" | "rejected" | "pending") => {
     setBusyId(shop.id);
@@ -174,13 +257,23 @@ export default function AdminPage() {
             <div className="text-[11px] text-white/40 font-medium">İşletme Onay Merkezi</div>
           </div>
         </div>
+        <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+          {(["shops", "promos"] as const).map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-3.5 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
+                view === v ? "bg-[#14b8a6] text-[#04221d]" : "text-white/60 hover:text-white"
+              }`}>
+              {v === "shops" ? "Başvurular" : "Promo Kodlar"}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-[12px] text-white/70 font-medium cursor-pointer select-none">
             <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} className="accent-[#14b8a6]" />
             İşlem sonrası işletmeye e-posta gönder
           </label>
           <button
-            onClick={async () => { setRefreshing(true); await fetchShops(); setRefreshing(false); }}
+            onClick={async () => { setRefreshing(true); await Promise.all([fetchShops(), fetchPromos()]); setRefreshing(false); }}
             className="flex items-center gap-1.5 text-[12px] font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl transition-all">
             <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} /> Yenile
           </button>
@@ -188,6 +281,7 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 md:px-8 py-8">
+        {view === "shops" && (<>
         {/* KONTROL LİSTESİ */}
         <div className="mb-6 flex items-start gap-3 bg-white border border-[#ececea] rounded-2xl px-5 py-4">
           <ShieldCheck size={18} className="text-[#14b8a6] flex-shrink-0 mt-0.5" />
@@ -291,6 +385,21 @@ export default function AdminPage() {
                           <Users size={13} className="text-gray-400 flex-shrink-0" />
                           {shop.staff.length > 0 ? `${shop.staff.length} personel — ${shop.staff.map(p => p.first_name).join(", ")}` : "Personel girilmemiş"}
                         </span>
+                        {shop.subscription_until !== undefined && shop.subscription_until !== null && (() => {
+                          const days = Math.ceil((new Date(shop.subscription_until).getTime() - Date.now()) / 86400000);
+                          return (
+                            <span className="flex items-center gap-1.5">
+                              <Tag size={13} className="text-gray-400 flex-shrink-0" />
+                              {days > 0 ? (
+                                <>Abonelik:&nbsp;<span className="font-semibold text-emerald-700">
+                                  {new Date(shop.subscription_until).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}
+                                </span>&nbsp;({days} gün)</>
+                              ) : (
+                                <span className="font-semibold text-red-600">Abonelik süresi dolmuş — müşterilere görünmüyor</span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {shop.description && (
@@ -331,6 +440,112 @@ export default function AdminPage() {
             })}
           </div>
         )}
+        </>)}
+
+        {view === "promos" && (<>
+        {/* YENİ KOD FORMU */}
+        <div className="bg-white border border-[#ececea] rounded-3xl p-5 md:p-6 mb-6">
+          <h3 className="text-[14px] font-bold mb-4 flex items-center gap-2">
+            <Tag size={15} className="text-[#14b8a6]" /> Yeni Promo Kod Oluştur
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Kod</label>
+              <input value={promoForm.code}
+                onChange={e => setPromoForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="Boş bırak → üretilir" maxLength={24}
+                className="w-full px-3 py-2 rounded-xl border border-[#ececea] text-[13px] font-semibold tracking-wider uppercase outline-none focus:border-[#14b8a6]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Süre (gün) *</label>
+              <input type="number" min={1} max={730} value={promoForm.duration_days}
+                onChange={e => setPromoForm(f => ({ ...f, duration_days: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-[#ececea] text-[13px] outline-none focus:border-[#14b8a6]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Kullanım Limiti</label>
+              <input type="number" min={1} value={promoForm.max_uses}
+                onChange={e => setPromoForm(f => ({ ...f, max_uses: e.target.value }))}
+                placeholder="Boş = sınırsız"
+                className="w-full px-3 py-2 rounded-xl border border-[#ececea] text-[13px] outline-none focus:border-[#14b8a6]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Son Kullanma</label>
+              <input type="date" value={promoForm.expires_at}
+                onChange={e => setPromoForm(f => ({ ...f, expires_at: e.target.value }))}
+                className="w-full px-3 py-2 rounded-xl border border-[#ececea] text-[13px] outline-none focus:border-[#14b8a6]" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Açıklama</label>
+              <input value={promoForm.description}
+                onChange={e => setPromoForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="örn: Pilot berberler"
+                className="w-full px-3 py-2 rounded-xl border border-[#ececea] text-[13px] outline-none focus:border-[#14b8a6]" />
+            </div>
+          </div>
+          <button onClick={createPromo} disabled={promoBusy || !promoForm.duration_days}
+            className="mt-4 flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50">
+            <Plus size={14} /> {promoBusy ? "Oluşturuluyor..." : "Kod Oluştur"}
+          </button>
+        </div>
+
+        {/* KOD LİSTESİ */}
+        {promos.length === 0 ? (
+          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-200">
+            <p className="text-[13px] font-semibold text-gray-400">Henüz promo kod yok — yukarıdan ilk kodu oluştur.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {promos.map(promo => {
+              const expired = promo.expires_at && new Date(promo.expires_at) < new Date();
+              const exhausted = promo.max_uses != null && promo.used_count >= promo.max_uses;
+              const usable = promo.is_active && !expired && !exhausted;
+              return (
+                <div key={promo.id} className={`bg-white rounded-2xl border p-4 md:p-5 ${usable ? "border-[#ececea]" : "border-gray-100 opacity-70"}`}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={() => copyCode(promo.code)} title="Kopyala"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0c0c0d] text-white font-mono font-bold text-[13px] tracking-widest hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+                      {promo.code} <Copy size={12} />
+                    </button>
+                    <span className="text-[12px] font-bold text-[#0c0c0d]">{promo.duration_days} gün</span>
+                    <span className="text-[12px] text-gray-500">
+                      Kullanım: <span className="font-bold text-[#0c0c0d]">{promo.used_count}{promo.max_uses != null ? ` / ${promo.max_uses}` : " (sınırsız)"}</span>
+                    </span>
+                    {promo.expires_at && (
+                      <span className={`text-[12px] ${expired ? "text-red-500 font-bold" : "text-gray-500"}`}>
+                        Son: {new Date(promo.expires_at).toLocaleDateString("tr-TR")}
+                      </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${
+                      usable ? "bg-emerald-100 text-emerald-800 border-emerald-200" : "bg-gray-100 text-gray-500 border-gray-200"
+                    }`}>
+                      {!promo.is_active ? "Kapalı" : expired ? "Süresi Doldu" : exhausted ? "Tükendi" : "Aktif"}
+                    </span>
+                    <div className="ml-auto">
+                      <button onClick={() => togglePromo(promo)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                          promo.is_active
+                            ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                        }`}>
+                        {promo.is_active ? "Kapat" : "Aç"}
+                      </button>
+                    </div>
+                  </div>
+                  {(promo.description || promo.promo_redemptions.length > 0) && (
+                    <div className="mt-2 text-[11.5px] text-gray-500">
+                      {promo.description && <span>{promo.description}</span>}
+                      {promo.promo_redemptions.length > 0 && (
+                        <span>{promo.description ? " · " : ""}Kullananlar: {promo.promo_redemptions.map(r => r.shops?.name || `#${r.shop_id}`).join(", ")}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        </>)}
       </main>
 
       {/* TOAST */}

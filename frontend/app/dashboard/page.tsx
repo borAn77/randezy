@@ -585,6 +585,8 @@ export default function Dashboard() {
   const [custSearch, setCustSearch] = useState('');
   const [selectedCustId, setSelectedCustId] = useState<string|null>(null);
   const [toasts, setToasts] = useState<{id:number; msg:string; type:'ok'|'err'}[]>([]);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
   const [replyingReviewId, setReplyingReviewId] = useState<string|null>(null);
   const [replyText, setReplyText] = useState('');
   const [savingReply, setSavingReply] = useState(false);
@@ -1513,6 +1515,84 @@ export default function Dashboard() {
     fetchInitialData();
   };
 
+  // Abonelik: kalan gün (kolon henüz yoksa null → band gizli)
+  const subDaysLeft = shop?.subscription_until
+    ? Math.ceil((new Date(shop.subscription_until).getTime() - Date.now()) / 86400000)
+    : null;
+
+  const handleCheckout = async () => {
+    if (promoBusy) return;
+    setPromoBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/billing/checkout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json.ok && json.url) {
+      window.location.href = json.url; // Stripe ödeme sayfasına git
+      return;
+    }
+    setPromoBusy(false);
+    showToast(json.reason === 'billing_not_configured'
+      ? 'Ödeme sistemi henüz yapılandırılmadı.'
+      : 'Ödeme sayfası açılamadı, tekrar deneyin.', 'err');
+  };
+
+  // Stripe Checkout dönüşü: ?billing=success&session_id=cs_... → ödemeyi doğrula
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const billing = params.get('billing');
+    if (!billing) return;
+    window.history.replaceState({}, '', '/dashboard');
+    if (billing === 'cancel') { showToast('Ödeme iptal edildi.', 'err'); return; }
+    const sessionId = params.get('session_id');
+    if (billing !== 'success' || !sessionId) return;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/billing/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json.ok) {
+        showToast('Ödemeniz alındı — aboneliğiniz aktif! 🎉');
+        fetchInitialData();
+      } else {
+        showToast('Ödeme doğrulanamadı. Sayfayı yenileyin; sorun sürerse bize ulaşın.', 'err');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRedeemPromo = async () => {
+    const code = promoCode.trim().toUpperCase();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/promo/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ code }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setPromoBusy(false);
+    if (json.ok) {
+      showToast(`Kod uygulandı — aboneliğinize ${json.duration_days} gün eklendi. 🎉`);
+      setPromoCode('');
+      fetchInitialData();
+    } else {
+      const msgs: Record<string, string> = {
+        invalid_code: 'Kod geçersiz. Kontrol edip tekrar dene.',
+        expired_code: 'Bu kodun süresi dolmuş.',
+        exhausted: 'Bu kod kullanım limitine ulaşmış.',
+        already_used: 'Bu kod bu işletmede zaten kullanılmış.',
+      };
+      showToast(msgs[json.reason as string] || 'Kod uygulanamadı, tekrar deneyin.', 'err');
+    }
+  };
+
   // Calendar view helpers
   const calHours = Array.from({ length: 14 }, (_, i) => i + 8); // 08–21
   const calHourH = 64; // px per hour
@@ -1709,6 +1789,53 @@ export default function Dashboard() {
                 İşletme doğrulaması tamamlanamadı. Bir yanlışlık olduğunu düşünüyorsanız bize ulaşın:
                 {' '}<a href="mailto:yildirimmehmetali65@gmail.com" className="font-semibold underline">yildirimmehmetali65@gmail.com</a>
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Abonelik durumu bandı (son 14 gün ve süresi dolmuşlar) ── */}
+        {shop && subDaysLeft !== null && subDaysLeft <= 14 && (
+          <div className={`mb-6 rounded-2xl border px-5 py-4 ${subDaysLeft <= 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle size={18} className={`flex-shrink-0 mt-0.5 ${subDaysLeft <= 0 ? 'text-red-500' : 'text-amber-500'}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-[13px] font-bold ${subDaysLeft <= 0 ? 'text-red-800' : 'text-amber-800'}`}>
+                  {subDaysLeft <= 0
+                    ? 'Aboneliğiniz aktif değil — işletmeniz müşterilere görünmüyor'
+                    : `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`}
+                </p>
+                <p className={`text-[12px] mt-0.5 ${subDaysLeft <= 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                  Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleCheckout}
+                    disabled={promoBusy}
+                    className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
+                  >
+                    {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
+                  </button>
+                  <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
+                  <input
+                    value={promoCode}
+                    onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === 'Enter') handleRedeemPromo(); }}
+                    placeholder="PROMO KODU"
+                    maxLength={24}
+                    className="px-3 py-2 rounded-xl border border-[#ececea] bg-white text-[13px] font-semibold tracking-widest uppercase w-40 outline-none focus:border-[#14b8a6] transition-colors"
+                  />
+                  <button
+                    onClick={handleRedeemPromo}
+                    disabled={promoBusy || !promoCode.trim()}
+                    className="px-4 py-2 rounded-xl bg-[#0c0c0d] text-white text-[12px] font-bold hover:bg-[#14b8a6] hover:text-[#04221d] transition-all disabled:opacity-50"
+                  >
+                    Kodu Kullan
+                  </button>
+                </div>
+                <p className="mt-2 text-[10.5px] text-gray-400">
+                  Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
+                </p>
+              </div>
             </div>
           </div>
         )}

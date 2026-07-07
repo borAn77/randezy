@@ -24,13 +24,13 @@ export function Pricing({ onStart }: { onStart?: () => void }) {
           className="text-center mb-12"
         >
           <div className="inline-block bg-[#00A3AD]/10 border border-[#00A3AD]/30 text-[#00A3AD] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-            🎉 Lansma Kampanyası
+            💎 Komisyonsuz Tek Fiyat
           </div>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 text-black">
             Şimdi tam zamanı
           </h2>
           <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
-            Lansma döneminde tüm özellikler tamamen ücretsiz
+            Tüm özellikler dahil — işlem başına komisyon yok
           </p>
         </motion.div>
 
@@ -45,11 +45,11 @@ export function Pricing({ onStart }: { onStart?: () => void }) {
             <div className="text-center mb-8">
               <h3 className="text-xl md:text-2xl font-bold mb-3 text-black">Randezy Pro</h3>
               <div className="flex items-end justify-center gap-3 mb-2">
-                <span className="text-5xl sm:text-6xl md:text-7xl font-bold text-black">₺0</span>
-                <span className="text-xl sm:text-2xl md:text-3xl text-gray-400 line-through mb-3">₺299</span>
+                <span className="text-5xl sm:text-6xl md:text-7xl font-bold text-black">₺1.699</span>
+                <span className="text-xl sm:text-2xl md:text-3xl text-gray-400 mb-3">/ay</span>
               </div>
               <p className="text-base md:text-lg text-gray-600">
-                Lansma süresince <span className="text-[#00A3AD] font-bold">tamamen ücretsiz</span>
+                Komisyonsuz sabit fiyat — <span className="text-[#00A3AD] font-bold">promo kodunla başla</span>
               </p>
             </div>
 

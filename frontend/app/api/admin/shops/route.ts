@@ -1,33 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createClient } from "@supabase/supabase-js";
+import { requireAdmin, supabaseAdmin } from "../../../../lib/admin-auth";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
-);
-
-// Admin yetkisi ADMIN_EMAILS env değişkeninden okunur (virgülle ayrılmış).
-// Env tanımlı değilse KİMSE erişemez — güvenli varsayılan.
-function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-async function requireAdmin(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!token) return null;
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-  const email = user?.email?.toLowerCase();
-  if (!user || !email || !adminEmails().includes(email)) return null;
-  return user;
-}
 
 export async function GET(req: NextRequest) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -41,7 +18,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("shops")
     .select(
-      "id, name, slug, category, city, district, street, shop_phone, image_url, gallery_urls, description, instagram, is_active, approval_status, created_at, owner_id, profiles(full_name, email, phone), services(id, name, price), staff(id, first_name, last_name)"
+      "id, name, slug, category, city, district, street, shop_phone, image_url, gallery_urls, description, instagram, is_active, approval_status, subscription_until, created_at, owner_id, profiles(full_name, email, phone), services(id, name, price), staff(id, first_name, last_name)"
     )
     .order("created_at", { ascending: false });
 
