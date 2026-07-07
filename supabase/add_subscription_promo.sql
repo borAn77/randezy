@@ -54,6 +54,26 @@ alter table public.promo_redemptions enable row level security;
 --    İstisnalar: sahibi kendi işletmesini her zaman görür; randevusu
 --    olan müşteri (geçmiş randevularının işletme adı kaybolmasın diye)
 --    işletme kaydını okumaya devam edebilir.
+--    ⚠️ Randevu kontrolü SECURITY DEFINER fonksiyonla yapılır — policy
+--    içinde doğrudan appointments sorgusu SONSUZ DÖNGÜ yaratır (42P17),
+--    çünkü appointments'ın RLS'i shops'a bakar. Değiştirme!
+create or replace function public.user_has_appointment_at(p_shop_id integer)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.appointments a
+    where a.shop_id = p_shop_id
+      and a.user_id = auth.uid()
+  );
+$$;
+
+revoke all on function public.user_has_appointment_at(integer) from public;
+grant execute on function public.user_has_appointment_at(integer) to anon, authenticated;
+
 drop policy if exists shops_approval_gate on public.shops;
 drop policy if exists shops_visibility_gate on public.shops;
 create policy shops_visibility_gate on public.shops
@@ -63,10 +83,7 @@ create policy shops_visibility_gate on public.shops
   using (
     (approval_status = 'approved' and subscription_until > now())
     or owner_id = auth.uid()
-    or exists (
-      select 1 from public.appointments a
-      where a.shop_id = shops.id and a.user_id = auth.uid()
-    )
+    or public.user_has_appointment_at(id)
   );
 
 -- 7) Policy'deki exists sorgusu için indeks
