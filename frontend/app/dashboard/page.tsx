@@ -27,6 +27,64 @@ const CATEGORIES_BY_TYPE: Record<string, string[]> = {
   'DÖVME': ['Minimal Dövme', 'Yazı Dövme', 'Renkli Dövme', 'Gerçekçi Dövme', 'Kapatma & Düzeltme', 'Piercing', 'Kalıcı Makyaj', 'Diğer'],
 };
 
+// Görsel Kimlik → portföy galerisi metinleri, işletme türüne göre
+const GALLERY_COPY_BY_TYPE: Record<string, { title: string; desc1: string; desc2: string; tip: string }> = {
+  'KUAFÖR': {
+    title: 'Favori Saç Modelleriniz',
+    desc1: 'Boya, röfle, keratin veya özel saç modellerinizden örnekler ekleyin.',
+    desc2: 'Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz saç modeli fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'BERBER': {
+    title: 'Favori Kesimleriniz',
+    desc1: 'Fade, sakal, uzun saç, boyama veya özel işlemlerinizden örnekler ekleyin.',
+    desc2: 'Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz kesim fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'GÜZELLİK MERKEZİ': {
+    title: 'Öne Çıkan Çalışmalarınız',
+    desc1: 'Cilt bakımı, lazer epilasyon, makyaj veya özel uygulamalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflar net olmalı; öncesi/sonrası karşılaştırmalar güveni artırır.',
+    tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'TIRNAK': {
+    title: 'Favori Tırnak Tasarımlarınız',
+    desc1: 'Manikür, pedikür, nail art veya protez tırnak çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda tasarım net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz tasarım fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'KAŞ VE KİRPİK': {
+    title: 'Favori Çalışmalarınız',
+    desc1: 'Kaş tasarımı, kirpik lifting, ipek kirpik veya microblading çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda detay net görünmeli, yakın çekim tercih edilmelidir.',
+    tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'MASAJ': {
+    title: 'Mekan ve Hizmet Fotoğraflarınız',
+    desc1: 'Masaj odanız, ekipmanlarınız veya uyguladığınız tekniklerden örnekler ekleyin.',
+    desc2: 'Sakin, temiz ve profesyonel bir atmosfer yansıtan fotoğraflar tercih edilmelidir.',
+    tip: 'Yüklediğiniz mekan ve hizmet fotoğrafları müşteri kararını doğrudan etkiler. Net ve güven veren fotoğraflar daha fazla rezervasyon sağlar.',
+  },
+  'FİZYOTERAPİ': {
+    title: 'Merkez ve Uygulama Fotoğraflarınız',
+    desc1: 'Kliniğiniz, ekipmanlarınız veya uyguladığınız tedavilerden örnekler ekleyin.',
+    desc2: 'Temiz, profesyonel ve güven veren fotoğraflar tercih edilmelidir.',
+    tip: 'Yüklediğiniz merkez fotoğrafları müşteri kararını doğrudan etkiler. Net ve güven veren fotoğraflar daha fazla rezervasyon sağlar.',
+  },
+  'DÖVME': {
+    title: 'Portfolyonuz',
+    desc1: 'Yaptığınız dövme, kapatma veya piercing çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda çalışma net görünmeli, iyi ışıklandırılmış olmalıdır.',
+    tip: 'Yüklediğiniz portfolyo fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+};
+const DEFAULT_GALLERY_COPY = {
+  title: 'Öne Çıkan Çalışmalarınız',
+  desc1: 'Yaptığınız işlerden örnekler ekleyin.',
+  desc2: 'Fotoğraflar net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+  tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+};
+
 const BERBER_CATALOG: Record<string, CatalogItem[]> = {
   'Popüler': [
     { name: 'Erkek Saç Kesimi',     category: 'Saç',         duration: 20, canonical_key: 'erkek_sac_kesimi' },
@@ -1793,14 +1851,16 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Abonelik durumu bandı — her zaman görünür, aciliyete göre renk değişir ── */}
-        {shop && subDaysLeft !== null && (() => {
-          const urgent = subDaysLeft <= 14; // 14 gün altı: kırmızı/amber uyarı; üstü: sakin yeşil şerit
+        {/* ── Abonelik durumu bandı — yalnızca acil durumda görünür (son 14 gün / süresi dolmuş).
+             Sağlıklı abonelikte hiç gösterilmez: promo kod girişi artık Stripe'ın kendi ödeme
+             sayfasında (checkout, allow_promotion_codes) yapılıyor, burada tekrar sormak kafa
+             karıştırıyordu ("zaten kod girdim, neden hala istiyor?"). ── */}
+        {shop && subDaysLeft !== null && subDaysLeft <= 14 && (() => {
           const expired = subDaysLeft <= 0;
-          const boxCls = expired ? 'bg-red-50 border-red-200' : urgent ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-100';
-          const iconCls = expired ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-emerald-500';
-          const titleCls = expired ? 'text-red-800' : urgent ? 'text-amber-800' : 'text-emerald-800';
-          const bodyCls = expired ? 'text-red-700' : urgent ? 'text-amber-700' : 'text-emerald-700';
+          const boxCls = expired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
+          const iconCls = expired ? 'text-red-500' : 'text-amber-500';
+          const titleCls = expired ? 'text-red-800' : 'text-amber-800';
+          const bodyCls = expired ? 'text-red-700' : 'text-amber-700';
           return (
             <div className={`mb-6 rounded-2xl border px-5 py-4 ${boxCls}`}>
               <div className="flex items-start gap-3">
@@ -1809,28 +1869,20 @@ export default function Dashboard() {
                   <p className={`text-[13px] font-bold ${titleCls}`}>
                     {expired
                       ? 'Aboneliğiniz aktif değil — işletmeniz müşterilere görünmüyor'
-                      : urgent
-                      ? `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`
-                      : `Aboneliğiniz aktif — ${subDaysLeft} gün kaldı`}
+                      : `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`}
                   </p>
                   <p className={`text-[12px] mt-0.5 ${bodyCls}`}>
-                    {urgent
-                      ? 'Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.'
-                      : 'Promo kodun mu var? Aşağıya girip aboneliğinizi uzatabilirsiniz.'}
+                    Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {urgent && (
-                      <>
-                        <button
-                          onClick={handleCheckout}
-                          disabled={promoBusy}
-                          className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
-                        >
-                          {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
-                        </button>
-                        <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
-                      </>
-                    )}
+                    <button
+                      onClick={handleCheckout}
+                      disabled={promoBusy}
+                      className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
+                    </button>
+                    <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
                     <input
                       value={promoCode}
                       onChange={e => setPromoCode(e.target.value.toUpperCase())}
@@ -1847,11 +1899,9 @@ export default function Dashboard() {
                       Kodu Kullan
                     </button>
                   </div>
-                  {urgent && (
-                    <p className="mt-2 text-[10.5px] text-gray-400">
-                      Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
-                    </p>
-                  )}
+                  <p className="mt-2 text-[10.5px] text-gray-400">
+                    Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
+                  </p>
                 </div>
               </div>
             </div>
@@ -2225,20 +2275,23 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Bölüm 2: Favori Kesimleriniz */}
+                {/* Bölüm 2: Portföy galerisi — işletme türüne göre başlık/metin */}
+                {(() => {
+                  const galleryCopy = GALLERY_COPY_BY_TYPE[shop?.category as string] ?? DEFAULT_GALLERY_COPY;
+                  return (
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
                   <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-sm font-black uppercase tracking-tighter">Favori Kesimleriniz</h3>
+                    <h3 className="text-sm font-black uppercase tracking-tighter">{galleryCopy.title}</h3>
                     <div className="relative group/tip2">
                       <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#00A3AD] hover:text-white transition-all cursor-help text-[10px] font-black">?</div>
                       <div className="absolute left-0 top-7 z-30 w-72 bg-black text-white text-[11px] font-bold leading-relaxed rounded-2xl p-4 opacity-0 group-hover/tip2:opacity-100 transition-all pointer-events-none shadow-2xl">
-                        Yüklediğiniz kesim fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.
+                        {galleryCopy.tip}
                       </div>
                     </div>
                   </div>
                   <div className="space-y-0.5 mb-6">
-                    <p className="text-[10px] font-bold text-gray-400">Fade, sakal, uzun saç, boyama veya özel işlemlerinizden örnekler ekleyin.</p>
-                    <p className="text-[10px] font-bold text-gray-400">Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.</p>
+                    <p className="text-[10px] font-bold text-gray-400">{galleryCopy.desc1}</p>
+                    <p className="text-[10px] font-bold text-gray-400">{galleryCopy.desc2}</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {(shop?.haircut_urls || []).map((url: string, i: number) => (
@@ -2274,6 +2327,8 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+                  );
+                })()}
 
               </div>
             )}
