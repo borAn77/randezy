@@ -64,11 +64,11 @@ export function Hero({ onStart }: { onStart?: () => void }) {
               onClick={onStart}
               className="bg-white text-black px-8 py-3 md:px-10 md:py-4 rounded-xl text-base md:text-lg font-semibold hover:shadow-2xl transition-all"
             >
-              Ücretsiz dene
+              Hemen başla
             </motion.button>
 
             <p className="text-sm text-gray-400">
-              Kredi kartı gerektirmez • Anında kurulum
+              Komisyonsuz sabit fiyat • Anında kurulum
             </p>
           </motion.div>
 

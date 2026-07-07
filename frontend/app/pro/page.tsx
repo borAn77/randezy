@@ -61,7 +61,7 @@ export default function ProPage() {
             onClick={handleStart}
             className="bg-black text-white px-8 py-2.5 rounded-full text-[12px] font-black uppercase tracking-widest hover:bg-[#00A3AD] transition-all shadow-lg"
           >
-            Ücretsiz Başla
+            Hemen Başla
           </button>
         </div>
       </nav>
