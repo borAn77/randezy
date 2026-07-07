@@ -29,14 +29,42 @@ export default function ProPage() {
       .select('email_verified')
       .eq('id', session.user.id)
       .maybeSingle();
-    if (profile?.email_verified === true) {
-      router.push("/isletme-ekle");
-    } else {
+    if (profile?.email_verified !== true) {
       // Giriş var ama OTP doğrulanmamış → doğrudan doğrulama ekranı
       setVerifyMode(true);
       setVerifyEmail(session.user.email || "");
       setIsAuthOpen(true);
+      return;
     }
+
+    // Zaten işletmesi olan sahip tekrar "Hemen Başla"ya basarsa panele gitsin
+    const { data: existingShop } = await supabase
+      .from('shops')
+      .select('id')
+      .eq('owner_id', session.user.id)
+      .limit(1)
+      .maybeSingle();
+    if (existingShop) {
+      router.push("/dashboard");
+      return;
+    }
+
+    // Yeni işletme sahibi: işletmesi henüz yok → önce ödeme sayfasına gönder.
+    // Ödeme başlatılamazsa akış kesilmesin, işletme formuna devam edilsin.
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json();
+      if (json.ok && json.url) {
+        window.location.href = json.url;
+        return;
+      }
+    } catch {
+      // sessizce devam — aşağıdaki fallback çalışır
+    }
+    router.push("/isletme-ekle");
   };
 
   return (

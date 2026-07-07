@@ -27,46 +27,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, reason: "not_paid" }, { status: 402 });
     }
 
-    const shopId = parseInt(session.metadata?.shop_id || "", 10);
-    if (!Number.isFinite(shopId)) {
-      return NextResponse.json({ ok: false, reason: "bad_session" }, { status: 400 });
-    }
-
-    // Oturum gerçekten bu kullanıcının işletmesine mi ait?
-    const { data: shop } = await supabaseAdmin
-      .from("shops")
-      .select("id, owner_id, subscription_until")
-      .eq("id", shopId)
-      .maybeSingle();
-    if (!shop || shop.owner_id !== user.id) {
-      return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
-    }
-
+    const subId = typeof session.subscription === "object" && session.subscription
+      ? session.subscription.id
+      : (session.subscription as string | null);
     const periodEnd = periodEndFromSubscription(session.subscription);
     const newUntil = periodEnd
       ? subscriptionUntilFromPeriodEnd(periodEnd)
       : new Date(Date.now() + 31 * 86400000).toISOString(); // emniyet: dönem okunamadıysa 31 gün
 
-    // Geriye gitme: mevcut bitiş daha ilerideyse dokunma
-    const finalUntil = new Date(newUntil) > new Date(shop.subscription_until ?? 0)
-      ? newUntil
-      : shop.subscription_until;
+    // Yol A: işletme zaten vardı (yenileme/ilk ödeme sonrası dashboard akışı)
+    const shopId = parseInt(session.metadata?.shop_id || "", 10);
+    if (Number.isFinite(shopId)) {
+      const { data: shop } = await supabaseAdmin
+        .from("shops")
+        .select("id, owner_id, subscription_until")
+        .eq("id", shopId)
+        .maybeSingle();
+      if (!shop || shop.owner_id !== user.id) {
+        return NextResponse.json({ ok: false, reason: "forbidden" }, { status: 403 });
+      }
+      // Geriye gitme: mevcut bitiş daha ilerideyse dokunma
+      const finalUntil = new Date(newUntil) > new Date(shop.subscription_until ?? 0)
+        ? newUntil
+        : shop.subscription_until;
 
-    const subId = typeof session.subscription === "object" && session.subscription
-      ? session.subscription.id
-      : (session.subscription as string | null);
+      await supabaseAdmin
+        .from("shops")
+        .update({
+          subscription_until: finalUntil,
+          stripe_customer_id: (session.customer as string) ?? null,
+          stripe_subscription_id: subId,
+        })
+        .eq("id", shopId);
 
-    await supabaseAdmin
-      .from("shops")
-      .update({
-        subscription_until: finalUntil,
-        stripe_customer_id: (session.customer as string) ?? null,
-        stripe_subscription_id: subId,
-      })
-      .eq("id", shopId);
+      console.log(`[billing/confirm] shop ${shopId} → paid, until ${finalUntil}`);
+      return NextResponse.json({ ok: true, subscription_until: finalUntil });
+    }
 
-    console.log(`[billing/confirm] shop ${shopId} → paid, until ${finalUntil}`);
-    return NextResponse.json({ ok: true, subscription_until: finalUntil });
+    // Yol B: henüz işletmesi yok — ödeme kaydı profile "pending" olarak yazılır,
+    // işletme formu gönderildiğinde /api/billing/attach-pending devreye girer.
+    if (session.metadata?.owner_id === user.id) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          pending_subscription_until: newUntil,
+          pending_stripe_customer_id: (session.customer as string) ?? null,
+          pending_stripe_subscription_id: subId,
+        })
+        .eq("id", user.id);
+
+      console.log(`[billing/confirm] owner ${user.id} → ödeme alındı, pending until ${newUntil}`);
+      return NextResponse.json({ ok: true, subscription_until: newUntil, pending: true });
+    }
+
+    return NextResponse.json({ ok: false, reason: "bad_session" }, { status: 400 });
   } catch (err) {
     console.error("[billing/confirm] error:", err);
     return NextResponse.json({ ok: false, reason: "stripe_error" }, { status: 500 });

@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabaseAdmin.auth.getUser(token);
   if (!user) return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
 
+  // İşletmesi olan sahibi için "yenileme" akışı; henüz işletmesi olmayan
+  // yeni kullanıcı için "önce öde, sonra işletme oluştur" akışı.
   const { data: shop } = await supabaseAdmin
     .from("shops")
     .select("id, name, stripe_customer_id")
@@ -20,24 +22,25 @@ export async function POST(req: NextRequest) {
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (!shop) return NextResponse.json({ ok: false, reason: "no_shop" }, { status: 404 });
 
   const origin = req.headers.get("origin") || "https://www.randezy.com";
+  const metadata: Record<string, string> = shop ? { shop_id: String(shop.id) } : { owner_id: user.id };
+  const returnPath = shop ? "/dashboard" : "/isletme-ekle";
 
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
       // Mevcut Stripe müşterisi varsa onu kullan, yoksa e-postayla yeni oluşsun
-      ...(shop.stripe_customer_id
+      ...(shop?.stripe_customer_id
         ? { customer: shop.stripe_customer_id }
         : { customer_email: user.email }),
-      client_reference_id: String(shop.id),
-      metadata: { shop_id: String(shop.id) },
-      subscription_data: { metadata: { shop_id: String(shop.id) } },
+      client_reference_id: shop ? String(shop.id) : user.id,
+      metadata,
+      subscription_data: { metadata },
       locale: "tr",
-      success_url: `${origin}/dashboard?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard?billing=cancel`,
+      success_url: `${origin}${returnPath}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}${returnPath}?billing=cancel`,
     });
     return NextResponse.json({ ok: true, url: session.url });
   } catch (err) {
