@@ -59,10 +59,11 @@ const STATUS_META: Record<DispStatus, { c: string; bg: string; label: string }> 
   pending:   { c: WARN,    bg: 'rgba(245,165,36,0.14)',  label: 'Bekleyen'      },
 };
 
-// Randevu saati geçtiği halde işletme sahibi henüz "Geldi/Tamamla" ya da
-// "Gelmedi" olarak işaretlememişse, bunu sessizce "Tamamlandı" saymak yerine
-// ayrı bir "Onay Bekliyor" durumuna düşürüyoruz — aksi halde gelire hiç
-// girmeden dimmed/done görünüp NextUpCard'da bir daha hiç sorulmuyordu.
+// Onaylanmış bir randevunun saati geçtiyse owner'dan ayrıca "Geldi/Tamamla"
+// onayı istemiyoruz — varsayılan "Tamamlandı" sayılır, müşteri gelmediyse
+// "Gelmedi" ile elle işaretlenir. Hâlâ "Beklemede" (hiç onaylanmamış) olup
+// saati geçen randevular ise sessizce "Tamamlandı" sayılmaz, dikkat çekmesi
+// için "Onay Bekliyor" durumunda kalır.
 function computeDispStatus(apt: DbApt): DispStatus {
   if (apt.status === 'Tamamlandı') return 'done';
   if (apt.status === 'İptal Edildi') return 'cancelled';
@@ -72,7 +73,7 @@ function computeDispStatus(apt: DbApt): DispStatus {
   const start = new Date(); start.setHours(h, m, 0, 0);
   const end   = new Date(start.getTime() + (apt.duration_snapshot || 30) * 60000);
   if (now >= start && now <= end) return 'now';
-  if (now > end) return 'overdue';
+  if (now > end) return apt.status === 'Onaylandı' ? 'done' : 'overdue';
   if (apt.status === 'Beklemede') return 'pending';
   return 'confirmed';
 }
@@ -159,12 +160,6 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
       { text: 'Onayla', onPress: () => onStatusChange(apt.id, 'Onaylandı') },
     ]);
 
-  const complete = () =>
-    Alert.alert('Müşteri geldi mi?', `${name} için randevuyu tamamlandı olarak işaretle?`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: '✓ Geldi', onPress: () => onStatusChange(apt.id, 'Tamamlandı') },
-    ]);
-
   const cancelPending = () =>
     Alert.alert('Randevuyu iptal et', `${name} için randevu iptal edilsin mi?`, [
       { text: 'Vazgeç', style: 'cancel' },
@@ -236,13 +231,6 @@ function NextUpCard({ apt, onStatusChange }: { apt: AptDisplay; onStatusChange: 
             onPress={markNoShow}
           >
             <Text style={{ fontSize: 13.5, fontWeight: '700', color: ROSE }}>Gelmedi</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.softBtn, { flex: 2, backgroundColor: OK, borderWidth: 0, shadowColor: OK, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}
-            onPress={complete}
-          >
-            <Feather name="check" size={16} color="#fff" />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff', marginLeft: 6 }}>Geldi / Tamamla</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -466,10 +454,19 @@ export default function HomeScreen() {
       const displayed: AptDisplay[] = aptList.map(a => ({ ...a, dispStatus: computeDispStatus(a) }));
       setTodayApts(displayed);
       setRevenue(
-        aptList
-          .filter(a => a.status === 'Tamamlandı')
+        displayed
+          .filter(a => a.dispStatus === 'done')
           .reduce((s, a) => s + (a.price ?? 0), 0)
       );
+
+      // Onaylanmış + saati geçmiş randevular dispStatus'ta 'done' sayılıyor;
+      // Finans ve diğer ekranlarla tutarlı kalması için DB'ye de yazıyoruz.
+      const autoCompleteIds = displayed
+        .filter(a => a.status === 'Onaylandı' && a.dispStatus === 'done')
+        .map(a => a.id);
+      if (autoCompleteIds.length) {
+        supabase.from('appointments').update({ status: 'Tamamlandı' }).in('id', autoCompleteIds);
+      }
 
       // build week chart
       const counts = weekDates.map(date => (weekRaw || []).filter((a: any) => a.appointment_date === date).length);
