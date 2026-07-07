@@ -36,6 +36,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# App Store review demo credentials
+store.config.json
+
 # generated native folders
 /ios
 /android
