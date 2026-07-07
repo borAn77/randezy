@@ -1793,52 +1793,70 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Abonelik durumu bandı (son 14 gün ve süresi dolmuşlar) ── */}
-        {shop && subDaysLeft !== null && subDaysLeft <= 14 && (
-          <div className={`mb-6 rounded-2xl border px-5 py-4 ${subDaysLeft <= 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
-            <div className="flex items-start gap-3">
-              <AlertCircle size={18} className={`flex-shrink-0 mt-0.5 ${subDaysLeft <= 0 ? 'text-red-500' : 'text-amber-500'}`} />
-              <div className="flex-1 min-w-0">
-                <p className={`text-[13px] font-bold ${subDaysLeft <= 0 ? 'text-red-800' : 'text-amber-800'}`}>
-                  {subDaysLeft <= 0
-                    ? 'Aboneliğiniz aktif değil — işletmeniz müşterilere görünmüyor'
-                    : `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`}
-                </p>
-                <p className={`text-[12px] mt-0.5 ${subDaysLeft <= 0 ? 'text-red-700' : 'text-amber-700'}`}>
-                  Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={handleCheckout}
-                    disabled={promoBusy}
-                    className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
-                  >
-                    {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
-                  </button>
-                  <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
-                  <input
-                    value={promoCode}
-                    onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === 'Enter') handleRedeemPromo(); }}
-                    placeholder="PROMO KODU"
-                    maxLength={24}
-                    className="px-3 py-2 rounded-xl border border-[#ececea] bg-white text-[13px] font-semibold tracking-widest uppercase w-40 outline-none focus:border-[#14b8a6] transition-colors"
-                  />
-                  <button
-                    onClick={handleRedeemPromo}
-                    disabled={promoBusy || !promoCode.trim()}
-                    className="px-4 py-2 rounded-xl bg-[#0c0c0d] text-white text-[12px] font-bold hover:bg-[#14b8a6] hover:text-[#04221d] transition-all disabled:opacity-50"
-                  >
-                    Kodu Kullan
-                  </button>
+        {/* ── Abonelik durumu bandı — her zaman görünür, aciliyete göre renk değişir ── */}
+        {shop && subDaysLeft !== null && (() => {
+          const urgent = subDaysLeft <= 14; // 14 gün altı: kırmızı/amber uyarı; üstü: sakin yeşil şerit
+          const expired = subDaysLeft <= 0;
+          const boxCls = expired ? 'bg-red-50 border-red-200' : urgent ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-100';
+          const iconCls = expired ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-emerald-500';
+          const titleCls = expired ? 'text-red-800' : urgent ? 'text-amber-800' : 'text-emerald-800';
+          const bodyCls = expired ? 'text-red-700' : urgent ? 'text-amber-700' : 'text-emerald-700';
+          return (
+            <div className={`mb-6 rounded-2xl border px-5 py-4 ${boxCls}`}>
+              <div className="flex items-start gap-3">
+                <AlertCircle size={18} className={`flex-shrink-0 mt-0.5 ${iconCls}`} />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[13px] font-bold ${titleCls}`}>
+                    {expired
+                      ? 'Aboneliğiniz aktif değil — işletmeniz müşterilere görünmüyor'
+                      : urgent
+                      ? `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`
+                      : `Aboneliğiniz aktif — ${subDaysLeft} gün kaldı`}
+                  </p>
+                  <p className={`text-[12px] mt-0.5 ${bodyCls}`}>
+                    {urgent
+                      ? 'Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.'
+                      : 'Promo kodun mu var? Aşağıya girip aboneliğinizi uzatabilirsiniz.'}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {urgent && (
+                      <>
+                        <button
+                          onClick={handleCheckout}
+                          disabled={promoBusy}
+                          className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
+                        >
+                          {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
+                        </button>
+                        <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
+                      </>
+                    )}
+                    <input
+                      value={promoCode}
+                      onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRedeemPromo(); }}
+                      placeholder="PROMO KODU"
+                      maxLength={24}
+                      className="px-3 py-2 rounded-xl border border-[#ececea] bg-white text-[13px] font-semibold tracking-widest uppercase w-40 outline-none focus:border-[#14b8a6] transition-colors"
+                    />
+                    <button
+                      onClick={handleRedeemPromo}
+                      disabled={promoBusy || !promoCode.trim()}
+                      className="px-4 py-2 rounded-xl bg-[#0c0c0d] text-white text-[12px] font-bold hover:bg-[#14b8a6] hover:text-[#04221d] transition-all disabled:opacity-50"
+                    >
+                      Kodu Kullan
+                    </button>
+                  </div>
+                  {urgent && (
+                    <p className="mt-2 text-[10.5px] text-gray-400">
+                      Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
+                    </p>
+                  )}
                 </div>
-                <p className="mt-2 text-[10.5px] text-gray-400">
-                  Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
-                </p>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {!shop && activeTab !== "settings" ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
