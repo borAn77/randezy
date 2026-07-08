@@ -185,10 +185,13 @@ export default function Home() {
       return matchesSearch && matchesCategory && matchesCity && matchesDistrict;
     });
     if (sortBy === "rating") {
-      // 3+ yorumu olmayan işletmeler puansız sayılır (score kolonunun varsayılan 5'i sıralamayı bozmasın)
+      // 3+ yorumu olmayan işletmeler puansız sayılır (score kolonunun varsayılan 5'i sıralamayı bozmasın).
+      // Native yorum yoksa, bağlıysa Google puanı kullanılır.
       const ratingOf = (s: any) => {
         const revs = s.reviews || [];
-        return revs.length >= 3 ? revs.reduce((t: number, r: any) => t + (r.rating || 0), 0) / revs.length : 0;
+        if (revs.length >= 3) return revs.reduce((t: number, r: any) => t + (r.rating || 0), 0) / revs.length;
+        if (s.google_rating != null && s.google_review_count > 0) return Number(s.google_rating);
+        return 0;
       };
       result = [...result].sort((a, b) => ratingOf(b) - ratingOf(a));
     }
@@ -230,7 +233,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans">
-      <section className="relative min-h-[82vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
+      <section className="relative min-h-[64vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
         <div className="absolute inset-0 bg-[#050505]" style={{ height: '100%', overflow: 'hidden' }}>
           {userId ? (
             <img
@@ -516,9 +519,15 @@ export default function Home() {
               const isDiscount = activeCampaign && (activeCampaign.type === 'percentage' || activeCampaign.type === 'fixed');
               const reviewCount = (shop.reviews || []).length;
               // Puan yalnızca 3+ yorumdan sonra, gerçek yorum ortalaması olarak gösterilir
-              const avgRating = reviewCount >= 3
+              const nativeRating = reviewCount >= 3
                 ? ((shop.reviews as any[]).reduce((s: number, r: any) => s + (r.rating || 0), 0) / reviewCount).toFixed(1)
                 : null;
+              // Native yorum yoksa ama Google bağlıysa Google puanını göster (kaynak G ile belirtilir)
+              const googleRating = (shop.google_rating != null && shop.google_review_count > 0)
+                ? Number(shop.google_rating).toFixed(1)
+                : null;
+              const displayRating = nativeRating ?? googleRating;
+              const displayCount = nativeRating ? reviewCount : shop.google_review_count;
               const topServices = [...(shop.services || [])]
                 .filter((s: any) => s && s.name)
                 .sort((a: any, b: any) => (a.sort_order ?? 999) - (b.sort_order ?? 999))
@@ -551,14 +560,14 @@ export default function Home() {
                         </span>
                       </div>
                     )}
-                    {avgRating && (
+                    {displayRating && (
                       <div
                         className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-semibold shadow-sm flex items-center gap-1"
                         style={{ color: "#0c0c0d" }}
                       >
                         <span className="text-amber-400">★</span>
-                        {avgRating}
-                        <span style={{ color: "#8a8a8e" }}>({reviewCount})</span>
+                        {displayRating}
+                        <span style={{ color: "#8a8a8e" }}>({displayCount})</span>
                       </div>
                     )}
                     <button

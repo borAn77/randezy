@@ -8,7 +8,7 @@ export const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? "build-placeholder"
 );
 
-function adminEmails(): string[] {
+export function adminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())

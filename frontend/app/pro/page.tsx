@@ -15,11 +15,6 @@ export default function ProPage() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [verifyMode, setVerifyMode] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState("");
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
-  const [promoInput, setPromoInput] = useState("");
-  const [promoBusy, setPromoBusy] = useState(false);
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [payBusy, setPayBusy] = useState(false);
   const [cancelNotice, setCancelNotice] = useState(false);
 
   const handleStart = async () => {
@@ -57,9 +52,24 @@ export default function ProPage() {
       return;
     }
 
-    // Yeni işletme sahibi: önce promo kod / ödeme seçimini göster
-    setPromoError(null);
-    setShowPaywallModal(true);
+    // Yeni işletme sahibi: Stripe'ın kendi ödeme sayfasına gönder.
+    // Orada "Promosyon kodu ekle" alanı var (RANDEZY2026 gibi kodlar için) —
+    // geçerli %100 indirimli kod girilirse kart bile istenmez.
+    // Ödeme başlatılamazsa akış kesilmesin, işletme formuna devam edilsin.
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = await res.json();
+      if (json.ok && json.url) {
+        window.location.href = json.url;
+        return;
+      }
+    } catch {
+      // sessizce devam — aşağıdaki fallback çalışır
+    }
+    router.push("/isletme-ekle");
   };
 
   // E-posta doğrulaması AuthModal içinde tamamlanınca (redirectAfterVerify
@@ -79,54 +89,6 @@ export default function ProPage() {
       setCancelNotice(true);
     }
   }, []);
-
-  const handleRedeemPending = async () => {
-    const code = promoInput.trim().toUpperCase();
-    if (!code || promoBusy) return;
-    setPromoBusy(true);
-    setPromoError(null);
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch('/api/promo/redeem-pending', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ code }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setPromoBusy(false);
-    if (json.ok) {
-      router.push('/isletme-ekle?billing=success&promo=1');
-      return;
-    }
-    const msgs: Record<string, string> = {
-      invalid_code: 'Kod geçersiz. Kontrol edip tekrar dene.',
-      expired_code: 'Bu kodun süresi dolmuş.',
-      exhausted: 'Bu kod kullanım limitine ulaşmış.',
-      already_used: 'Bu kodu zaten kullandınız.',
-    };
-    setPromoError(msgs[json.reason as string] || 'Kod uygulanamadı, tekrar deneyin.');
-  };
-
-  const handlePayWithCard = async () => {
-    if (payBusy) return;
-    setPayBusy(true);
-    setPromoError(null);
-    const { data: { session } } = await supabase.auth.getSession();
-    try {
-      const res = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      });
-      const json = await res.json();
-      if (json.ok && json.url) {
-        window.location.href = json.url;
-        return;
-      }
-    } catch {
-      // aşağıdaki hata mesajı gösterilir
-    }
-    setPayBusy(false);
-    setPromoError('Ödeme sayfası açılamadı, tekrar deneyin.');
-  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -161,7 +123,7 @@ export default function ProPage() {
       {cancelNotice && (
         <div className="max-w-2xl mx-auto mt-6 px-6">
           <div className="flex items-start justify-between gap-3 bg-amber-50 border border-amber-100 text-amber-700 text-[13px] font-bold rounded-2xl px-5 py-4">
-            <span>Ödeme tamamlanmadı. Promo kodun varsa "Hemen Başla"ya basıp tekrar dene.</span>
+            <span>Ödeme tamamlanmadı. "Hemen Başla"ya basıp tekrar deneyebilirsin.</span>
             <button onClick={() => setCancelNotice(false)} className="text-amber-400 hover:text-amber-700 flex-shrink-0">
               <X size={16} />
             </button>
@@ -188,61 +150,6 @@ export default function ProPage() {
         verificationOnly={verifyMode}
         initialEmail={verifyEmail}
       />
-
-      {/* Promo kod / ödeme seçim modalı — işletme oluşturulmadan ÖNCE gösterilir */}
-      {showPaywallModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-          <div className="bg-white rounded-[2.5rem] max-w-md w-full p-8 md:p-10 relative animate-in zoom-in duration-300">
-            <button
-              onClick={() => { setShowPaywallModal(false); setPromoInput(""); setPromoError(null); }}
-              className="absolute top-6 right-6 text-gray-300 hover:text-black transition-colors"
-            >
-              <X size={24} />
-            </button>
-            <h3 className="text-2xl font-black uppercase tracking-tight mb-2 text-black">İşletmeni Randezy'e Taşı</h3>
-            <p className="text-sm text-gray-400 font-medium mb-8">Devam etmeden önce bir seçenek seç.</p>
-
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-              Promo kodun var mı?
-            </label>
-            <div className="flex gap-2">
-              <input
-                value={promoInput}
-                onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(null); }}
-                onKeyDown={e => { if (e.key === 'Enter') handleRedeemPending(); }}
-                placeholder="ÖRN. RANDEZY2026"
-                maxLength={24}
-                className="flex-1 min-w-0 px-4 py-3 bg-gray-50 rounded-2xl font-black text-sm outline-none border-2 border-transparent focus:border-[#00A3AD] text-black tracking-widest uppercase"
-              />
-              <button
-                onClick={handleRedeemPending}
-                disabled={promoBusy || !promoInput.trim()}
-                className="px-5 py-3 rounded-2xl bg-[#00A3AD] text-white text-[12px] font-black uppercase tracking-wide hover:bg-black transition-all disabled:opacity-40 flex-shrink-0"
-              >
-                {promoBusy ? '...' : 'Uygula'}
-              </button>
-            </div>
-            {promoError && <p className="text-red-500 text-[12px] font-bold mt-2">{promoError}</p>}
-
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px bg-gray-100" />
-              <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">veya</span>
-              <div className="flex-1 h-px bg-gray-100" />
-            </div>
-
-            <button
-              onClick={handlePayWithCard}
-              disabled={payBusy}
-              className="w-full bg-black text-white py-4 rounded-2xl font-black text-[12px] uppercase tracking-widest hover:bg-[#00A3AD] transition-all disabled:opacity-50"
-            >
-              {payBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Kart ile Öde'}
-            </button>
-            <p className="text-center text-[10px] text-gray-300 font-bold uppercase tracking-widest mt-4">
-              Komisyonsuz sabit fiyat · İstediğin an devam edebilirsin
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

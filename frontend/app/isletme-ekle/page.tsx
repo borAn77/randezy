@@ -87,12 +87,6 @@ export default function IsletmeEkle() {
     }
     if (billing !== 'success') return;
 
-    // Promo koddan geldi (Stripe'a hiç uğramadı) — zaten uygulandı, sadece bildir
-    if (params.get('promo') === '1') {
-      setPaymentNotice({ ok: true, msg: 'Promo kodun uygulandı 🎉 Şimdi işletmeni oluştur, aboneliğin otomatik aktifleşecek.' });
-      return;
-    }
-
     const sessionId = params.get('session_id');
     if (!sessionId) return;
     (async () => {
@@ -171,6 +165,13 @@ export default function IsletmeEkle() {
         // aktarım başarısız olsa da işletme oluştu — dashboard'daki abonelik
         // bandı sahibi yine de ödeme/promo ile devam edebilir
       }
+
+      // Adminlere "yeni başvuru var" e-postası — başarısız olsa da akış kesilmez
+      fetch('/api/admin/notify-new-shop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ shopId: newShop.id }),
+      }).catch(() => {});
 
       router.push('/dashboard');
     } catch (err: any) {

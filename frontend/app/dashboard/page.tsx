@@ -7,7 +7,7 @@ import AuthModal from "../../components/layout/AuthModal";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
-  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
+  Clock, Trash2, Save, X, Menu, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
   Star, MessageSquare, Phone, Search,
   ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent,
   Copy, RefreshCw, KeyRound
@@ -25,6 +25,64 @@ const CATEGORIES_BY_TYPE: Record<string, string[]> = {
   'MASAJ': ['Klasik Masaj', 'Medikal Masaj', 'Spor Masajı', 'Aromaterapi', 'Sıcak Taş Masajı', 'Refleksoloji', 'Bölgesel Masaj', 'Diğer'],
   'FİZYOTERAPİ': ['Ön Değerlendirme', 'Manuel Terapi', 'Egzersiz Terapisi', 'Rehabilitasyon', 'Spor Fizyoterapisi', 'Medikal Masaj', 'Elektroterapi', 'Diğer'],
   'DÖVME': ['Minimal Dövme', 'Yazı Dövme', 'Renkli Dövme', 'Gerçekçi Dövme', 'Kapatma & Düzeltme', 'Piercing', 'Kalıcı Makyaj', 'Diğer'],
+};
+
+// Görsel Kimlik → portföy galerisi metinleri, işletme türüne göre
+const GALLERY_COPY_BY_TYPE: Record<string, { title: string; desc1: string; desc2: string; tip: string }> = {
+  'KUAFÖR': {
+    title: 'Favori Saç Modelleriniz',
+    desc1: 'Boya, röfle, keratin veya özel saç modellerinizden örnekler ekleyin.',
+    desc2: 'Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz saç modeli fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'BERBER': {
+    title: 'Favori Kesimleriniz',
+    desc1: 'Fade, sakal, uzun saç, boyama veya özel işlemlerinizden örnekler ekleyin.',
+    desc2: 'Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz kesim fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'GÜZELLİK MERKEZİ': {
+    title: 'Öne Çıkan Çalışmalarınız',
+    desc1: 'Cilt bakımı, lazer epilasyon, makyaj veya özel uygulamalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflar net olmalı; öncesi/sonrası karşılaştırmalar güveni artırır.',
+    tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'TIRNAK': {
+    title: 'Favori Tırnak Tasarımlarınız',
+    desc1: 'Manikür, pedikür, nail art veya protez tırnak çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda tasarım net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+    tip: 'Yüklediğiniz tasarım fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'KAŞ VE KİRPİK': {
+    title: 'Favori Çalışmalarınız',
+    desc1: 'Kaş tasarımı, kirpik lifting, ipek kirpik veya microblading çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda detay net görünmeli, yakın çekim tercih edilmelidir.',
+    tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+  'MASAJ': {
+    title: 'Mekan ve Hizmet Fotoğraflarınız',
+    desc1: 'Masaj odanız, ekipmanlarınız veya uyguladığınız tekniklerden örnekler ekleyin.',
+    desc2: 'Sakin, temiz ve profesyonel bir atmosfer yansıtan fotoğraflar tercih edilmelidir.',
+    tip: 'Yüklediğiniz mekan ve hizmet fotoğrafları müşteri kararını doğrudan etkiler. Net ve güven veren fotoğraflar daha fazla rezervasyon sağlar.',
+  },
+  'FİZYOTERAPİ': {
+    title: 'Merkez ve Uygulama Fotoğraflarınız',
+    desc1: 'Kliniğiniz, ekipmanlarınız veya uyguladığınız tedavilerden örnekler ekleyin.',
+    desc2: 'Temiz, profesyonel ve güven veren fotoğraflar tercih edilmelidir.',
+    tip: 'Yüklediğiniz merkez fotoğrafları müşteri kararını doğrudan etkiler. Net ve güven veren fotoğraflar daha fazla rezervasyon sağlar.',
+  },
+  'DÖVME': {
+    title: 'Portfolyonuz',
+    desc1: 'Yaptığınız dövme, kapatma veya piercing çalışmalarınızdan örnekler ekleyin.',
+    desc2: 'Fotoğraflarda çalışma net görünmeli, iyi ışıklandırılmış olmalıdır.',
+    tip: 'Yüklediğiniz portfolyo fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
+  },
+};
+const DEFAULT_GALLERY_COPY = {
+  title: 'Öne Çıkan Çalışmalarınız',
+  desc1: 'Yaptığınız işlerden örnekler ekleyin.',
+  desc2: 'Fotoğraflar net görünmeli, arka plan sade ve ışık dengeli olmalıdır.',
+  tip: 'Yüklediğiniz çalışma fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.',
 };
 
 const BERBER_CATALOG: Record<string, CatalogItem[]> = {
@@ -536,6 +594,7 @@ export default function Dashboard() {
   const [staffCodes, setStaffCodes] = useState<Record<string, string>>({});
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -590,6 +649,9 @@ export default function Dashboard() {
   const [replyingReviewId, setReplyingReviewId] = useState<string|null>(null);
   const [replyText, setReplyText] = useState('');
   const [savingReply, setSavingReply] = useState(false);
+  const [googleQuery, setGoogleQuery] = useState('');
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleResults, setGoogleResults] = useState<{place_id:string; name:string; formatted_address:string; rating?:number; user_ratings_total?:number}[] | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [calFilterStaff, setCalFilterStaff] = useState<string|null>(null);
   const [isNewAptModalOpen, setIsNewAptModalOpen] = useState(false);
@@ -1593,6 +1655,75 @@ export default function Dashboard() {
     }
   };
 
+  const handleGoogleSearch = async () => {
+    const query = googleQuery.trim() || [shop?.name, shop?.district, shop?.city].filter(Boolean).join(' ');
+    if (!query || googleBusy) return;
+    setGoogleBusy(true);
+    setGoogleResults(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) {
+      setGoogleResults(json.results);
+      if (json.results.length === 0) showToast('Sonuç bulunamadı, farklı bir isimle dene.', 'err');
+    } else {
+      showToast('Arama başarısız oldu, tekrar dene.', 'err');
+    }
+  };
+
+  const handleGoogleLink = async (placeId: string) => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ placeId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) {
+      showToast(`Google işletmen bağlandı — ★${json.rating ?? '-'} (${json.review_count ?? 0} yorum)`);
+      setGoogleResults(null);
+      setGoogleQuery('');
+      fetchInitialData();
+    } else {
+      showToast(json.reason === 'already_linked_elsewhere' ? 'Bu Google kaydı başka bir işletmeye bağlı.' : 'Bağlanamadı, tekrar dene.', 'err');
+    }
+  };
+
+  const handleGoogleRefresh = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/refresh', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) { showToast('Google yorumları güncellendi.'); fetchInitialData(); }
+    else showToast('Güncellenemedi, tekrar dene.', 'err');
+  };
+
+  const handleGoogleUnlink = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/link', {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    });
+    setGoogleBusy(false);
+    if (res.ok) { showToast('Google bağlantısı kaldırıldı.'); fetchInitialData(); }
+    else showToast('Kaldırılamadı, tekrar dene.', 'err');
+  };
+
   // Calendar view helpers
   const calHours = Array.from({ length: 14 }, (_, i) => i + 8); // 08–21
   const calHourH = 64; // px per hour
@@ -1692,11 +1823,20 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#f7f5f0] flex font-sans text-[#0c0c0d]">
+      {/* Mobil drawer arka planı — yalnızca menü açıkken ve mobilde */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileNavOpen(false)} />
+      )}
       {/* SIDEBAR */}
-      <aside className="w-64 bg-[#0c0c0d] fixed h-full flex flex-col z-50 overflow-y-auto">
-        <div className="px-6 py-6 border-b border-white/5">
-          <div className="text-[18px] font-bold text-white tracking-tight">RANDEZY<span className="text-[#14b8a6]">.PRO</span></div>
-          <div className="h-0.5 w-7 bg-[#14b8a6] mt-1.5"></div>
+      <aside className={`w-64 bg-[#0c0c0d] fixed h-full flex flex-col z-50 overflow-y-auto transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-6 py-6 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <div className="text-[18px] font-bold text-white tracking-tight">RANDEZY<span className="text-[#14b8a6]">.PRO</span></div>
+            <div className="h-0.5 w-7 bg-[#14b8a6] mt-1.5"></div>
+          </div>
+          <button onClick={() => setMobileNavOpen(false)} className="md:hidden text-white/50 hover:text-white transition-colors" aria-label="Menüyü kapat">
+            <X size={20}/>
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-5">
@@ -1704,7 +1844,7 @@ export default function Dashboard() {
             <div key={gi}>
               <p className="text-[9px] font-semibold text-white/30 uppercase tracking-[0.15em] px-3 mb-1.5">{group.label}</p>
               {group.items.map(item => (
-                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileNavOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all mb-0.5 relative ${
                     activeTab === item.id
                       ? 'bg-[#14b8a6] text-[#04221d] font-semibold shadow-lg shadow-[#14b8a6]/20'
@@ -1729,26 +1869,31 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 min-h-screen flex flex-col">
+      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
         {/* TOPBAR */}
-        <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between px-8 py-3.5">
-          <div className="text-sm font-semibold text-[#0c0c0d]">{shop?.name || 'İşletme Paneli'}</div>
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between gap-2 px-4 md:px-8 py-3.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setMobileNavOpen(true)} className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#ececea] text-[#0c0c0d] flex-shrink-0" aria-label="Menüyü aç">
+              <Menu size={18}/>
+            </button>
+            <div className="text-sm font-semibold text-[#0c0c0d] truncate">{shop?.name || 'İşletme Paneli'}</div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {shop?.id && (
               <>
                 <a href={shop.slug ? `/b/${shop.slug}` : `/shop/${shop.id}`} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
+                  className="hidden md:flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
                   <ArrowUpRight size={13}/> Sayfamı Gör
                 </a>
                 <button onClick={copyBookingLink}
-                  className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] transition-all text-[#7a7a7e] hover:text-[#14b8a6]">
+                  className="hidden md:flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] transition-all text-[#7a7a7e] hover:text-[#14b8a6]">
                   {linkCopied ? <CheckCircle2 size={13} className="text-[#15803d]"/> : <Tag size={13}/>}
                   {linkCopied ? 'Kopyalandı!' : 'Link Kopyala'}
                 </button>
               </>
             )}
-            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
-              <Plus size={14}/> Randevu Ekle
+            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-3 md:px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+              <Plus size={14}/> <span className="hidden sm:inline">Randevu Ekle</span>
             </button>
             <div className="relative">
               <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white border border-[#ececea] rounded-xl flex items-center justify-center text-[#0c0c0d] hover:bg-[#f7f5f0] transition-all">
@@ -1756,16 +1901,16 @@ export default function Dashboard() {
               </button>
               {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#14b8a6] text-[#04221d] text-[9px] font-bold rounded-full flex items-center justify-center">{pendingCount}</span>}
             </div>
-            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-3 py-1.5">
-              <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center">
+            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-2 md:px-3 py-1.5">
+              <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
                 {shop?.profiles?.avatar_url ? <img src={shop.profiles.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[#14b8a6] font-bold text-[11px]">{shop?.name?.charAt(0) || 'R'}</span>}
               </div>
-              <span className="text-[12px] font-semibold text-[#0c0c0d]">{shop?.name || 'Hesabım'}</span>
+              <span className="hidden lg:inline text-[12px] font-semibold text-[#0c0c0d]">{shop?.name || 'Hesabım'}</span>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
 
         {/* ── Ön onay durumu bandı ── */}
         {shop && shop.approval_status === 'pending' && (
@@ -1793,14 +1938,16 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Abonelik durumu bandı — her zaman görünür, aciliyete göre renk değişir ── */}
-        {shop && subDaysLeft !== null && (() => {
-          const urgent = subDaysLeft <= 14; // 14 gün altı: kırmızı/amber uyarı; üstü: sakin yeşil şerit
+        {/* ── Abonelik durumu bandı — yalnızca acil durumda görünür (son 14 gün / süresi dolmuş).
+             Sağlıklı abonelikte hiç gösterilmez: promo kod girişi artık Stripe'ın kendi ödeme
+             sayfasında (checkout, allow_promotion_codes) yapılıyor, burada tekrar sormak kafa
+             karıştırıyordu ("zaten kod girdim, neden hala istiyor?"). ── */}
+        {shop && subDaysLeft !== null && subDaysLeft <= 14 && (() => {
           const expired = subDaysLeft <= 0;
-          const boxCls = expired ? 'bg-red-50 border-red-200' : urgent ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-100';
-          const iconCls = expired ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-emerald-500';
-          const titleCls = expired ? 'text-red-800' : urgent ? 'text-amber-800' : 'text-emerald-800';
-          const bodyCls = expired ? 'text-red-700' : urgent ? 'text-amber-700' : 'text-emerald-700';
+          const boxCls = expired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200';
+          const iconCls = expired ? 'text-red-500' : 'text-amber-500';
+          const titleCls = expired ? 'text-red-800' : 'text-amber-800';
+          const bodyCls = expired ? 'text-red-700' : 'text-amber-700';
           return (
             <div className={`mb-6 rounded-2xl border px-5 py-4 ${boxCls}`}>
               <div className="flex items-start gap-3">
@@ -1809,28 +1956,20 @@ export default function Dashboard() {
                   <p className={`text-[13px] font-bold ${titleCls}`}>
                     {expired
                       ? 'Aboneliğiniz aktif değil — işletmeniz müşterilere görünmüyor'
-                      : urgent
-                      ? `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`
-                      : `Aboneliğiniz aktif — ${subDaysLeft} gün kaldı`}
+                      : `Aboneliğinizin bitmesine ${subDaysLeft} gün kaldı`}
                   </p>
                   <p className={`text-[12px] mt-0.5 ${bodyCls}`}>
-                    {urgent
-                      ? 'Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.'
-                      : 'Promo kodun mu var? Aşağıya girip aboneliğinizi uzatabilirsiniz.'}
+                    Aboneliğinizi hemen başlatın veya promo kodunuzu kullanın.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {urgent && (
-                      <>
-                        <button
-                          onClick={handleCheckout}
-                          disabled={promoBusy}
-                          className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
-                        >
-                          {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
-                        </button>
-                        <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
-                      </>
-                    )}
+                    <button
+                      onClick={handleCheckout}
+                      disabled={promoBusy}
+                      className="px-5 py-2 rounded-xl bg-[#14b8a6] text-white text-[12px] font-bold hover:bg-[#0d9488] transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {promoBusy ? 'Yönlendiriliyor...' : '₺1.699/ay — Aboneliği Başlat'}
+                    </button>
+                    <span className="text-[11px] text-gray-400 font-semibold px-1">veya</span>
                     <input
                       value={promoCode}
                       onChange={e => setPromoCode(e.target.value.toUpperCase())}
@@ -1847,11 +1986,9 @@ export default function Dashboard() {
                       Kodu Kullan
                     </button>
                   </div>
-                  {urgent && (
-                    <p className="mt-2 text-[10.5px] text-gray-400">
-                      Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
-                    </p>
-                  )}
+                  <p className="mt-2 text-[10.5px] text-gray-400">
+                    Kartınız yurt dışı işlemlere kapalıysa ödeme reddedilebilir — bankanızdan açtırabilir veya kredi kartı kullanabilirsiniz.
+                  </p>
                 </div>
               </div>
             </div>
@@ -2225,20 +2362,23 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Bölüm 2: Favori Kesimleriniz */}
+                {/* Bölüm 2: Portföy galerisi — işletme türüne göre başlık/metin */}
+                {(() => {
+                  const galleryCopy = GALLERY_COPY_BY_TYPE[shop?.category as string] ?? DEFAULT_GALLERY_COPY;
+                  return (
                 <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 md:p-10">
                   <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-sm font-black uppercase tracking-tighter">Favori Kesimleriniz</h3>
+                    <h3 className="text-sm font-black uppercase tracking-tighter">{galleryCopy.title}</h3>
                     <div className="relative group/tip2">
                       <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#00A3AD] hover:text-white transition-all cursor-help text-[10px] font-black">?</div>
                       <div className="absolute left-0 top-7 z-30 w-72 bg-black text-white text-[11px] font-bold leading-relaxed rounded-2xl p-4 opacity-0 group-hover/tip2:opacity-100 transition-all pointer-events-none shadow-2xl">
-                        Yüklediğiniz kesim fotoğrafları müşteri kararını doğrudan etkiler. Net, yakın çekim ve kaliteli sonuç fotoğrafları daha fazla rezervasyon sağlar.
+                        {galleryCopy.tip}
                       </div>
                     </div>
                   </div>
                   <div className="space-y-0.5 mb-6">
-                    <p className="text-[10px] font-bold text-gray-400">Fade, sakal, uzun saç, boyama veya özel işlemlerinizden örnekler ekleyin.</p>
-                    <p className="text-[10px] font-bold text-gray-400">Fotoğraflarda saç modeli net görünmeli, arka plan sade ve ışık dengeli olmalıdır.</p>
+                    <p className="text-[10px] font-bold text-gray-400">{galleryCopy.desc1}</p>
+                    <p className="text-[10px] font-bold text-gray-400">{galleryCopy.desc2}</p>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {(shop?.haircut_urls || []).map((url: string, i: number) => (
@@ -2274,6 +2414,8 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+                  );
+                })()}
 
               </div>
             )}
@@ -2908,7 +3050,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Stats row */}
-                        <div className="grid grid-cols-4 border-b border-[#ececea]" style={{background: 'var(--paper)'}}>
+                        <div className="grid grid-cols-2 md:grid-cols-4 border-b border-[#ececea]" style={{background: 'var(--paper)'}}>
                           {[
                             { label: 'Toplam Ziyaret', value: activeCust.visits.toString() },
                             { label: 'Toplam Harcama', value: '₺' + activeCust.totalSpent.toLocaleString('tr-TR') },
@@ -3262,7 +3404,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Est. Net Kâr</p>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Tahmini Net Kâr</p>
                     <h3 className="text-[28px] font-bold text-[#14b8a6] leading-none">₺{finNetProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
                     <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">%30 gider tahminiyle</p>
                   </div>
@@ -3349,7 +3491,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* PERSONEL + HİZMET */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                     <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-1">Personel Performansı</h3>
                     <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Tüm Zamanlar</p>
@@ -3456,7 +3598,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* İPTAL + MÜŞTERİ + ÖNERİLER */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                     <h3 className="text-[12px] font-mono uppercase tracking-widest mb-1 text-[#c2410c]">İptal Analizi</h3>
                     <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Bu Ay</p>
@@ -3898,6 +4040,81 @@ export default function Dashboard() {
                       <div className="px-5 py-3 bg-gray-50">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Harita Önizleme — Adres değiştikten sonra kaydedin</p>
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* GOOGLE YORUMLARI */}
+                <div className="border-t border-gray-100 pt-10">
+                  <p className="text-[10px] font-mono text-[#14b8a6] uppercase tracking-widest mb-2">Google Yorumları</p>
+                  <p className="text-xs text-gray-400 font-medium mb-6">İşletmeni Google'daki kaydınla eşleştir — puanın ve son yorumların işletme sayfanda görünsün.</p>
+
+                  {shop?.google_place_id ? (
+                    <div className="bg-[#fafaf8] rounded-2xl p-6 border border-[#ececea] space-y-5">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="text-3xl font-black text-[#0c0c0d]">★ {shop.google_rating ?? '-'}</div>
+                          <div className="text-[11px] font-mono text-gray-400 uppercase tracking-widest">{shop.google_review_count ?? 0} Google yorumu</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={handleGoogleRefresh} disabled={googleBusy}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#ececea] bg-white text-[11px] font-bold text-gray-500 hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all disabled:opacity-50">
+                            <RefreshCw size={12} className={googleBusy ? 'animate-spin' : ''} /> Yenile
+                          </button>
+                          <button type="button" onClick={handleGoogleUnlink} disabled={googleBusy}
+                            className="px-3 py-2 rounded-xl border border-red-100 bg-white text-[11px] font-bold text-red-400 hover:bg-red-50 transition-all disabled:opacity-50">
+                            Kaldır
+                          </button>
+                        </div>
+                      </div>
+                      {shop.google_reviews_synced_at && (
+                        <p className="text-[10px] font-mono text-gray-300">Son güncelleme: {new Date(shop.google_reviews_synced_at).toLocaleString('tr-TR')} · Google en fazla 5 yorum göstermeye izin veriyor</p>
+                      )}
+                      {(shop.google_reviews || []).length > 0 && (
+                        <div className="space-y-3 pt-2 border-t border-[#ececea]">
+                          {shop.google_reviews.slice(0, 5).map((rev: any, i: number) => (
+                            <div key={i} className="text-[12px]">
+                              <span className="font-bold text-[#0c0c0d]">★{rev.rating} {rev.author_name}</span>
+                              <span className="text-gray-400"> · {rev.relative_time_description}</span>
+                              <p className="text-gray-500 mt-0.5 line-clamp-2">{rev.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          value={googleQuery}
+                          onChange={e => setGoogleQuery(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleGoogleSearch(); } }}
+                          placeholder={[shop?.name, shop?.district, shop?.city].filter(Boolean).join(' ') || 'İşletme adı'}
+                          className="flex-1 p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] text-[#0c0c0d]"
+                        />
+                        <button type="button" onClick={handleGoogleSearch} disabled={googleBusy}
+                          className="px-6 rounded-xl bg-[#0c0c0d] text-white text-[11px] font-bold uppercase tracking-widest hover:bg-[#14b8a6] transition-all disabled:opacity-50">
+                          {googleBusy ? '...' : 'Ara'}
+                        </button>
+                      </div>
+                      {googleResults && googleResults.length > 0 && (
+                        <div className="space-y-2">
+                          {googleResults.map(r => (
+                            <button type="button" key={r.place_id} onClick={() => handleGoogleLink(r.place_id)} disabled={googleBusy}
+                              className="w-full text-left p-4 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] hover:bg-[#f7fdfc] transition-all disabled:opacity-50">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-bold text-[#0c0c0d] truncate">{r.name}</p>
+                                  <p className="text-[11px] text-gray-400 truncate">{r.formatted_address}</p>
+                                </div>
+                                {r.rating != null && (
+                                  <span className="flex-shrink-0 text-[12px] font-bold text-gray-500">★{r.rating} · {r.user_ratings_total}</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

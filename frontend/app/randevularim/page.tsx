@@ -141,10 +141,27 @@ function IcoMsg() {
 
 const BRAND = '#00A3AD';
 
+// ── Responsive ──────────────────────────────────────────────────────────────────
+// Inline style kullandığımız için media query gömemiyoruz; mobil kırılımı
+// matchMedia ile takip edip stil override'larını JS tarafında uyguluyoruz.
+// 768px altı = mobil (masaüstü görünümü aynen korunur).
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return isMobile;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Randevularim() {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const [appointments, setAppointments] = useState<AptRow[]>([]);
   const [loading, setLoading]           = useState(true);
   const [activeTab, setActiveTab]       = useState<TabKey>('upcoming');
@@ -273,11 +290,11 @@ export default function Randevularim() {
             Randevular yükleniyor…
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 296px', gap: 24, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 296px', gap: isMobile ? 18 : 24, alignItems: 'start' }}>
 
             {/* ── Left column ── */}
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 22 }}>
-              <HeroCard apt={nextApt} onCancel={() => nextApt && setCancelTarget(nextApt)} />
+              <HeroCard apt={nextApt} onCancel={() => nextApt && setCancelTarget(nextApt)} isMobile={isMobile} />
 
               <div>
                 <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 14, gap: 2 }}>
@@ -321,6 +338,7 @@ export default function Randevularim() {
                       localRating={localRatings[apt.id]}
                       onCancel={() => setCancelTarget(apt)}
                       onRate={() => setRateTarget(apt)}
+                      isMobile={isMobile}
                     />
                   ))}
                 </div>
@@ -328,7 +346,7 @@ export default function Randevularim() {
             </div>
 
             {/* ── Stats sidebar ── */}
-            <div style={{ position: 'sticky', top: 96 }}>
+            <div style={isMobile ? undefined : { position: 'sticky', top: 96 }}>
               <StatsCard
                 completedCount={completed.length}
                 upcomingCount={upcoming.length}
@@ -363,7 +381,7 @@ export default function Randevularim() {
 
 // ── Hero card ─────────────────────────────────────────────────────────────────
 
-function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void }) {
+function HeroCard({ apt, onCancel, isMobile }: { apt: AptRow | null; onCancel: () => void; isMobile: boolean }) {
   if (!apt) {
     return (
       <div style={{ background: '#fff', border: '1.5px dashed #e2e8f0', borderRadius: 20, padding: '36px 28px', textAlign: 'center' }}>
@@ -386,7 +404,7 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
   return (
     <div style={{
       background: `linear-gradient(135deg, ${bgColor} 0%, #fff 65%)`,
-      border: '1px solid #e8edf2', borderRadius: 20, padding: 26,
+      border: '1px solid #e8edf2', borderRadius: 20, padding: isMobile ? 18 : 26,
       position: 'relative', overflow: 'hidden',
     }}>
       <div style={{
@@ -395,18 +413,18 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
       }} />
 
       <div style={{ position: 'relative' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? 14 : 18 }}>
           <span style={{ fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', color: BRAND, fontWeight: 700 }}>
             Sıradaki randevun
           </span>
           <StatusPill status={apt.status} />
         </div>
 
-        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-          <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={96} radius={18} />
+        <div style={{ display: 'flex', gap: isMobile ? 14 : 20, alignItems: 'flex-start' }}>
+          <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={isMobile ? 60 : 96} radius={isMobile ? 14 : 18} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: '0 0 3px', fontSize: 22, fontWeight: 700, color: '#0f172a', letterSpacing: -0.4, lineHeight: 1.2 }}>
+            <h2 style={{ margin: '0 0 3px', fontSize: isMobile ? 18 : 22, fontWeight: 700, color: '#0f172a', letterSpacing: -0.4, lineHeight: 1.2 }}>
               {apt.shops?.name ?? 'İşletme'}
             </h2>
             {(apt.shops?.district || apt.shops?.city) && (
@@ -415,23 +433,26 @@ function HeroCard({ apt, onCancel }: { apt: AptRow | null; onCancel: () => void 
               </div>
             )}
 
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e8edf2', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e8edf2', display: 'flex', gap: isMobile ? 16 : 24, flexWrap: 'wrap' }}>
               <InfoCol label="Hizmet" value={apt.service_name} sub={apt.staff ? `${apt.staff.first_name} ${apt.staff.last_name}` : '—'} />
               <InfoCol label="Tarih"  value={`${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${DAYS_TR[d.getDay()]}`} sub={fmtTimeParts(apt.appointment_time)} />
               <InfoCol label="Ücret"  value={`${apt.price}₺`} sub="Yerinde ödeme" mono />
+              {isMobile && <InfoCol label="Kalan" value={cd.main} sub={cd.sub} mono />}
             </div>
           </div>
 
-          <div style={{
-            flexShrink: 0, width: 108, textAlign: 'center',
-            background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 8px',
-          }}>
-            <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>kaldı</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: BRAND, lineHeight: 1, letterSpacing: -1, fontFamily: 'monospace' }}>
-              {cd.main}
+          {!isMobile && (
+            <div style={{
+              flexShrink: 0, width: 108, textAlign: 'center',
+              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 8px',
+            }}>
+              <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>kaldı</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: BRAND, lineHeight: 1, letterSpacing: -1, fontFamily: 'monospace' }}>
+                {cd.main}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 5, lineHeight: 1.3 }}>{cd.sub}</div>
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 5, lineHeight: 1.3 }}>{cd.sub}</div>
-          </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -519,94 +540,115 @@ function StatTile({ label, value, sub, mono }: { label: string; value: string | 
 
 // ── Appointment card ──────────────────────────────────────────────────────────
 
-function AptCard({ apt, kind, localRating, onCancel, onRate }: {
+function AptCard({ apt, kind, localRating, onCancel, onRate, isMobile }: {
   apt: AptRow; kind: TabKey; localRating?: number;
-  onCancel: () => void; onRate: () => void;
+  onCancel: () => void; onRate: () => void; isMobile: boolean;
 }) {
   const d     = aptDateTime(apt);
   const rated = !!localRating;
+
+  const actions = (
+    <>
+      {kind === 'upcoming' && (
+        <ActionBtn danger onClick={onCancel}>İptal</ActionBtn>
+      )}
+      {kind === 'past' && !rated && (
+        <ActionBtn primary onClick={onRate}>Değerlendir</ActionBtn>
+      )}
+      {kind === 'cancelled' && (
+        <ActionBtn primary onClick={() => {}}>Tekrar randevu</ActionBtn>
+      )}
+    </>
+  );
 
   return (
     <div
       style={{
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
-        padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 14,
+        padding: isMobile ? 14 : '15px 18px',
+        display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 12 : 14,
         opacity: kind === 'cancelled' ? 0.76 : 1, transition: 'border-color 0.15s',
       }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = '#00A3AD55')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#e2e8f0')}
     >
-      {/* Date block */}
+      {/* Üst grup: tarih + görsel + bilgi (masaüstünde flex:1 ile satırın çoğu) */}
+      <div style={{ flex: isMobile ? undefined : 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 14 }}>
+        {/* Date block */}
+        <div style={{
+          width: 66, flexShrink: 0, textAlign: 'center',
+          background: '#f8fafc', borderRadius: 12, padding: '9px 4px',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1,
+        }}>
+          <div style={{ fontSize: 11, color: BRAND, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 }}>
+            {MONTHS_SHORT[d.getMonth()]}
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1, letterSpacing: -1, fontFamily: 'monospace' }}>
+            {d.getDate()}
+          </div>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {DAYS_TR[d.getDay()]}
+          </div>
+        </div>
+
+        <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={60} radius={12} />
+
+        {/* Main info */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: -0.2,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              textDecoration: kind === 'cancelled' ? 'line-through' : 'none',
+            }}>
+              {apt.shops?.name ?? 'İşletme'}
+            </span>
+            <StatusPill status={apt.status} />
+          </div>
+
+          <div style={{ fontSize: 13, color: '#64748b' }}>{apt.service_name}</div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: 'monospace' }}>{fmtTimeParts(apt.appointment_time)}</span>
+            {(apt.shops?.district || apt.shops?.city) && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <IcoMap s={11} /> {apt.shops?.district || apt.shops?.city}
+              </span>
+            )}
+            {kind === 'past' && rated && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Stars value={localRating!} size={10} />
+                <span style={{ fontSize: 11 }}>· değerlendirildi</span>
+              </span>
+            )}
+            {kind === 'cancelled' && apt.cancel_reason && (
+              <span style={{ color: '#94a3b8' }}>{apt.cancel_reason}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Alt grup: fiyat + aksiyon. Mobilde ayrı satır (üst çizgi ile), masaüstünde satırın sağında */}
       <div style={{
-        width: 66, flexShrink: 0, textAlign: 'center',
-        background: '#f8fafc', borderRadius: 12, padding: '9px 4px',
-        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1,
+        display: 'flex', alignItems: 'center', flexShrink: 0,
+        gap: 14,
+        justifyContent: isMobile ? 'space-between' : 'flex-end',
+        marginTop: isMobile ? 2 : 0,
+        paddingTop: isMobile ? 12 : 0,
+        borderTop: isMobile ? '1px solid #f1f5f9' : 'none',
       }}>
-        <div style={{ fontSize: 11, color: BRAND, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 }}>
-          {MONTHS_SHORT[d.getMonth()]}
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1, letterSpacing: -1, fontFamily: 'monospace' }}>
-          {d.getDate()}
-        </div>
-        <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {DAYS_TR[d.getDay()]}
-        </div>
-      </div>
-
-      <BusinessThumb shopId={apt.shop_id} shopName={apt.shops?.name} size={60} radius={12} />
-
-      {/* Main info */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{
-            fontSize: 15, fontWeight: 700, color: '#0f172a', letterSpacing: -0.2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            textDecoration: kind === 'cancelled' ? 'line-through' : 'none',
-          }}>
-            {apt.shops?.name ?? 'İşletme'}
-          </span>
-          <StatusPill status={apt.status} />
+        {/* Price */}
+        <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', letterSpacing: -0.3 }}>
+            {apt.price != null ? `${apt.price}₺` : '—'}
+          </div>
         </div>
 
-        <div style={{ fontSize: 13, color: '#64748b' }}>{apt.service_name}</div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'monospace' }}>{fmtTimeParts(apt.appointment_time)}</span>
-          {(apt.shops?.district || apt.shops?.city) && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              <IcoMap s={11} /> {apt.shops?.district || apt.shops?.city}
-            </span>
-          )}
-          {kind === 'past' && rated && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <Stars value={localRating!} size={10} />
-              <span style={{ fontSize: 11 }}>· değerlendirildi</span>
-            </span>
-          )}
-          {kind === 'cancelled' && apt.cancel_reason && (
-            <span style={{ color: '#94a3b8' }}>{apt.cancel_reason}</span>
-          )}
+        {/* Actions */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, width: 116 }}>
+          {actions}
         </div>
-      </div>
-
-      {/* Price */}
-      <div style={{ flexShrink: 0, textAlign: 'right' }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', letterSpacing: -0.3 }}>
-          {apt.price != null ? `${apt.price}₺` : '—'}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, width: 116 }}>
-        {kind === 'upcoming' && (
-          <ActionBtn danger onClick={onCancel}>İptal</ActionBtn>
-        )}
-        {kind === 'past' && !rated && (
-          <ActionBtn primary onClick={onRate}>Değerlendir</ActionBtn>
-        )}
-        {kind === 'cancelled' && (
-          <ActionBtn primary onClick={() => {}}>Tekrar randevu</ActionBtn>
-        )}
       </div>
     </div>
   );
