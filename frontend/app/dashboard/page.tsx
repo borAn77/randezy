@@ -3050,7 +3050,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Stats row */}
-                        <div className="grid grid-cols-4 border-b border-[#ececea]" style={{background: 'var(--paper)'}}>
+                        <div className="grid grid-cols-2 md:grid-cols-4 border-b border-[#ececea]" style={{background: 'var(--paper)'}}>
                           {[
                             { label: 'Toplam Ziyaret', value: activeCust.visits.toString() },
                             { label: 'Toplam Harcama', value: '₺' + activeCust.totalSpent.toLocaleString('tr-TR') },
@@ -3404,7 +3404,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
-                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Est. Net Kâr</p>
+                    <p className="text-[10px] font-mono uppercase tracking-widest text-[#7a7a7e] mb-3">Tahmini Net Kâr</p>
                     <h3 className="text-[28px] font-bold text-[#14b8a6] leading-none">₺{finNetProfit.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}</h3>
                     <p className="text-[10px] font-mono text-[#7a7a7e] mt-2">%30 gider tahminiyle</p>
                   </div>
@@ -3491,7 +3491,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* PERSONEL + HİZMET */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                     <h3 className="text-[15px] font-semibold text-[#0c0c0d] mb-1">Personel Performansı</h3>
                     <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Tüm Zamanlar</p>
@@ -3598,7 +3598,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* İPTAL + MÜŞTERİ + ÖNERİLER */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-white p-6 rounded-2xl border border-[#ececea]">
                     <h3 className="text-[12px] font-mono uppercase tracking-widest mb-1 text-[#c2410c]">İptal Analizi</h3>
                     <p className="text-[9px] font-mono text-[#7a7a7e] mb-4">Bu Ay</p>
