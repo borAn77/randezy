@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView,
@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '../lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -15,6 +16,13 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -66,6 +74,46 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
     }
   };
 
+  const handleAppleLogin = async () => {
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        Alert.alert('Giriş başarısız', 'Apple kimlik doğrulaması alınamadı.');
+        return;
+      }
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) {
+        Alert.alert('Giriş başarısız', error.message);
+        return;
+      }
+      // Apple, ad-soyadı sadece ilk girişte döndürür — profildeki tam adı o an kaydediyoruz.
+      const fullName = credential.fullName
+        ? `${credential.fullName.givenName ?? ''} ${credential.fullName.familyName ?? ''}`.trim()
+        : '';
+      if (fullName && data.user) {
+        await supabase.from('profiles').upsert(
+          { id: data.user.id, email: data.user.email, full_name: fullName },
+          { onConflict: 'id' }
+        );
+      }
+      // Session kurulunca App.tsx içindeki onAuthStateChange ekranı geçirir.
+    } catch (e: any) {
+      if (e?.code === 'ERR_REQUEST_CANCELED') return; // kullanıcı vazgeçti
+      Alert.alert('Giriş başarısız', e?.message ?? 'Bilinmeyen hata');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -93,7 +141,7 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
           secureTextEntry
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading || googleLoading}>
+        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading || googleLoading || appleLoading}>
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.buttonText}>Giriş Yap</Text>}
@@ -108,18 +156,34 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
         <TouchableOpacity
           style={styles.googleButton}
           onPress={handleGoogleLogin}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || appleLoading}
         >
           {googleLoading
             ? <ActivityIndicator color="#6366f1" />
             : <Text style={styles.googleButtonText}>Google ile Giriş Yap</Text>}
         </TouchableOpacity>
 
+        {appleAvailable && (
+          appleLoading ? (
+            <View style={[styles.appleButton, styles.appleButtonLoading]}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={10}
+              style={styles.appleButton}
+              onPress={handleAppleLogin}
+            />
+          )
+        )}
+
         {/* Personel: kodla giriş (ayrı salt-okunur takvim modu) */}
         <TouchableOpacity
           style={styles.staffLink}
           onPress={() => navigation?.navigate('PersonelGiris')}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || appleLoading}
         >
           <Text style={styles.staffLinkText}>
             Personel misin? <Text style={styles.staffLinkBold}>Kodla giriş yap</Text>
@@ -130,7 +194,7 @@ export default function LoginScreen({ navigation }: { navigation?: { navigate: (
         <TouchableOpacity
           style={styles.signupLink}
           onPress={() => Linking.openURL('https://www.randezy.com/isletme-ekle')}
-          disabled={loading || googleLoading}
+          disabled={loading || googleLoading || appleLoading}
         >
           <Text style={styles.staffLinkText}>
             İşletmeniz yok mu? <Text style={styles.staffLinkBold}>Hemen kaydolun</Text>
@@ -221,6 +285,17 @@ const styles = StyleSheet.create({
     color: '#334155',
     fontSize: 16,
     fontWeight: '600',
+  },
+  appleButton: {
+    width: '100%',
+    height: 48,
+    marginTop: 12,
+  },
+  appleButtonLoading: {
+    backgroundColor: '#000',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   staffLink: {
     marginTop: 18,

@@ -19,7 +19,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "5"
+      "buildNumber": "5",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -40,6 +41,7 @@
         }
       ],
       "expo-font",
+      "expo-apple-authentication",
       "./plugins/withFmtConstevalFix.js"
     ],
     "web": {
