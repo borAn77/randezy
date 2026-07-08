@@ -233,7 +233,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans">
-      <section className="relative min-h-[82vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
+      <section className="relative min-h-[64vh] md:h-[84vh] w-full flex flex-col text-white overflow-hidden" style={{ contain: 'paint' }}>
         <div className="absolute inset-0 bg-[#050505]" style={{ height: '100%', overflow: 'hidden' }}>
           {userId ? (
             <img
