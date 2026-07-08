@@ -7,7 +7,7 @@ import AuthModal from "../../components/layout/AuthModal";
 import {
   TrendingUp, Users, Calendar, Settings, Plus, Edit3,
   Package, LayoutDashboard, Camera, Image as ImageIcon, UploadCloud,
-  Clock, Trash2, Save, X, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
+  Clock, Trash2, Save, X, Menu, CheckCircle2, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
   Star, MessageSquare, Phone, Search,
   ArrowUpRight, ArrowDownRight, Download, Lightbulb, Mail, Tag, Percent,
   Copy, RefreshCw, KeyRound
@@ -594,6 +594,7 @@ export default function Dashboard() {
   const [staffCodes, setStaffCodes] = useState<Record<string, string>>({});
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [shop, setShop] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -1822,11 +1823,20 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#f7f5f0] flex font-sans text-[#0c0c0d]">
+      {/* Mobil drawer arka planı — yalnızca menü açıkken ve mobilde */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileNavOpen(false)} />
+      )}
       {/* SIDEBAR */}
-      <aside className="w-64 bg-[#0c0c0d] fixed h-full flex flex-col z-50 overflow-y-auto">
-        <div className="px-6 py-6 border-b border-white/5">
-          <div className="text-[18px] font-bold text-white tracking-tight">RANDEZY<span className="text-[#14b8a6]">.PRO</span></div>
-          <div className="h-0.5 w-7 bg-[#14b8a6] mt-1.5"></div>
+      <aside className={`w-64 bg-[#0c0c0d] fixed h-full flex flex-col z-50 overflow-y-auto transition-transform duration-300 md:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-6 py-6 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <div className="text-[18px] font-bold text-white tracking-tight">RANDEZY<span className="text-[#14b8a6]">.PRO</span></div>
+            <div className="h-0.5 w-7 bg-[#14b8a6] mt-1.5"></div>
+          </div>
+          <button onClick={() => setMobileNavOpen(false)} className="md:hidden text-white/50 hover:text-white transition-colors" aria-label="Menüyü kapat">
+            <X size={20}/>
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-5">
@@ -1834,7 +1844,7 @@ export default function Dashboard() {
             <div key={gi}>
               <p className="text-[9px] font-semibold text-white/30 uppercase tracking-[0.15em] px-3 mb-1.5">{group.label}</p>
               {group.items.map(item => (
-                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileNavOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all mb-0.5 relative ${
                     activeTab === item.id
                       ? 'bg-[#14b8a6] text-[#04221d] font-semibold shadow-lg shadow-[#14b8a6]/20'
@@ -1859,26 +1869,31 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 min-h-screen flex flex-col">
+      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
         {/* TOPBAR */}
-        <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between px-8 py-3.5">
-          <div className="text-sm font-semibold text-[#0c0c0d]">{shop?.name || 'İşletme Paneli'}</div>
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-40 bg-[#f7f5f0]/90 backdrop-blur border-b border-[#ececea] flex items-center justify-between gap-2 px-4 md:px-8 py-3.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setMobileNavOpen(true)} className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-[#ececea] text-[#0c0c0d] flex-shrink-0" aria-label="Menüyü aç">
+              <Menu size={18}/>
+            </button>
+            <div className="text-sm font-semibold text-[#0c0c0d] truncate">{shop?.name || 'İşletme Paneli'}</div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {shop?.id && (
               <>
                 <a href={shop.slug ? `/b/${shop.slug}` : `/shop/${shop.id}`} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
+                  className="hidden md:flex items-center gap-1.5 text-[12px] font-semibold text-[#7a7a7e] hover:text-[#14b8a6] transition-all px-3 py-2 rounded-xl hover:bg-white border border-transparent hover:border-[#ececea]">
                   <ArrowUpRight size={13}/> Sayfamı Gör
                 </a>
                 <button onClick={copyBookingLink}
-                  className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] transition-all text-[#7a7a7e] hover:text-[#14b8a6]">
+                  className="hidden md:flex items-center gap-1.5 text-[12px] font-semibold px-3 py-2 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] transition-all text-[#7a7a7e] hover:text-[#14b8a6]">
                   {linkCopied ? <CheckCircle2 size={13} className="text-[#15803d]"/> : <Tag size={13}/>}
                   {linkCopied ? 'Kopyalandı!' : 'Link Kopyala'}
                 </button>
               </>
             )}
-            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
-              <Plus size={14}/> Randevu Ekle
+            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-3 md:px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+              <Plus size={14}/> <span className="hidden sm:inline">Randevu Ekle</span>
             </button>
             <div className="relative">
               <button onClick={() => setActiveTab('appointments')} className="w-9 h-9 bg-white border border-[#ececea] rounded-xl flex items-center justify-center text-[#0c0c0d] hover:bg-[#f7f5f0] transition-all">
@@ -1886,16 +1901,16 @@ export default function Dashboard() {
               </button>
               {pendingCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#14b8a6] text-[#04221d] text-[9px] font-bold rounded-full flex items-center justify-center">{pendingCount}</span>}
             </div>
-            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-3 py-1.5">
-              <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center">
+            <div className="flex items-center gap-2 bg-white border border-[#ececea] rounded-xl px-2 md:px-3 py-1.5">
+              <div className="w-6 h-6 bg-[#0c0c0d] rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
                 {shop?.profiles?.avatar_url ? <img src={shop.profiles.avatar_url} className="w-full h-full object-cover" /> : <span className="text-[#14b8a6] font-bold text-[11px]">{shop?.name?.charAt(0) || 'R'}</span>}
               </div>
-              <span className="text-[12px] font-semibold text-[#0c0c0d]">{shop?.name || 'Hesabım'}</span>
+              <span className="hidden lg:inline text-[12px] font-semibold text-[#0c0c0d]">{shop?.name || 'Hesabım'}</span>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
 
         {/* ── Ön onay durumu bandı ── */}
         {shop && shop.approval_status === 'pending' && (
