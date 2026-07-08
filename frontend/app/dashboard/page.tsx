@@ -648,6 +648,9 @@ export default function Dashboard() {
   const [replyingReviewId, setReplyingReviewId] = useState<string|null>(null);
   const [replyText, setReplyText] = useState('');
   const [savingReply, setSavingReply] = useState(false);
+  const [googleQuery, setGoogleQuery] = useState('');
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleResults, setGoogleResults] = useState<{place_id:string; name:string; formatted_address:string; rating?:number; user_ratings_total?:number}[] | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [calFilterStaff, setCalFilterStaff] = useState<string|null>(null);
   const [isNewAptModalOpen, setIsNewAptModalOpen] = useState(false);
@@ -1649,6 +1652,75 @@ export default function Dashboard() {
       };
       showToast(msgs[json.reason as string] || 'Kod uygulanamadı, tekrar deneyin.', 'err');
     }
+  };
+
+  const handleGoogleSearch = async () => {
+    const query = googleQuery.trim() || [shop?.name, shop?.district, shop?.city].filter(Boolean).join(' ');
+    if (!query || googleBusy) return;
+    setGoogleBusy(true);
+    setGoogleResults(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ query }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) {
+      setGoogleResults(json.results);
+      if (json.results.length === 0) showToast('Sonuç bulunamadı, farklı bir isimle dene.', 'err');
+    } else {
+      showToast('Arama başarısız oldu, tekrar dene.', 'err');
+    }
+  };
+
+  const handleGoogleLink = async (placeId: string) => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ placeId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) {
+      showToast(`Google işletmen bağlandı — ★${json.rating ?? '-'} (${json.review_count ?? 0} yorum)`);
+      setGoogleResults(null);
+      setGoogleQuery('');
+      fetchInitialData();
+    } else {
+      showToast(json.reason === 'already_linked_elsewhere' ? 'Bu Google kaydı başka bir işletmeye bağlı.' : 'Bağlanamadı, tekrar dene.', 'err');
+    }
+  };
+
+  const handleGoogleRefresh = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/refresh', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    });
+    const json = await res.json().catch(() => ({}));
+    setGoogleBusy(false);
+    if (json.ok) { showToast('Google yorumları güncellendi.'); fetchInitialData(); }
+    else showToast('Güncellenemedi, tekrar dene.', 'err');
+  };
+
+  const handleGoogleUnlink = async () => {
+    if (googleBusy) return;
+    setGoogleBusy(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/api/google-reviews/link', {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${session?.access_token}` },
+    });
+    setGoogleBusy(false);
+    if (res.ok) { showToast('Google bağlantısı kaldırıldı.'); fetchInitialData(); }
+    else showToast('Kaldırılamadı, tekrar dene.', 'err');
   };
 
   // Calendar view helpers
@@ -3953,6 +4025,81 @@ export default function Dashboard() {
                       <div className="px-5 py-3 bg-gray-50">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Harita Önizleme — Adres değiştikten sonra kaydedin</p>
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* GOOGLE YORUMLARI */}
+                <div className="border-t border-gray-100 pt-10">
+                  <p className="text-[10px] font-mono text-[#14b8a6] uppercase tracking-widest mb-2">Google Yorumları</p>
+                  <p className="text-xs text-gray-400 font-medium mb-6">İşletmeni Google'daki kaydınla eşleştir — puanın ve son yorumların işletme sayfanda görünsün.</p>
+
+                  {shop?.google_place_id ? (
+                    <div className="bg-[#fafaf8] rounded-2xl p-6 border border-[#ececea] space-y-5">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="text-3xl font-black text-[#0c0c0d]">★ {shop.google_rating ?? '-'}</div>
+                          <div className="text-[11px] font-mono text-gray-400 uppercase tracking-widest">{shop.google_review_count ?? 0} Google yorumu</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={handleGoogleRefresh} disabled={googleBusy}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#ececea] bg-white text-[11px] font-bold text-gray-500 hover:border-[#14b8a6] hover:text-[#14b8a6] transition-all disabled:opacity-50">
+                            <RefreshCw size={12} className={googleBusy ? 'animate-spin' : ''} /> Yenile
+                          </button>
+                          <button type="button" onClick={handleGoogleUnlink} disabled={googleBusy}
+                            className="px-3 py-2 rounded-xl border border-red-100 bg-white text-[11px] font-bold text-red-400 hover:bg-red-50 transition-all disabled:opacity-50">
+                            Kaldır
+                          </button>
+                        </div>
+                      </div>
+                      {shop.google_reviews_synced_at && (
+                        <p className="text-[10px] font-mono text-gray-300">Son güncelleme: {new Date(shop.google_reviews_synced_at).toLocaleString('tr-TR')} · Google en fazla 5 yorum göstermeye izin veriyor</p>
+                      )}
+                      {(shop.google_reviews || []).length > 0 && (
+                        <div className="space-y-3 pt-2 border-t border-[#ececea]">
+                          {shop.google_reviews.slice(0, 5).map((rev: any, i: number) => (
+                            <div key={i} className="text-[12px]">
+                              <span className="font-bold text-[#0c0c0d]">★{rev.rating} {rev.author_name}</span>
+                              <span className="text-gray-400"> · {rev.relative_time_description}</span>
+                              <p className="text-gray-500 mt-0.5 line-clamp-2">{rev.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          value={googleQuery}
+                          onChange={e => setGoogleQuery(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleGoogleSearch(); } }}
+                          placeholder={[shop?.name, shop?.district, shop?.city].filter(Boolean).join(' ') || 'İşletme adı'}
+                          className="flex-1 p-4 bg-[#fafaf8] rounded-xl outline-none text-[13px] border border-[#ececea] focus:border-[#14b8a6] text-[#0c0c0d]"
+                        />
+                        <button type="button" onClick={handleGoogleSearch} disabled={googleBusy}
+                          className="px-6 rounded-xl bg-[#0c0c0d] text-white text-[11px] font-bold uppercase tracking-widest hover:bg-[#14b8a6] transition-all disabled:opacity-50">
+                          {googleBusy ? '...' : 'Ara'}
+                        </button>
+                      </div>
+                      {googleResults && googleResults.length > 0 && (
+                        <div className="space-y-2">
+                          {googleResults.map(r => (
+                            <button type="button" key={r.place_id} onClick={() => handleGoogleLink(r.place_id)} disabled={googleBusy}
+                              className="w-full text-left p-4 rounded-xl border border-[#ececea] bg-white hover:border-[#14b8a6] hover:bg-[#f7fdfc] transition-all disabled:opacity-50">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[13px] font-bold text-[#0c0c0d] truncate">{r.name}</p>
+                                  <p className="text-[11px] text-gray-400 truncate">{r.formatted_address}</p>
+                                </div>
+                                {r.rating != null && (
+                                  <span className="flex-shrink-0 text-[12px] font-bold text-gray-500">★{r.rating} · {r.user_ratings_total}</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
