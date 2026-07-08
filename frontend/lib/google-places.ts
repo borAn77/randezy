@@ -52,13 +52,15 @@ export async function fetchGooglePlaceDetails(placeId: string): Promise<{
     throw new Error(`Google Places detay hatası: ${json.status} ${json.error_message || ""}`);
   }
   const r = json.result || {};
-  const reviews: GoogleReview[] = (r.reviews || []).map((rev: any) => ({
-    author_name: rev.author_name,
-    rating: rev.rating,
-    text: rev.text,
-    relative_time_description: rev.relative_time_description,
-    time: rev.time,
-  }));
+  const reviews: GoogleReview[] = (r.reviews || [])
+    .filter((rev: any) => rev.rating >= 3)
+    .map((rev: any) => ({
+      author_name: rev.author_name,
+      rating: rev.rating,
+      text: rev.text,
+      relative_time_description: rev.relative_time_description,
+      time: rev.time,
+    }));
   return {
     rating: typeof r.rating === "number" ? r.rating : null,
     review_count: typeof r.user_ratings_total === "number" ? r.user_ratings_total : null,
