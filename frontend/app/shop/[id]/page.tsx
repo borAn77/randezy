@@ -960,7 +960,7 @@ export default function ShopDetail() {
 
               {/* Bottom-right: CTA chip */}
               {isOpenNow && nextSlot && (
-                <div className="absolute right-5 bottom-5 text-white rounded-2xl flex items-center gap-3 shadow-xl text-xs" style={{ background: 'rgba(12,12,13,0.88)', backdropFilter: 'blur(20px)', padding: '6px 6px 6px 14px', maxWidth: '320px' }}>
+                <div className="absolute left-5 bottom-[86px] md:left-auto md:right-5 md:bottom-5 text-white rounded-2xl flex items-center gap-3 shadow-xl text-xs" style={{ background: 'rgba(12,12,13,0.88)', backdropFilter: 'blur(20px)', padding: '6px 6px 6px 14px', maxWidth: '320px' }}>
                   <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#15803d', boxShadow: '0 0 0 3px rgba(21,128,61,0.25)', animation: 'pulse 2s infinite' }} />
                   <span style={{ color: 'rgba(255,255,255,0.85)' }}>Bugün <b style={{ color: '#fff', fontWeight: 600 }}>{nextSlot}</b> müsait</span>
                   <button
