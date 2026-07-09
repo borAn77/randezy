@@ -973,36 +973,22 @@ export default function ShopDetail() {
                 </div>
               )}
 
-              {/* Mobil: tek birleşik kart (isim + müsaitlik + CTA) */}
-              <div className="md:hidden absolute left-4 right-4 bottom-4 rounded-2xl shadow-xl p-3" style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)' }}>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full flex-shrink-0 grid place-items-center font-bold text-white text-sm" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)' }}>
-                    {shop.name?.charAt(0)}
-                  </div>
-                  <div className="text-[15px] font-bold tracking-tight m-0 flex items-center gap-1.5 min-w-0">
-                    <span className="truncate">{shop.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider flex-shrink-0" style={{ background: '#e6f7f4', color: '#0d9488' }}>✓</span>
-                  </div>
+              {/* Mobil: tek ince satır (isim + CTA) — görseli minimum kapatır */}
+              <div className="md:hidden absolute left-3 right-3 bottom-3 rounded-xl shadow-lg flex items-center gap-2.5 pl-2.5 pr-2 py-2" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)' }}>
+                <div className="w-8 h-8 rounded-full flex-shrink-0 grid place-items-center font-bold text-white text-[13px]" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)' }}>
+                  {shop.name?.charAt(0)}
                 </div>
-                <div className="flex items-center justify-between gap-3 mt-2.5">
-                  {isOpenNow && nextSlot ? (
-                    <span className="text-[12px] text-gray-500 flex items-center gap-1.5 min-w-0">
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#15803d' }} />
-                      Bugün <b className="text-gray-700 font-semibold">{nextSlot}</b> müsait
-                    </span>
-                  ) : (
-                    <span className="font-mono text-[10px] text-gray-400 uppercase tracking-wider truncate">
-                      {shop.category}{shop.city ? ` · ${shop.city}` : ''}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="flex-shrink-0 border-0 rounded-xl font-bold text-[13px] flex items-center gap-1"
-                    style={{ background: '#14b8a6', color: '#04221d', padding: '9px 14px' }}
-                  >
-                    Randevu al →
-                  </button>
+                <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                  <span className="text-sm font-bold tracking-tight truncate">{shop.name}</span>
+                  {isOpenNow && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#15803d' }} title="Açık" />}
                 </div>
+                <button
+                  onClick={() => document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="flex-shrink-0 border-0 rounded-lg font-bold text-[12px] flex items-center gap-1"
+                  style={{ background: '#14b8a6', color: '#04221d', padding: '7px 12px' }}
+                >
+                  Randevu al →
+                </button>
               </div>
             </div>
 
