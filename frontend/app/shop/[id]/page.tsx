@@ -942,8 +942,8 @@ export default function ShopDetail() {
                 </button>
               </div>
 
-              {/* Bottom-left: biz card */}
-              <div className="absolute left-5 bottom-5 rounded-2xl flex items-center gap-3 shadow-xl max-w-[340px]" style={{ background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', padding: '10px 16px 10px 12px' }}>
+              {/* Bottom-left: biz card (masaüstü) */}
+              <div className="absolute left-5 bottom-5 rounded-2xl hidden md:flex items-center gap-3 shadow-xl max-w-[340px]" style={{ background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(20px)', padding: '10px 16px 10px 12px' }}>
                 <div className="w-10 h-10 rounded-full flex-shrink-0 grid place-items-center font-bold text-white text-base" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)' }}>
                   {shop.name?.charAt(0)}
                 </div>
@@ -958,9 +958,9 @@ export default function ShopDetail() {
                 </div>
               </div>
 
-              {/* Bottom-right: CTA chip */}
+              {/* Bottom-right: CTA chip (masaüstü) */}
               {isOpenNow && nextSlot && (
-                <div className="absolute right-5 bottom-5 text-white rounded-2xl flex items-center gap-3 shadow-xl text-xs" style={{ background: 'rgba(12,12,13,0.88)', backdropFilter: 'blur(20px)', padding: '6px 6px 6px 14px', maxWidth: '320px' }}>
+                <div className="absolute right-5 bottom-5 text-white rounded-2xl hidden md:flex items-center gap-3 shadow-xl text-xs" style={{ background: 'rgba(12,12,13,0.88)', backdropFilter: 'blur(20px)', padding: '6px 6px 6px 14px', maxWidth: '320px' }}>
                   <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#15803d', boxShadow: '0 0 0 3px rgba(21,128,61,0.25)', animation: 'pulse 2s infinite' }} />
                   <span style={{ color: 'rgba(255,255,255,0.85)' }}>Bugün <b style={{ color: '#fff', fontWeight: 600 }}>{nextSlot}</b> müsait</span>
                   <button
@@ -972,6 +972,24 @@ export default function ShopDetail() {
                   </button>
                 </div>
               )}
+
+              {/* Mobil: tek ince satır (isim + CTA) — görseli minimum kapatır */}
+              <div className="md:hidden absolute left-3 right-3 bottom-3 rounded-xl shadow-lg flex items-center gap-2.5 pl-2.5 pr-2 py-2" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)' }}>
+                <div className="w-8 h-8 rounded-full flex-shrink-0 grid place-items-center font-bold text-white text-[13px]" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)' }}>
+                  {shop.name?.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                  <span className="text-sm font-bold tracking-tight truncate">{shop.name}</span>
+                  {isOpenNow && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#15803d' }} title="Açık" />}
+                </div>
+                <button
+                  onClick={() => document.getElementById('services-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="flex-shrink-0 border-0 rounded-lg font-bold text-[12px] flex items-center gap-1"
+                  style={{ background: '#14b8a6', color: '#04221d', padding: '7px 12px' }}
+                >
+                  Randevu al →
+                </button>
+              </div>
             </div>
 
             {/* Active campaigns banner */}
