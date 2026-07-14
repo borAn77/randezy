@@ -606,6 +606,8 @@ export default function Dashboard() {
   const [serviceForm, setServiceForm] = useState({ name: "", price: "", duration: "", image_url: "", category: "Diğer", canonical_key: "", is_custom: false, description: "", sort_order: 999 });
   const [serviceModalMode, setServiceModalMode] = useState<'catalog' | 'manual'>('catalog');
   const [activeCatalogTab, setActiveCatalogTab] = useState('Popüler');
+  const [photoService, setPhotoService] = useState<any>(null); // örnek fotoğraf modalı açık olan hizmet
+  const [uploadingExamplePhotos, setUploadingExamplePhotos] = useState(false);
   // Toplu hizmet ekleme
   type BulkRow = { name: string; category: string; duration: string; price: string; canonical_key: string | null; is_custom: boolean };
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -919,6 +921,35 @@ export default function Dashboard() {
       showToast('Yükleme hatası: ' + err.message, 'err');
       return null;
     }
+  };
+
+  // Hizmet örnek fotoğraflarını kaydet (randevu ekranında müşteriye gösterilir)
+  const saveExamplePhotos = async (svc: any, photos: string[]) => {
+    const { error } = await supabase.from('services').update({ example_photos: photos }).eq('id', svc.id);
+    if (error) {
+      if (error.code === '42703') showToast('Veritabanı güncellemesi gerekli: add_service_example_photos.sql çalıştırılmalı.', 'err');
+      else showToast('Hata: ' + error.message, 'err');
+      return false;
+    }
+    setServices(prev => prev.map(s => s.id === svc.id ? { ...s, example_photos: photos } : s));
+    setPhotoService((p: any) => (p && p.id === svc.id ? { ...p, example_photos: photos } : p));
+    return true;
+  };
+
+  const handleExamplePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !photoService) return;
+    setUploadingExamplePhotos(true);
+    const uploaded: string[] = [];
+    for (const file of Array.from(files)) {
+      const url = await handleFileUpload(file, 'service-examples');
+      if (url) uploaded.push(url);
+    }
+    if (uploaded.length > 0) {
+      const current: string[] = Array.isArray(photoService.example_photos) ? photoService.example_photos : [];
+      const ok = await saveExamplePhotos(photoService, [...current, ...uploaded]);
+      if (ok) showToast(`${uploaded.length} fotoğraf eklendi.`);
+    }
+    setUploadingExamplePhotos(false);
   };
 
   const handleServiceSubmit = async (e: any) => {
@@ -3158,6 +3189,10 @@ export default function Dashboard() {
                               className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#7a7a7e] transition-all flex items-center justify-center gap-1">
                               <Edit3 size={12}/> Düzenle
                             </button>
+                            <button onClick={() => setPhotoService(s)}
+                              className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#14b8a6] hover:text-[#0d9488] transition-all flex items-center justify-center gap-1">
+                              <Camera size={12}/> Fotoğraf Ekle{Array.isArray(s.example_photos) && s.example_photos.length > 0 ? ` (${s.example_photos.length})` : ''}
+                            </button>
                             <button onClick={async () => { if (await askConfirm("Bu hizmet silinsin mi?")) { await supabase.from('services').delete().eq('id',s.id); fetchInitialData(); } }}
                               className="py-2 px-3 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[#7a7a7e] hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all">
                               <Trash2 size={13}/>
@@ -4479,6 +4514,44 @@ export default function Dashboard() {
           </div>
         );
       })()}
+
+      {/* ÖRNEK FOTOĞRAF MODALI */}
+      {photoService && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-8 relative overflow-y-auto max-h-[90vh]">
+            <button onClick={() => setPhotoService(null)} className="absolute top-6 right-6 text-gray-300 hover:text-black transition-colors"><X size={24}/></button>
+            <h3 className="text-xl font-bold text-[#0c0c0d] uppercase tracking-tight mb-1">Örnek Fotoğraflar</h3>
+            <p className="text-[11px] font-mono uppercase tracking-[0.1em] text-[#7a7a7e] mb-6">{photoService.name} — müşteriler randevu alırken görür</p>
+            {Array.isArray(photoService.example_photos) && photoService.example_photos.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {photoService.example_photos.map((url: string, pi: number) => (
+                  <div key={pi} className="relative aspect-square rounded-xl overflow-hidden border border-[#ececea] group">
+                    <img src={url} className="w-full h-full object-cover" alt={`${photoService.name} örnek ${pi + 1}`} />
+                    <button
+                      onClick={async () => {
+                        if (await askConfirm("Bu fotoğraf kaldırılsın mı?")) {
+                          const next = photoService.example_photos.filter((_: string, i: number) => i !== pi);
+                          if (await saveExamplePhotos(photoService, next)) showToast('Fotoğraf kaldırıldı.');
+                        }
+                      }}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 backdrop-blur text-white rounded-full flex items-center justify-center hover:bg-red-500 transition-all">
+                      <X size={12}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[13px] text-[#7a7a7e] mb-4">Henüz örnek fotoğraf yok. Bu hizmete ait çalışmalarınızdan fotoğraf ekleyin.</p>
+            )}
+            <label className={`flex flex-col items-center justify-center h-28 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl transition-all ${uploadingExamplePhotos ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:border-[#14b8a6]'}`}>
+              <UploadCloud className="text-gray-300 mb-1.5" size={24}/>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{uploadingExamplePhotos ? 'Yükleniyor...' : 'Fotoğraf Yükle'}</span>
+              <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingExamplePhotos}
+                onChange={async (e) => { await handleExamplePhotoUpload(e.target.files); e.target.value = ''; }} />
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* YENİ RANDEVU MODALI */}
       {isNewAptModalOpen && (

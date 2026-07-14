@@ -1088,6 +1088,18 @@ export default function ShopDetail() {
                                   <span className="flex items-center gap-1"><Clock size={11} className="text-[#14b8a6]" /> {service.duration} dk</span>
                                   {staff.length > 0 && <span className="flex items-center gap-1"><User size={11} className="text-[#14b8a6]" /> {serviceStaffFilter ? serviceStaffFilter.first_name : 'Tüm Personel'}</span>}
                                 </div>
+                                {Array.isArray(service.example_photos) && service.example_photos.length > 0 && (
+                                  <div className="flex gap-1.5 mt-2.5 flex-wrap">
+                                    {service.example_photos.map((url: string, pi: number) => (
+                                      <button key={pi}
+                                        onClick={e => { e.stopPropagation(); setLightboxUrl(url); }}
+                                        className="w-11 h-11 rounded-lg overflow-hidden border border-[#ececea] hover:border-[#14b8a6] hover:scale-105 transition-all flex-shrink-0"
+                                        aria-label={`${service.name} örnek fotoğraf ${pi + 1}`}>
+                                        <img src={url} className="w-full h-full object-cover" alt={`${service.name} örnek ${pi + 1}`} loading="lazy" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               {(() => {
                                 const { original, discounted, pct } = calcDiscountedPrice(service, activeCampaigns);
