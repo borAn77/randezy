@@ -913,10 +913,10 @@ export default function Dashboard() {
       let uploadBlob: Blob = file;
       let fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
       // iPhone HEIC/HEIF fotoğrafları tarayıcıda görüntülenemez — yüklerken JPEG'e çevir
+      // (heic2any yeni iOS HEIC'lerinde ERR_LIBHEIF veriyor; heic-to güncel libheif kullanıyor)
       if (fileExt === 'heic' || fileExt === 'heif' || file.type === 'image/heic' || file.type === 'image/heif') {
-        const heic2any = (await import('heic2any')).default;
-        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-        uploadBlob = Array.isArray(converted) ? converted[0] : converted;
+        const { heicTo } = await import('heic-to/next');
+        uploadBlob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
         fileExt = 'jpg';
       }
       const fileName = `${Math.random().toString(36).substring(7)}.${fileExt}`;
