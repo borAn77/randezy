@@ -657,8 +657,12 @@ export default function Dashboard() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [calFilterStaff, setCalFilterStaff] = useState<string|null>(null);
   const [isNewAptModalOpen, setIsNewAptModalOpen] = useState(false);
-  const [newAptForm, setNewAptForm] = useState({ customerName: '', phone: '', serviceId: '', staffId: '', date: '', time: '', status: 'Onaylandı' });
+  const [newAptForm, setNewAptForm] = useState({ customerName: '', phone: '', serviceIds: [] as string[], staffId: '', date: '', time: '', status: 'Onaylandı' });
   const [savingNewApt, setSavingNewApt] = useState(false);
+  // Ek hizmet (randevuya sonradan eklenen işlem/ürün) formu — detay modalında
+  const [extraFormOpen, setExtraFormOpen] = useState(false);
+  const [extraForm, setExtraForm] = useState({ mode: 'catalog' as 'catalog' | 'custom', serviceId: '', customName: '', customPrice: '', staffId: '' });
+  const [savingExtra, setSavingExtra] = useState(false);
 
   const showToast = (msg: string, type: 'ok'|'err' = 'ok') => {
     const id = Date.now();
@@ -713,7 +717,8 @@ export default function Dashboard() {
 
     setSavingNewApt(true);
 
-    const svc = services.find((s: any) => String(s.id) === String(newAptForm.serviceId));
+    // İlk seçilen hizmet ana randevu olur; kalanlar aynı ziyaretin ek hizmetleri (is_extra)
+    const svc = services.find((s: any) => String(s.id) === String(newAptForm.serviceIds[0]));
     const newDuration = svc?.duration ?? 30;
     const BUFFER_MIN = 5;
     const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -726,6 +731,7 @@ export default function Dashboard() {
       .select('appointment_time, service_id, service_name')
       .eq('shop_id', shop.id)
       .eq('appointment_date', newAptForm.date)
+      .eq('is_extra', false)
       .in('status', ['Beklemede', 'Onaylandı', 'Tamamlandı']);
 
     if (staffId) {
@@ -766,13 +772,35 @@ export default function Dashboard() {
       price: svc?.price || 0,
       status: newAptForm.status,
     };
-    const { error } = await supabase.from('appointments').insert([payload]);
+    const { data: created, error } = await supabase.from('appointments').insert([payload]).select('id').single();
     if (error) {
       showToast('Hata: ' + error.message, 'err');
     } else {
+      // 2. ve sonraki hizmetler: aynı ziyaretin ek hizmetleri (slot işgal etmez, ciroya yansır)
+      if (newAptForm.serviceIds.length > 1 && created?.id) {
+        const extraRows = newAptForm.serviceIds.slice(1).map(sid => {
+          const s = services.find((x: any) => String(x.id) === String(sid));
+          return {
+            shop_id: shop.id,
+            customer_name: newAptForm.customerName.trim(),
+            customer_phone: newAptForm.phone.trim() || null,
+            service_id: s?.id || null,
+            service_name: s?.name || '',
+            staff_id: staffId,
+            appointment_date: newAptForm.date,
+            appointment_time: newAptForm.time,
+            price: s?.price || 0,
+            status: newAptForm.status,
+            is_extra: true,
+            parent_appointment_id: created.id,
+          };
+        });
+        const { error: exErr } = await supabase.from('appointments').insert(extraRows);
+        if (exErr) showToast('Randevu oluşturuldu ancak ek hizmetler eklenemedi: ' + exErr.message, 'err');
+      }
       showToast('Randevu oluşturuldu.');
       setIsNewAptModalOpen(false);
-      setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: '', time: '', status: 'Onaylandı' });
+      setNewAptForm({ customerName: '', phone: '', serviceIds: [] as string[], staffId: '', date: '', time: '', status: 'Onaylandı' });
       fetchInitialData();
     }
     setSavingNewApt(false);
@@ -1061,6 +1089,8 @@ export default function Dashboard() {
   const updateAppointmentStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
     if (!error) {
+      // Ek hizmetler parent'ın statusunu takip eder (notify SADECE parent için ateşlenir)
+      await supabase.from('appointments').update({ status: newStatus }).eq('parent_appointment_id', id);
       fetchInitialData();
       if (newStatus === 'Onaylandı') {
         const apt = appointments.find(a => a.id === id);
@@ -1100,6 +1130,7 @@ export default function Dashboard() {
     }
     const apt = appointments.find(a => a.id === id);
     await supabase.from('appointments').update({ status: 'İptal Edildi', cancel_reason: rejectReason.trim() }).eq('id', id);
+    await supabase.from('appointments').update({ status: 'İptal Edildi' }).eq('parent_appointment_id', id); // ekstralar da iptal
     setRejectingId(null);
     setRejectReason("");
     setRejectError("");
@@ -1146,6 +1177,7 @@ export default function Dashboard() {
     }
     const apt = selectedApt;
     await supabase.from('appointments').update({ status: 'İptal Edildi', cancel_reason: detailRejectReason.trim() }).eq('id', apt.id);
+    await supabase.from('appointments').update({ status: 'İptal Edildi' }).eq('parent_appointment_id', apt.id); // ekstralar da iptal
     setSelectedApt(null);
     setDetailRejectMode(false);
     setDetailRejectReason('');
@@ -1195,6 +1227,53 @@ export default function Dashboard() {
     if (!selectedApt) return;
     await updateAppointmentStatus(selectedApt.id, 'Tamamlandı');
     setSelectedApt((prev: any) => prev ? { ...prev, status: 'Tamamlandı' } : null);
+  };
+
+  // Randevuya ek hizmet/ürün ekle — kardeş satır (is_extra), ciroya yansır, slot işgal etmez
+  const handleAddExtra = async () => {
+    if (!selectedApt || !shop?.id) return;
+    let name = '', price = 0, svcId: any = null;
+    if (extraForm.mode === 'catalog') {
+      const svc = services.find((s: any) => String(s.id) === String(extraForm.serviceId));
+      if (!svc) { showToast('Lütfen bir hizmet seçin.', 'err'); return; }
+      name = svc.name; price = Number(svc.price) || 0; svcId = svc.id;
+    } else {
+      name = extraForm.customName.trim();
+      price = parseFloat(extraForm.customPrice.replace(',', '.'));
+      if (!name) { showToast('Lütfen bir ad girin.', 'err'); return; }
+      if (isNaN(price) || price < 0) { showToast('Geçerli bir fiyat girin.', 'err'); return; }
+    }
+    setSavingExtra(true);
+    const { error } = await supabase.from('appointments').insert([{
+      shop_id: shop.id,
+      customer_name: selectedApt.customer_name || getCustomerName(selectedApt),
+      customer_phone: selectedApt.customer_phone || null,
+      service_id: svcId,
+      service_name: name,
+      staff_id: extraForm.staffId || selectedApt.staff_id || null,
+      appointment_date: selectedApt.appointment_date,
+      appointment_time: selectedApt.appointment_time,
+      price,
+      status: selectedApt.status,
+      is_extra: true,
+      parent_appointment_id: selectedApt.id,
+    }]);
+    if (error) { showToast('Ek hizmet eklenemedi: ' + error.message, 'err'); }
+    else {
+      showToast('Ek hizmet eklendi.');
+      setExtraFormOpen(false);
+      setExtraForm({ mode: 'catalog', serviceId: '', customName: '', customPrice: '', staffId: '' });
+      fetchInitialData();
+    }
+    setSavingExtra(false);
+  };
+
+  const handleRemoveExtra = async (extraId: string) => {
+    if (!(await askConfirm('Bu ek hizmet silinsin mi?', 'Sil'))) return;
+    const { error } = await supabase.from('appointments').delete().eq('id', extraId);
+    if (error) { showToast('Silme hatası: ' + error.message, 'err'); return; }
+    showToast('Ek hizmet silindi.');
+    fetchInitialData();
   };
 
   const handleSettingsSubmit = async (e: any) => {
@@ -1422,12 +1501,15 @@ export default function Dashboard() {
   const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
   // Real metrics
+  // Ekstralar (is_extra) ayrı randevu DEĞİLDİR: para metriklerine dahil, adet/ziyaret/listelerden hariç
+  const visibleAppointments = appointments.filter((a: any) => !a.is_extra);
   const confirmedAppointments = appointments.filter(a => a.status === 'Onaylandı' || a.status === 'Tamamlandı');
+  const confirmedVisits = confirmedAppointments.filter((a: any) => !a.is_extra);
   const totalRevenue = confirmedAppointments.reduce((sum, a) => sum + (parseFloat(a.price) || 0), 0);
-  const uniqueCustomers = new Set(appointments.map((a: any) => a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id))).size;
-  const pendingCount = appointments.filter(a => a.status === 'Beklemede').length;
-  const pendingAppointments = appointments.filter(a => a.status === 'Beklemede');
-  const otherAppointments = appointments.filter(a => a.status !== 'Beklemede');
+  const uniqueCustomers = new Set(visibleAppointments.map((a: any) => a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id))).size;
+  const pendingCount = visibleAppointments.filter(a => a.status === 'Beklemede').length;
+  const pendingAppointments = visibleAppointments.filter(a => a.status === 'Beklemede');
+  const otherAppointments = visibleAppointments.filter(a => a.status !== 'Beklemede');
 
   // Finance computed values
   const today = toLocalDateStr(new Date());
@@ -1441,8 +1523,8 @@ export default function Dashboard() {
   const todayRevenue = confirmedAppointments.filter((a: any) => a.appointment_date === today).reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
   const monthlyRevenue = confirmedThisMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
   const prevMonthRevenue = confirmedPrevMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
-  const monthlyApptCount = confirmedThisMonth.length;
-  const avgBasket = monthlyApptCount > 0 ? monthlyRevenue / monthlyApptCount : 0;
+  const monthlyApptCount = confirmedThisMonth.filter((a: any) => !a.is_extra).length; // ziyaret sayısı (ekstralar ayrı randevu değil)
+  const avgBasket = monthlyApptCount > 0 ? monthlyRevenue / monthlyApptCount : 0; // sepet ekstraları içerir — doğru
   const cancellationLoss = cancelledThisMonth.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
   const finEstExpenses = monthlyRevenue * 0.30;
   const finNetProfit = monthlyRevenue - finEstExpenses;
@@ -1486,7 +1568,7 @@ export default function Dashboard() {
 
   // Only confirmed/completed appointments count as real occupancy in the heatmap
   const heatmapData: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-  confirmedAppointments.forEach((a: any) => {
+  confirmedVisits.forEach((a: any) => {
     if (!a.appointment_date || !a.appointment_time) return;
     const d = new Date(a.appointment_date + 'T12:00:00');
     const dayIdx = d.getDay(); const hour = parseInt(a.appointment_time.split(':')[0]);
@@ -1495,14 +1577,14 @@ export default function Dashboard() {
   const heatmapMax = Math.max(1, ...heatmapData.flat());
   const heatmapHours = Array.from({ length: 14 }, (_, i) => i + 8);
 
-  const totalCancellations = cancelledAll.length;
-  const cancellationRate = appointments.length > 0 ? (totalCancellations / appointments.length * 100) : 0;
-  const thisMonthTotal = appointments.filter((a: any) => a.appointment_date?.startsWith(currentMonth)).length;
-  const cancellationRateMonth = thisMonthTotal > 0 ? (cancelledThisMonth.length / thisMonthTotal * 100) : 0;
+  const totalCancellations = cancelledAll.filter((a: any) => !a.is_extra).length;
+  const cancellationRate = visibleAppointments.length > 0 ? (totalCancellations / visibleAppointments.length * 100) : 0;
+  const thisMonthTotal = visibleAppointments.filter((a: any) => a.appointment_date?.startsWith(currentMonth)).length;
+  const cancellationRateMonth = thisMonthTotal > 0 ? (cancelledThisMonth.filter((a: any) => !a.is_extra).length / thisMonthTotal * 100) : 0;
 
   // Loyalty: count only confirmed/completed appointments, using full uid (includes walk-ins)
   const custCounts: Record<string, number> = {};
-  confirmedAppointments.forEach((a: any) => {
+  confirmedVisits.forEach((a: any) => {
     const uid = a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id);
     custCounts[uid] = (custCounts[uid] || 0) + 1;
   });
@@ -1515,7 +1597,7 @@ export default function Dashboard() {
   const smartSuggestions: string[] = [];
   let lbDay = -1, lbHour = 9, lbVal = Infinity;
   for (let d = 1; d <= 5; d++) { for (let h = 9; h <= 17; h++) { if (heatmapData[d][h] < lbVal) { lbVal = heatmapData[d][h]; lbDay = d; lbHour = h; } } }
-  if (appointments.length > 0 && lbDay > -1) smartSuggestions.push(`${fDayNames[lbDay]} ${lbHour}:00–${lbHour + 1}:00 arası düşük yoğunluk var. Bu saatler için kampanya önerilir.`);
+  if (visibleAppointments.length > 0 && lbDay > -1) smartSuggestions.push(`${fDayNames[lbDay]} ${lbHour}:00–${lbHour + 1}:00 arası düşük yoğunluk var. Bu saatler için kampanya önerilir.`);
   if (servicePerf.length > 0 && servicePerf[0].totalRevenue > 0) smartSuggestions.push(`"${servicePerf[0].name}" en yüksek ciro getiren hizmet (₺${servicePerf[0].totalRevenue.toLocaleString('tr-TR')} · ${servicePerf[0].salesCount} satış).`);
   if (cancellationRateMonth > 10) smartSuggestions.push(`Bu ay iptal oranı %${cancellationRateMonth.toFixed(1)} — müşterilere hatırlatma mesajı gönderilmesi önerilir.`);
   if (staffPerf.length > 0 && staffPerf[0].revenue > 0) smartSuggestions.push(`En çok ciro getiren personel: ${staffPerf[0].first_name} ${staffPerf[0].last_name} (₺${staffPerf[0].revenue.toLocaleString('tr-TR')}).`);
@@ -1526,15 +1608,18 @@ export default function Dashboard() {
 
   // Customer list derived from appointments
   const customerMap: Record<string, any> = {};
+  const aptById = new Map(appointments.map((a: any) => [a.id, a]));
   appointments.forEach((a: any) => {
+    // Ekstra satırlar parent'ın müşterisine yazılır (ekstralarda user_id NULL — hayalet müşteri oluşmasın)
+    const keySrc = a.is_extra && aptById.get(a.parent_appointment_id) ? aptById.get(a.parent_appointment_id) : a;
     // anonymous walk-in with no phone gets its own slot per appointment (avoids merging strangers)
-    const uid = a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id);
+    const uid = keySrc.user_id || (keySrc.customer_phone ? 'phone_' + keySrc.customer_phone : 'apt_' + keySrc.id);
     if (!customerMap[uid]) {
       customerMap[uid] = {
         id: uid,
-        name: getCustomerName(a),
-        phone: a.customer_phone || a.profiles?.phone || '',
-        email: a.profiles?.email || '',
+        name: getCustomerName(keySrc),
+        phone: keySrc.customer_phone || keySrc.profiles?.phone || '',
+        email: keySrc.profiles?.email || '',
         visits: 0,
         totalSpent: 0,
         lastVisit: null as string | null,
@@ -1545,8 +1630,8 @@ export default function Dashboard() {
     }
     const c = customerMap[uid];
     if (a.status === 'Onaylandı' || a.status === 'Tamamlandı') {
-      c.visits++;
-      c.totalSpent += Number(a.price || 0);
+      if (!a.is_extra) c.visits++;          // ziyaret: sadece ana satır
+      c.totalSpent += Number(a.price || 0); // harcama: ekstralar dahil
       const d = a.appointment_date as string;
       if (d) {
         if (!c.lastVisit || d > c.lastVisit) c.lastVisit = d;
@@ -1587,7 +1672,7 @@ export default function Dashboard() {
   });
   const activeCust = selectedCustId ? customerList.find((c: any) => c.id === selectedCustId) : (customerList[0] || null);
   const custHistory = activeCust
-    ? appointments.filter((a: any) => (a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id)) === activeCust.id)
+    ? visibleAppointments.filter((a: any) => (a.user_id || (a.customer_phone ? 'phone_' + a.customer_phone : 'apt_' + a.id)) === activeCust.id)
         .sort((a: any, b: any) => (b.appointment_date as string).localeCompare(a.appointment_date as string))
     : [];
   const vipCount = customerList.filter((c: any) => c.tag === 'vip').length;
@@ -1792,7 +1877,7 @@ export default function Dashboard() {
     return d;
   })();
   const calCurrentDayStr = toLocalDateStr(calCurrentDay);
-  const calCurrentDayApts = appointments.filter((a: any) => a.appointment_date === calCurrentDayStr);
+  const calCurrentDayApts = visibleAppointments.filter((a: any) => a.appointment_date === calCurrentDayStr);
   const isCurrentDayToday = calCurrentDayStr === today;
   const _now = new Date();
   const currentTimeTop = isCurrentDayToday ? (_now.getHours() + _now.getMinutes() / 60 - 8) * calHourH : -1;
@@ -1931,7 +2016,7 @@ export default function Dashboard() {
                 </button>
               </>
             )}
-            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-3 md:px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
+            <button onClick={() => { setNewAptForm({ customerName: '', phone: '', serviceIds: [] as string[], staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="flex items-center gap-2 bg-[#0c0c0d] text-white text-[12px] font-semibold px-3 md:px-4 py-2 rounded-xl hover:bg-[#14b8a6] hover:text-[#04221d] transition-all">
               <Plus size={14}/> <span className="hidden sm:inline">Randevu Ekle</span>
             </button>
             <div className="relative">
@@ -2157,7 +2242,7 @@ export default function Dashboard() {
                   ].map((btn) => (
                     <button
                       key={btn.tab}
-                      onClick={() => { if (btn.openModal) { setNewAptForm({ customerName: '', phone: '', serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); } else { setActiveTab(btn.tab); } }}
+                      onClick={() => { if (btn.openModal) { setNewAptForm({ customerName: '', phone: '', serviceIds: [] as string[], staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); } else { setActiveTab(btn.tab); } }}
                       className={`flex flex-col items-start gap-3 p-5 rounded-2xl border transition-all text-left group ${
                         btn.dark
                           ? 'bg-[#0c0c0d] text-white border-transparent hover:bg-[#14b8a6] hover:text-[#04221d]'
@@ -2174,7 +2259,7 @@ export default function Dashboard() {
 
                 {/* Bugünün Randevuları */}
                 {(() => {
-                  const todayApts = appointments.filter((a: any) => a.appointment_date === today).sort((a: any, b: any) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
+                  const todayApts = visibleAppointments.filter((a: any) => a.appointment_date === today).sort((a: any, b: any) => (a.appointment_time || '').localeCompare(b.appointment_time || ''));
                   if (todayApts.length === 0) return null;
                   return (
                     <div className="bg-white border border-[#ececea] rounded-2xl overflow-hidden">
@@ -2245,7 +2330,7 @@ export default function Dashboard() {
                     <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#7a7a7e] mb-3">Bekleyen Randevu</p>
                     <p className="text-[28px] font-bold leading-none text-[#0c0c0d]">{pendingCount}</p>
                     <p className={`text-[10px] font-mono mt-2 ${pendingCount > 0 ? 'text-[#c2410c]' : 'text-[#15803d]'}`}>{pendingCount > 0 ? 'Onay bekliyor' : 'Tümü onaylı'}</p>
-                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Toplam {confirmedAppointments.length} onaylı</p>
+                    <p className="text-[10px] font-mono uppercase tracking-wide text-[#7a7a7e] mt-1">Toplam {confirmedVisits.length} onaylı</p>
                   </div>
                 </div>
               </div>
@@ -2518,12 +2603,12 @@ export default function Dashboard() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-4 flex items-center gap-2 flex-wrap">
                       <div className="flex gap-1.5 flex-wrap">
                         {[
-                          { val: 'all', label: 'Tümü', count: appointments.length },
-                          { val: 'Beklemede', label: 'Bekleyen', count: appointments.filter((a:any)=>a.status==='Beklemede').length },
-                          { val: 'Onaylandı', label: 'Onaylı', count: appointments.filter((a:any)=>a.status==='Onaylandı').length },
-                          { val: 'İptal Edildi', label: 'İptal', count: appointments.filter((a:any)=>a.status==='İptal Edildi').length },
-                          { val: 'Tamamlandı', label: 'Tamamlanan', count: appointments.filter((a:any)=>a.status==='Tamamlandı').length },
-                          { val: 'Gelmedi', label: 'Gelmedi', count: appointments.filter((a:any)=>a.status==='Gelmedi').length },
+                          { val: 'all', label: 'Tümü', count: visibleAppointments.length },
+                          { val: 'Beklemede', label: 'Bekleyen', count: visibleAppointments.filter((a:any)=>a.status==='Beklemede').length },
+                          { val: 'Onaylandı', label: 'Onaylı', count: visibleAppointments.filter((a:any)=>a.status==='Onaylandı').length },
+                          { val: 'İptal Edildi', label: 'İptal', count: visibleAppointments.filter((a:any)=>a.status==='İptal Edildi').length },
+                          { val: 'Tamamlandı', label: 'Tamamlanan', count: visibleAppointments.filter((a:any)=>a.status==='Tamamlandı').length },
+                          { val: 'Gelmedi', label: 'Gelmedi', count: visibleAppointments.filter((a:any)=>a.status==='Gelmedi').length },
                         ].map(f => (
                           <button key={f.val} onClick={() => setListFilter(f.val)}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${listFilter === f.val ? 'bg-black text-white shadow-sm' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
@@ -2541,7 +2626,7 @@ export default function Dashboard() {
                     </div>
                     {/* Rows */}
                     {(() => {
-                      let filtered = appointments as any[];
+                      let filtered = visibleAppointments as any[];
                       if (listFilter !== 'all') filtered = filtered.filter((a:any) => a.status === listFilter);
                       if (listSearch.trim()) filtered = filtered.filter((a:any) =>
                         getCustomerName(a).toLowerCase().includes(listSearch.toLowerCase()) ||
@@ -2744,7 +2829,7 @@ export default function Dashboard() {
                             {calWeekDays.map((day, i) => {
                               const ds = toLocalDateStr(day);
                               const isToday = ds === today;
-                              const cnt = appointments.filter((a: any) => a.appointment_date === ds).length;
+                              const cnt = visibleAppointments.filter((a: any) => a.appointment_date === ds).length;
                               return (
                                 <div key={i}
                                   className={`flex-1 text-center py-3 border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-all ${isToday ? 'bg-[#00A3AD]/5' : ''}`}
@@ -2768,7 +2853,7 @@ export default function Dashboard() {
                             {calWeekDays.map((day, di) => {
                               const ds = toLocalDateStr(day);
                               const isToday = ds === today;
-                              let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              let dayApts = visibleAppointments.filter((a: any) => a.appointment_date === ds);
                               if (calFilterStaff) dayApts = calFilterStaff === '__unassigned' ? dayApts.filter((a: any) => !a.staff_id) : dayApts.filter((a: any) => a.staff_id === calFilterStaff);
                               return (
                                 <div key={di}
@@ -2831,7 +2916,7 @@ export default function Dashboard() {
                               const ds = toLocalDateStr(day);
                               const isThisMonth = day.getMonth() === mStart.getMonth();
                               const isTodayCell = ds === today;
-                              let dayApts = appointments.filter((a: any) => a.appointment_date === ds);
+                              let dayApts = visibleAppointments.filter((a: any) => a.appointment_date === ds);
                               if (calFilterStaff) dayApts = calFilterStaff === '__unassigned' ? dayApts.filter((a: any) => !a.staff_id) : dayApts.filter((a: any) => a.staff_id === calFilterStaff);
                               return (
                                 <div key={i}
@@ -3077,7 +3162,7 @@ export default function Dashboard() {
                               <p className="text-[11px] font-mono tracking-widest uppercase mt-1 opacity-60">{activeCust.phone || activeCust.email || 'İletişim yok'}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => { setNewAptForm({ customerName: activeCust.name, phone: activeCust.phone, serviceId: '', staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
+                              <button onClick={() => { setNewAptForm({ customerName: activeCust.name, phone: activeCust.phone, serviceIds: [] as string[], staffId: '', date: today, time: '09:00', status: 'Onaylandı' }); setIsNewAptModalOpen(true); }} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Randevu ekle"><Plus size={15}/></button>
                               {activeCust.phone && (
                                 <>
                                   <a href={`tel:${activeCust.phone}`} className="w-9 h-9 bg-white/10 rounded-xl text-white hover:bg-white/20 transition-all flex items-center justify-center" title="Ara"><Phone size={15}/></a>
@@ -4580,14 +4665,29 @@ export default function Dashboard() {
                 value={newAptForm.phone}
                 onChange={e => setNewAptForm(f => ({ ...f, phone: e.target.value }))}
               />
-              <select
-                className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
-                value={newAptForm.serviceId}
-                onChange={e => setNewAptForm(f => ({ ...f, serviceId: e.target.value }))}
-              >
-                <option value="">Hizmet seç (isteğe bağlı)</option>
-                {services.map((s: any) => <option key={s.id} value={s.id}>{s.name} — ₺{s.price}</option>)}
-              </select>
+              <div>
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block mb-1">Hizmetler (birden fazla seçilebilir)</label>
+                <div className="max-h-44 overflow-y-auto bg-gray-50 rounded-xl p-2 space-y-1">
+                  {services.length === 0 && <p className="text-xs text-gray-400 font-semibold px-2 py-1.5">Henüz hizmet eklenmemiş.</p>}
+                  {services.map((s: any) => {
+                    const sid = String(s.id);
+                    const idx = newAptForm.serviceIds.indexOf(sid);
+                    return (
+                      <button key={s.id} type="button"
+                        onClick={() => setNewAptForm(f => ({ ...f, serviceIds: idx >= 0 ? f.serviceIds.filter(x => x !== sid) : [...f.serviceIds, sid] }))}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-all ${idx >= 0 ? 'bg-[#0c0c0d] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+                        <span className="truncate">{s.name}{idx === 0 && newAptForm.serviceIds.length > 1 ? ' · ANA' : ''}</span>
+                        <span className="flex-shrink-0 ml-2">₺{s.price}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {newAptForm.serviceIds.length > 0 && (
+                  <p className="text-[10px] font-black text-gray-500 mt-1.5 ml-1 uppercase tracking-widest">
+                    {newAptForm.serviceIds.length} hizmet · Toplam ₺{newAptForm.serviceIds.reduce((t, sid) => t + (Number(services.find((x: any) => String(x.id) === sid)?.price) || 0), 0).toLocaleString('tr-TR')}
+                  </p>
+                )}
+              </div>
               <select
                 className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
                 value={newAptForm.staffId}
@@ -4596,6 +4696,15 @@ export default function Dashboard() {
                 <option value="">Personel seç (isteğe bağlı)</option>
                 {staff.map((s: any) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
               </select>
+              {/* Walk-in hızlı giriş: bugün + şu an + Tamamlandı */}
+              <button type="button" onClick={() => {
+                const d = new Date();
+                d.setMinutes(Math.round(d.getMinutes() / 5) * 5, 0, 0);
+                const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+                setNewAptForm(f => ({ ...f, date: toLocalDateStr(d), time: `${hh}:${mm}`, status: 'Tamamlandı' }));
+              }} className="w-full flex items-center justify-center gap-2 py-3 bg-[#e6f7f4] text-[#0d9488] border border-[#14b8a6]/30 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-[#14b8a6] hover:text-white transition-all">
+                <Clock size={14}/> Şimdi Geldi — bugün · şu an · Tamamlandı
+              </button>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block mb-1">Tarih *</label>
@@ -4629,7 +4738,12 @@ export default function Dashboard() {
 
       {/* RANDEVU DETAY MODALİ */}
       {selectedApt && (() => {
-        const close = () => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); };
+        const close = () => { setSelectedApt(null); setDetailRejectMode(false); setDetailRejectReason(''); setDetailRejectError(''); setExtraFormOpen(false); setExtraForm({ mode: 'catalog', serviceId: '', customName: '', customPrice: '', staffId: '' }); };
+        // Ek hizmetler taze appointments state'inden türetilir (refetch sonrası canlı güncellenir)
+        const extras = appointments.filter((a: any) => a.parent_appointment_id === selectedApt.id);
+        const extrasTotal = extras.reduce((s: number, a: any) => s + (parseFloat(a.price) || 0), 0);
+        const grandTotal = (parseFloat(selectedApt.price) || 0) + extrasTotal;
+        const canAddExtra = !selectedApt.is_extra && ['Beklemede', 'Onaylandı', 'Tamamlandı'].includes(selectedApt.status);
         const nameParts = getCustomerName(selectedApt).split(' ');
         const initials = nameParts.map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
         const aptId = (selectedApt.id as string)?.slice(-8)?.toUpperCase() || '--------';
@@ -4712,6 +4826,92 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
+
+              {/* Ek Hizmetler — aynı ziyarette yapılan ekstra işlemler / ürün satışları */}
+              {(extras.length > 0 || canAddExtra) && (
+                <div className="bg-gray-50 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Ek Hizmetler{extras.length > 0 ? ` (${extras.length})` : ''}</p>
+                    {canAddExtra && !extraFormOpen && (
+                      <button onClick={() => { setExtraForm({ mode: 'catalog', serviceId: '', customName: '', customPrice: '', staffId: selectedApt.staff_id || '' }); setExtraFormOpen(true); }}
+                        className="flex items-center gap-1 text-[10px] font-black text-[#0d9488] uppercase tracking-widest hover:text-black transition-colors">
+                        <Plus size={12}/> Ek Hizmet Ekle
+                      </button>
+                    )}
+                  </div>
+                  {extras.map((a: any) => (
+                    <div key={a.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-black truncate">{a.service_name}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{a.staff ? `${a.staff.first_name} ${a.staff.last_name}` : 'Atanmadı'}</p>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-sm font-black text-[#0d9488]">₺{Number(a.price || 0).toLocaleString('tr-TR')}</span>
+                        <button onClick={() => handleRemoveExtra(a.id)} className="text-gray-300 hover:text-red-500 transition-colors" title="Ek hizmeti sil">
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {extras.length > 0 && (
+                    <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Toplam (hizmet + ekstralar)</p>
+                      <p className="text-base font-black text-black">₺{grandTotal.toLocaleString('tr-TR')}</p>
+                    </div>
+                  )}
+                  {extraFormOpen && (
+                    <div className="bg-white rounded-xl p-4 space-y-3">
+                      <div className="flex gap-1.5">
+                        <button onClick={() => setExtraForm(f => ({ ...f, mode: 'catalog' }))}
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${extraForm.mode === 'catalog' ? 'bg-[#0c0c0d] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                          Katalog
+                        </button>
+                        <button onClick={() => setExtraForm(f => ({ ...f, mode: 'custom' }))}
+                          className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${extraForm.mode === 'custom' ? 'bg-[#0c0c0d] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                          Serbest (ürün vb.)
+                        </button>
+                      </div>
+                      {extraForm.mode === 'catalog' ? (
+                        <select
+                          className="w-full px-3 py-2.5 bg-gray-50 rounded-lg text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
+                          value={extraForm.serviceId}
+                          onChange={e => setExtraForm(f => ({ ...f, serviceId: e.target.value }))}>
+                          <option value="">Hizmet seç *</option>
+                          {services.map((s: any) => <option key={s.id} value={s.id}>{s.name} — ₺{s.price}</option>)}
+                        </select>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <input placeholder="Ad * (örn. Şampuan)"
+                            className="w-full px-3 py-2.5 bg-gray-50 rounded-lg text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]"
+                            value={extraForm.customName} onChange={e => setExtraForm(f => ({ ...f, customName: e.target.value }))} />
+                          <input placeholder="Fiyat (₺) *" inputMode="decimal"
+                            className="w-full px-3 py-2.5 bg-gray-50 rounded-lg text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6]"
+                            value={extraForm.customPrice} onChange={e => setExtraForm(f => ({ ...f, customPrice: e.target.value }))} />
+                        </div>
+                      )}
+                      {staff.length > 0 && (
+                        <select
+                          className="w-full px-3 py-2.5 bg-gray-50 rounded-lg text-sm font-semibold outline-none border-2 border-transparent focus:border-[#14b8a6] text-[#0c0c0d]"
+                          value={extraForm.staffId}
+                          onChange={e => setExtraForm(f => ({ ...f, staffId: e.target.value }))}>
+                          <option value="">Personel (isteğe bağlı)</option>
+                          {staff.map((s: any) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
+                        </select>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={handleAddExtra} disabled={savingExtra}
+                          className="flex-1 py-2.5 bg-[#0c0c0d] text-white rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-[#14b8a6] transition-all disabled:opacity-40">
+                          {savingExtra ? 'Kaydediliyor...' : 'Kaydet'}
+                        </button>
+                        <button onClick={() => { setExtraFormOpen(false); setExtraForm({ mode: 'catalog', serviceId: '', customName: '', customPrice: '', staffId: '' }); }}
+                          className="px-4 py-2.5 bg-gray-100 text-gray-500 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
+                          Vazgeç
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Red gerekçesi */}
               {selectedApt.cancel_reason && (
