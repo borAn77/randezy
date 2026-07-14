@@ -370,6 +370,8 @@ export default function ShopDetail() {
   const [userHasReviewed, setUserHasReviewed] = useState(false);
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxList, setLightboxList] = useState<string[] | null>(null); // örnek fotoğraflarda ok ile gezinme
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [staff, setStaff] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
@@ -1092,7 +1094,7 @@ export default function ShopDetail() {
                                   <div className="flex gap-1.5 mt-2.5 flex-wrap">
                                     {service.example_photos.map((url: string, pi: number) => (
                                       <button key={pi}
-                                        onClick={e => { e.stopPropagation(); setLightboxUrl(url); }}
+                                        onClick={e => { e.stopPropagation(); setLightboxList(service.example_photos); setLightboxIndex(pi); setLightboxUrl(url); }}
                                         className="w-11 h-11 rounded-lg overflow-hidden border border-[#ececea] hover:border-[#14b8a6] hover:scale-105 transition-all flex-shrink-0"
                                         aria-label={`${service.name} örnek fotoğraf ${pi + 1}`}>
                                         <img src={url} className="w-full h-full object-cover" alt={`${service.name} örnek ${pi + 1}`} loading="lazy" />
@@ -1543,9 +1545,28 @@ export default function ShopDetail() {
 
       {/* Lightbox */}
       {lightboxUrl && (
-        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4" onClick={() => setLightboxUrl(null)}>
+        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4" onClick={() => { setLightboxUrl(null); setLightboxList(null); }}>
           <button className="absolute top-5 right-5 text-white hover:text-gray-300 transition-colors"><X size={28} /></button>
+          {lightboxList && lightboxList.length > 1 && (
+            <button
+              onClick={e => { e.stopPropagation(); const ni = (lightboxIndex - 1 + lightboxList.length) % lightboxList.length; setLightboxIndex(ni); setLightboxUrl(lightboxList[ni]); }}
+              className="absolute left-2 md:left-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors"
+              aria-label="Önceki fotoğraf">
+              <ChevronLeft size={32} />
+            </button>
+          )}
           <img src={lightboxUrl} className="max-h-[90vh] max-w-[95vw] rounded-2xl object-contain" onClick={e => e.stopPropagation()} />
+          {lightboxList && lightboxList.length > 1 && (
+            <button
+              onClick={e => { e.stopPropagation(); const ni = (lightboxIndex + 1) % lightboxList.length; setLightboxIndex(ni); setLightboxUrl(lightboxList[ni]); }}
+              className="absolute right-2 md:right-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white p-2 bg-white/10 rounded-full transition-colors"
+              aria-label="Sonraki fotoğraf">
+              <ChevronRight size={32} />
+            </button>
+          )}
+          {lightboxList && lightboxList.length > 1 && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 font-mono text-[12px] tracking-wider">{lightboxIndex + 1} / {lightboxList.length}</div>
+          )}
         </div>
       )}
 

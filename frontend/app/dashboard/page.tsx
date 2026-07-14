@@ -910,10 +910,18 @@ export default function Dashboard() {
 
   const handleFileUpload = async (file: File, folder: string) => {
     try {
-      const fileExt = file.name.split('.').pop();
+      let uploadBlob: Blob = file;
+      let fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      // iPhone HEIC/HEIF fotoğrafları tarayıcıda görüntülenemez — yüklerken JPEG'e çevir
+      if (fileExt === 'heic' || fileExt === 'heif' || file.type === 'image/heic' || file.type === 'image/heif') {
+        const heic2any = (await import('heic2any')).default;
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+        uploadBlob = Array.isArray(converted) ? converted[0] : converted;
+        fileExt = 'jpg';
+      }
       const fileName = `${Math.random().toString(36).substring(7)}.${fileExt}`;
       const filePath = `${folder}/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from('randezy_images').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('randezy_images').upload(filePath, uploadBlob);
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from('randezy_images').getPublicUrl(filePath);
       return data.publicUrl;
