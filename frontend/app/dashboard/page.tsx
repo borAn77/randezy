@@ -3199,7 +3199,7 @@ export default function Dashboard() {
                             </button>
                             <button onClick={() => setPhotoService(s)}
                               className="flex-1 py-2 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[11px] font-semibold text-[#3a3a3d] font-mono uppercase tracking-[0.06em] hover:bg-white hover:border-[#14b8a6] hover:text-[#0d9488] transition-all flex items-center justify-center gap-1">
-                              <Camera size={12}/> Fotoğraf Ekle{Array.isArray(s.example_photos) && s.example_photos.length > 0 ? ` (${s.example_photos.length})` : ''}
+                              <Camera size={12}/> Fotoğraf Ekle/Sil{Array.isArray(s.example_photos) && s.example_photos.length > 0 ? ` (${s.example_photos.length})` : ''}
                             </button>
                             <button onClick={async () => { if (await askConfirm("Bu hizmet silinsin mi?")) { await supabase.from('services').delete().eq('id',s.id); fetchInitialData(); } }}
                               className="py-2 px-3 bg-[#fafaf8] border border-[#ececea] rounded-lg text-[#7a7a7e] hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-all">
