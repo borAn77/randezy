@@ -19,6 +19,19 @@ type Period = 'week' | 'month' | 'year';
 
 const PERIOD_LABELS: Record<Period, string> = { week: 'Bu Hafta', month: 'Bu Ay', year: 'Bu Yıl' };
 
+// HomeScreen'deki otomatik-tamamlama mantığıyla aynı: saati geçmiş "Onaylandı"
+// randevu, owner Ana Sayfa'yı açıp DB'ye yazana kadar beklemeden burada da
+// "Tamamlandı" sayılır — aksi halde Finans, hiç açılmamış günlerin gelirini atlıyordu.
+function isEffectivelyCompleted(a: { status: string; appointment_date: string; appointment_time: string; duration_snapshot: number | null }): boolean {
+  if (a.status === 'Tamamlandı') return true;
+  if (a.status !== 'Onaylandı') return false;
+  const [h, m] = a.appointment_time.split(':').map(Number);
+  const start = new Date(`${a.appointment_date}T00:00:00`);
+  start.setHours(h, m, 0, 0);
+  const end = new Date(start.getTime() + (a.duration_snapshot || 30) * 60000);
+  return new Date() > end;
+}
+
 function getPeriodRange(period: Period): { start: string; end: string } {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -61,7 +74,7 @@ export default function FinanceScreen() {
       const [{ data: apts }, { data: staff }] = await Promise.all([
         supabase
           .from('appointments')
-          .select('status, price, service_name, appointment_date, staff_id')
+          .select('status, price, service_name, appointment_date, appointment_time, duration_snapshot, staff_id')
           .eq('shop_id', shopId)
           .gte('appointment_date', start)
           .lte('appointment_date', end),
@@ -69,7 +82,7 @@ export default function FinanceScreen() {
       ]);
 
       const list = apts || [];
-      const completed = list.filter((a: any) => a.status === 'Tamamlandı');
+      const completed = list.filter((a: any) => isEffectivelyCompleted(a));
       const cancelled = list.filter((a: any) => a.status === 'İptal Edildi');
       const noShow = list.filter((a: any) => a.status === 'Gelmedi');
       const revenue = completed.reduce((s: number, a: any) => s + (a.price ?? 0), 0);
