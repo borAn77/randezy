@@ -1,48 +1,57 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Site kapatma anahtarı.
+ * ============================================================
+ *  RANDEZY KAPALI  —  site kapatma anahtarı
+ * ============================================================
  *
- * Kapatmak için : Vercel > Settings > Environment Variables > SITE_CLOSED = 1  (sonra redeploy)
- * Geri açmak için: aynı değişkeni sil (veya 1 dışında bir değer yap) > redeploy
+ * Site şu anda KAPALI. Varsayılan kapalıdır: Vercel paneline girmeye gerek yok,
+ * bu dosya deploy edildiği anda site kapanır.
  *
- * Kod hiçbir şekilde silinmez; sadece web sayfaları 503 ile "kapalı" ekranına düşer.
+ * Sayfalar da /api/* uçları da kapalıdır; hiçbir yoldan sisteme kayıt olunamaz
+ * veya kişisel veri (isim/telefon) girilemez.
+ *
+ * GERİ AÇMAK — iki yoldan biri:
+ *   1) Vercel'e erişim varsa : Environment Variables > SITE_OPEN = 1 > Redeploy
+ *   2) Erişim yoksa          : aşağıdaki SITE_ACIK satırını `= true` yap, push et
+ *
+ * Kodun tamamı olduğu gibi duruyor; site açıldığında hiçbir şey değişmeden
+ * eskisi gibi çalışır.
  */
-const SITE_KAPALI = process.env.SITE_CLOSED === "1";
-
-/**
- * Site kapalıyken bile çalışmaya devam eden yollar.
- * Buraya dokunma: mobil uygulama (/api/staff/login, /api/staff/calendar, /api/notify),
- * Stripe webhook (/api/billing/webhook) ve günlük hatırlatma cron'u (/api/cron/reminders)
- * bu muafiyet sayesinde bozulmadan çalışır.
- */
-function acikKalanYol(pathname: string): boolean {
-  return pathname === "/api" || pathname.startsWith("/api/");
-}
+const SITE_ACIK = process.env.SITE_OPEN === "1";
 
 export default function proxy(request: NextRequest) {
+  if (SITE_ACIK) {
+    return NextResponse.next();
+  }
+
   const { pathname } = request.nextUrl;
 
-  if (!SITE_KAPALI || acikKalanYol(pathname)) {
-    return NextResponse.next();
+  // API uçları kapalıyken HTML yerine JSON döner (misafir randevu, personel
+  // girişi, bildirim, cron — hepsi dahil).
+  if (pathname === "/api" || pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "Randezy şu anda hizmet vermiyor." },
+      { status: 503, headers: KAPALI_BASLIKLARI }
+    );
   }
 
   return new NextResponse(KAPALI_SAYFASI, {
     status: 503,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      // Geçici kapanış: arama motorları sayfayı indeksten düşürmez.
-      "retry-after": "3600",
-      // CDN kapalı sayfayı önbelleğe almasın; site geri açıldığında anında yayına döner.
-      "cache-control": "no-store, must-revalidate",
-    },
+    headers: { ...KAPALI_BASLIKLARI, "content-type": "text/html; charset=utf-8" },
   });
 }
 
+const KAPALI_BASLIKLARI = {
+  // Geçici kapanış: arama motorları sayfayı indeksten düşürmez.
+  "retry-after": "3600",
+  // CDN kapalı yanıtı önbelleğe almasın; site geri açıldığında anında yayına döner.
+  "cache-control": "no-store, must-revalidate",
+};
+
+// Hiçbir yol muaf değil — tam kapanış.
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|mp4|webm|txt|xml)$).*)",
-  ],
+  matcher: ["/:path*"],
 };
 
 const KAPALI_SAYFASI = `<!doctype html>
@@ -99,11 +108,7 @@ const KAPALI_SAYFASI = `<!doctype html>
   }
   a { color: #0d9488; font-weight: 600; text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .alt {
-    margin-top: 32px;
-    font-size: 13px;
-    color: #8a8a8e;
-  }
+  .alt { margin-top: 32px; font-size: 13px; color: #8a8a8e; }
   @media (prefers-color-scheme: dark) {
     body { background: #0c0c0d; color: #ececea; }
     .marka { color: #ececea; }
@@ -118,7 +123,7 @@ const KAPALI_SAYFASI = `<!doctype html>
     <div class="marka">rande<span>zy</span></div>
     <div class="cizgi"></div>
     <h1>Randezy şu anda hizmet vermiyor</h1>
-    <p>Randevu sistemimiz geçici olarak kapatılmıştır. Gösterdiğiniz ilgi için teşekkür ederiz.</p>
+    <p>Randevu sistemimiz kapatılmıştır. Gösterdiğiniz ilgi için teşekkür ederiz.</p>
     <p class="alt">Sorularınız için <a href="mailto:destek@randezy.com">destek@randezy.com</a></p>
   </main>
 </body>
